@@ -18,8 +18,8 @@ using SiemensTagExporter.ViewModel;
 using SiemensTagExporter.Model;
 using SiemensTagExporter.Utils;
 using Microsoft.VisualBasic.ApplicationServices;
-using Siemens_trend.Utils;
-using Siemens_trend.ViewModel;
+//using Siemens_trend.Utils;
+//using Siemens_trend.ViewModel;
 
 namespace SiemensTagExporter
 {

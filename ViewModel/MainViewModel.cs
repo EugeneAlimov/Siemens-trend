@@ -10,7 +10,7 @@ using Siemens.Engineering;
 using Siemens.Engineering.SW;
 using SiemensTagExporter.Utils;
 
-namespace SiemensTagExporter.ViewModel
+namespace SiemensTagExporter
 {
     /// <summary>
     /// Аргументы события изменения статуса
