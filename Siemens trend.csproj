@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+
+<StartupObject>Siemens_trend.App</StartupObject>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>Siemens_trend</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>Latest</LangVersion>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Accessibility" />
+    <Reference Include="Siemens.Engineering">
+        <HintPath>C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll</HintPath>
+        <Private>false</Private>
+    </Reference>
+
+    <PackageReference Include="LiveChartsCore" Version="2.0.0-rc5.4" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView" Version="2.0.0-rc5.4" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc5.4" />
+
+
+    <Reference Include="LiveCharts.Wpf">
+        <HintPath>C:\Users\crazy\.nuget\packages\livecharts.wpf\0.9.7\lib\net45\LiveCharts.Wpf.dll</HintPath>
+    </Reference>
+
+
+    <PackageReference Include="OpenTK" Version="3.3.3" />
+
+    <PackageReference Include="Siemens.Collaboration.Net.OperatingSystem.Windows" Version="3.0.1725521661" />
+    <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Openness.Resolver" Version="1.1.1725480302" />
+    <PackageReference Include="S7netplus" Version="0.20.0" />
+    <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Packages.Openness" Version="19.0.1725520202" />
+    <PackageReference Include="SkiaSharp" Version="3.118.0-preview.2.3" />
+    <PackageReference Include="SkiaSharp.Views" Version="3.118.0-preview.2.3" />
+    <PackageReference Include="SkiaSharp.Views.WindowsForms" Version="3.118.0-preview.2.3" />
+    <PackageReference Include="SkiaSharp.Views.WPF" Version="3.118.0-preview.2.3" />
+  </ItemGroup>
+
+</Project>
