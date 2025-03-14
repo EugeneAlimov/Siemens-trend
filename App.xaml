@@ -1,14 +1,11 @@
 ﻿<Application x:Class="Siemens_trend.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:SiemensTagExporter"
+             xmlns:local="clr-namespace:Siemens_trend"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
             <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
-
-            <!-- Конвертер для индикатора прогресса (0 = исп. IsIndeterminate) -->
-            <local:ProgressValueConverter x:Key="ProgressConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
