@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35527.113
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Siemens trend", "Siemens trend.csproj", "{F514DAE0-BE99-445E-ABF3-C3B2429DEB01}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Siemens_trend", "Siemens_trend.csproj", "{F514DAE0-BE99-445E-ABF3-C3B2429DEB01}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

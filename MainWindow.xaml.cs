@@ -1,420 +1,285 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using S7.Net;
-using LiveChartsCore;
-using LiveChartsCore.SkiaSharpView;
-using LiveChartsCore.SkiaSharpView.WPF;
-using Siemens_trend.Helpers;
+using SiemensTagExporter.ViewModel;
+using SiemensTagExporter.Model;
+using SiemensTagExporter.Utils;
+using Microsoft.VisualBasic.ApplicationServices;
+using Siemens_trend.Utils;
+using Siemens_trend.ViewModel;
 
-namespace Siemens_trend
+namespace SiemensTagExporter
 {
+    /// <summary>
+    /// Логика взаимодействия для MainWindow.xaml
+    /// </summary>
     public partial class MainWindow : Window
     {
-        private Plc? plc;
-        private TiaPortalHelper tiaHelper;
-        private string? projectPath;
-        private HashSet<string> selectedTags = new HashSet<string>();
-        private System.Timers.Timer updateTimer;
-        private Dictionary<string, ObservableCollection<double>> tagData;
-
-        public ISeries[] Series { get; set; }
-        public Axis[] XAxes { get; set; }
-        public Axis[] YAxes { get; set; }
+        private readonly MainViewModel _viewModel;
+        private readonly SimpleLogger _logger;
 
         public MainWindow()
         {
             InitializeComponent();
-            tiaHelper = new TiaPortalHelper();
-            tagData = new Dictionary<string, ObservableCollection<double>>();
 
-            // 🔹 Делаем кнопку неактивной при старте
-            StartMonitoringButton.IsEnabled = false;
+            // Инициализация логгера
+            _logger = new SimpleLogger();
+            _logger.LogEvent += OnLogEvent;
 
-            // 🔹 Загружаем теги и DB при старте, если они есть
-            if (tiaHelper.AreTagsAvailable())
+            // Инициализация и установка модели представления
+            _viewModel = new MainViewModel(_logger);
+            DataContext = _viewModel;
+
+            // Подписка на события
+            _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            _viewModel.StatusChanged += ViewModel_StatusChanged;
+
+            // Начальная инициализация
+            UpdateUIState();
+
+            // Вывод информации при запуске
+            LogMessage("Приложение запущено. Ожидание подключения к TIA Portal...");
+        }
+
+        #region Обработчики событий
+
+        /// <summary>
+        /// Обработчик изменения свойств в ViewModel
+        /// </summary>
+        private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
             {
-                tiaHelper.GetTagsAndDB();
-                UpdateTagTreeView();
+                case nameof(MainViewModel.IsConnected):
+                case nameof(MainViewModel.IsLoading):
+                case nameof(MainViewModel.SelectedPlc):
+                case nameof(MainViewModel.SelectedDb):
+                    UpdateUIState();
+                    break;
             }
-
-            // 🔹 Назначаем обработчики кнопок
-            ConnectButton.Click += ConnectButton_Click;
-            DisconnectButton.Click += DisconnectButton_Click;
-            LoadTagsButton.Click += LoadTagsButton_Click;
-            ExportFromTIAButton.Click += ExportFromTIAButton_Click;
-            StartMonitoringButton.Click += StartMonitoringButton_Click;
-
-            // Инициализация осей
-            XAxes = new[] { new Axis { Name = "Time" } };
-            YAxes = new[] { new Axis { Name = "Value" } };
-
-            // Инициализация пустого графика
-            Series = new ISeries[]
-            {
-                new LineSeries<double>
-                {
-                    Values = new ObservableCollection<double>(),
-                    Fill = null
-                }
-            };
-
-            DataContext = this;
-
-            updateTimer = new System.Timers.Timer(1000);
-            updateTimer.Elapsed += UpdateChart;
         }
 
-        private void StartMonitoringButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Обработчик изменения статуса
+        /// </summary>
+        private void ViewModel_StatusChanged(object sender, StatusEventArgs e)
         {
-            updateTimer.Start();
+            LogMessage(e.Message);
+            UpdateProgress(e.ProgressValue);
         }
 
-        private void UpdateChart(object sender, System.Timers.ElapsedEventArgs e)
+        /// <summary>
+        /// Обработчик события логирования
+        /// </summary>
+        private void OnLogEvent(object sender, LogEventArgs e)
         {
+            // Выполняем обновление UI в потоке UI
             Dispatcher.Invoke(() =>
             {
-                bool dataUpdated = false; // Флаг, чтобы обновлять UI только при изменении данных
-
-                foreach (var tag in selectedTags)
-                {
-                    try
-                    {
-                        object value = tiaHelper.ReadTagValue(tag);
-
-                        if (value == null || value.ToString() == "N/A" || value.ToString().Contains("Ошибка"))
-                        {
-                            LogError($"⚠ Тег {tag} не найден или ошибка чтения.");
-                            continue; // Пропускаем этот тег, не добавляя 0
-                        }
-
-                        // ✅ Пробуем преобразовать в double
-                        double newValue;
-                        if (value is double doubleValue)
-                        {
-                            newValue = doubleValue;
-                        }
-                        else if (!double.TryParse(value.ToString(), out newValue))
-                        {
-                            LogError($"⚠ Ошибка преобразования значения тега {tag}: {value}");
-                            continue; // Пропускаем этот тег, если не удалось преобразовать
-                        }
-
-                        // ✅ Проверяем, есть ли тег в `tagData`
-                        if (!tagData.ContainsKey(tag))
-                        {
-                            tagData[tag] = new ObservableCollection<double>();
-                        }
-
-                        // ✅ Обновляем данные
-                        tagData[tag].Add(newValue);
-                        if (tagData[tag].Count > 50) tagData[tag].RemoveAt(0);
-
-                        dataUpdated = true; // Отмечаем, что данные изменились
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"❌ Ошибка чтения {tag}: {ex.Message}");
-                    }
-                }
-
-                // 🔹 Обновляем график только если были изменения
-                if (dataUpdated)
-                {
-                    Series = selectedTags
-                        .Where(tag => tagData.ContainsKey(tag)) // Только если тег в `tagData`
-                        .Select(tag => new LineSeries<double>
-                        {
-                            Name = tag,
-                            Values = tagData[tag]
-                        }).ToArray();
-
-                    DataContext = null;
-                    DataContext = this;
-                }
+                string message = $"[{DateTime.Now:HH:mm:ss}] [{e.Level}] {e.Message}";
+                LogMessage(message);
             });
         }
 
-        private object ReadOptimizedTag(string tagName)
+        #endregion
+
+        #region Вспомогательные методы
+
+        /// <summary>
+        /// Обновление состояния элементов UI
+        /// </summary>
+        private void UpdateUIState()
         {
-            try
+            // Статус подключения
+            statusConnectionState.Text = _viewModel.IsConnected ? "Подключено" : "Отключено";
+            statusConnectionState.Foreground = _viewModel.IsConnected
+                ? new SolidColorBrush(Colors.Green)
+                : new SolidColorBrush(Colors.Red);
+
+            // Текущий проект
+            statusProjectName.Text = _viewModel.ProjectName;
+
+            // Обновление индикатора загрузки
+            if (_viewModel.IsLoading)
             {
-                var software = tiaHelper.GetPlcSoftware();
-                if (software == null)
-                {
-                    throw new Exception("PLC Software не найден.");
-                }
-
-                var tagTable = software.TagTableGroup.TagTables.FirstOrDefault(t => t.Tags.Any(tag => tag.Name == tagName));
-                if (tagTable == null)
-                {
-                    throw new Exception($"Тег {tagName} не найден в TIA Portal.");
-                }
-
-                var tag = tagTable.Tags.FirstOrDefault(t => t.Name == tagName);
-                if (tag == null)
-                {
-                    throw new Exception($"Тег {tagName} отсутствует в таблице тегов.");
-                }
-
-                return tag.GetAttribute("Value")?.ToString() ?? "0"; // ✅ Читаем значение
+                statusProgressBar.Visibility = Visibility.Visible;
+                progressRing.Visibility = Visibility.Visible;
             }
-            catch (Exception ex)
+            else
             {
-                LogError($"Ошибка Symbolic Access для {tagName}: {ex.Message}");
-                return "0";
+                statusProgressBar.Visibility = Visibility.Collapsed;
+                progressRing.Visibility = Visibility.Collapsed;
             }
+
+            // Обновление состояния кнопок
+            btnConnect.IsEnabled = !_viewModel.IsLoading && !_viewModel.IsConnected;
+            btnDisconnect.IsEnabled = !_viewModel.IsLoading && _viewModel.IsConnected;
+            btnGetPlcs.IsEnabled = !_viewModel.IsLoading && _viewModel.IsConnected;
+            btnGetPlcTags.IsEnabled = !_viewModel.IsLoading && _viewModel.SelectedPlc != null;
+            btnGetDbs.IsEnabled = !_viewModel.IsLoading && _viewModel.SelectedPlc != null;
+            btnGetDbTags.IsEnabled = !_viewModel.IsLoading && _viewModel.SelectedDb != null;
+            btnExportTags.IsEnabled = !_viewModel.IsLoading &&
+                (_viewModel.PlcTags?.Count > 0 || _viewModel.DbTags?.Count > 0);
         }
 
-        private void ConnectButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                string ip = IpTextBox.Text.Trim();
-                if (!short.TryParse(RackTextBox.Text.Trim(), out short rack) ||
-                    !short.TryParse(SlotTextBox.Text.Trim(), out short slot))
-                {
-                    MessageBox.Show("Некорректные значения Rack или Slot.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                plc = new Plc(CpuType.S71200, ip, rack, slot);
-
-                try
-                {
-                    plc.Open();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка подключения: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
-                if (plc.IsConnected)
-                {
-                    StatusTextBlock.Text = "Статус: Подключено";
-                    LogMessage($"✅ Успешное подключение к ПЛК {ip} (Rack: {rack}, Slot: {slot})");
-
-                    // 🔹 Включаем кнопку мониторинга, если есть выбранные теги
-                    StartMonitoringButton.IsEnabled = selectedTags.Count > 0;
-                }
-                else
-                {
-                    MessageBox.Show("❌ Не удалось подключиться к ПЛК.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Ошибка подключения: {ex.Message}");
-                StatusTextBlock.Text = "Статус: Ошибка подключения";
-            }
-        }
-
-        private void DisconnectButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (plc != null && plc.IsConnected)
-                {
-                    plc.Close();
-                    StatusTextBlock.Text = "Статус: Отключено";
-                    LogMessage("🔌 Отключение от ПЛК.");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Ошибка отключения: {ex.Message}");
-            }
-        }
-
-        private void TagsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        {
-            if (e.NewValue is TreeViewItem selectedItem)
-            {
-                string tagName = selectedItem.Header.ToString();
-
-                if (!selectedTags.Contains(tagName))
-                {
-                    selectedTags.Add(tagName);
-                    tagData[tagName] = new ObservableCollection<double>();
-                }
-            }
-        }
-
-        private void UpdateTagTreeView()
+        /// <summary>
+        /// Добавление сообщения в лог
+        /// </summary>
+        private void LogMessage(string message)
         {
             Dispatcher.Invoke(() =>
             {
-                TagsTreeView.Items.Clear();
-
-                if (tiaHelper.PlcData.Tags.Count == 0 && tiaHelper.PlcData.DataBlocks.Count == 0)
-                {
-                    LogMessage("⚠ Нет загруженных тегов.");
-                    return;
-                }
-
-                // 🔹 Группируем теги PLC по таблицам
-                TreeViewItem globalTagsGroup = new TreeViewItem { Header = $"Глобальные теги ({tiaHelper.PlcData.Tags.Count})" };
-
-                var tagGroups = tiaHelper.PlcData.Tags
-                    .GroupBy(t => t.TableName)
-                    .OrderBy(g => g.Key); // 🔹 Сортируем по имени группы
-
-                foreach (var group in tagGroups)
-                {
-                    TreeViewItem groupNode = new TreeViewItem { Header = $"{group.Key} ({group.Count()} тегов)" };
-
-                    foreach (var tag in group)
-                    {
-                        //var checkBox = new CheckBox { Content = $"{tag.Name} ({tag.DataType})" };
-                        var checkBox = new CheckBox { Content = tag.Name }; // Используем полное имя из XML
-                        checkBox.Checked += TagSelectionChanged;
-                        checkBox.Unchecked += TagSelectionChanged;
-                        groupNode.Items.Add(checkBox);
-                    }
-
-                    globalTagsGroup.Items.Add(groupNode);
-                }
-
-                TagsTreeView.Items.Add(globalTagsGroup);
-
-                // 🔹 Группируем DB
-                TreeViewItem dbTagsGroup = new TreeViewItem { Header = $"Data Blocks ({tiaHelper.PlcData.DataBlocks.Count})" };
-
-                foreach (var db in tiaHelper.PlcData.DataBlocks)
-                {
-                    TreeViewItem dbNode = new TreeViewItem { Header = $"{db.Name} ({db.Variables.Count} переменных)" };
-
-                    foreach (var variable in db.Variables)
-                    {
-                        var checkBox = new CheckBox { Content = $"{variable.Name}: {variable.DataType}" };
-                        checkBox.Checked += TagSelectionChanged;
-                        checkBox.Unchecked += TagSelectionChanged;
-                        dbNode.Items.Add(checkBox);
-                    }
-
-                    dbTagsGroup.Items.Add(dbNode);
-                }
-
-                TagsTreeView.Items.Add(dbTagsGroup);
+                txtLog.AppendText(message + Environment.NewLine);
+                txtLog.ScrollToEnd();
             });
         }
 
-        private void TagSelectionChanged(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Обновление индикатора прогресса
+        /// </summary>
+        private void UpdateProgress(int value)
         {
-            if (sender is CheckBox checkBox)
+            Dispatcher.Invoke(() =>
             {
-                string tagName = checkBox.Content.ToString();
-
-                if (checkBox.IsChecked == true)
-                {
-                    if (!selectedTags.Contains(tagName))
-                    {
-                        selectedTags.Add(tagName);
-                        tagData[tagName] = new ObservableCollection<double>();
-                    }
-                }
-                else
-                {
-                    if (selectedTags.Contains(tagName))
-                    {
-                        selectedTags.Remove(tagName);
-                        tagData.Remove(tagName);
-                    }
-                }
-            }
-
-            // ✅ Делаем кнопку активной, если есть выбранные теги
-            StartMonitoringButton.IsEnabled = selectedTags.Count > 0;
+                statusProgressBar.Value = value;
+            });
         }
 
-        private async void ExportFromTIAButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Сохранение лога в файл
+        /// </summary>
+        private void SaveLogToFile()
         {
-            if (string.IsNullOrEmpty(projectPath))
+            try
             {
-                OpenFileDialog openFileDialog = new OpenFileDialog
+                SaveFileDialog saveFileDialog = new SaveFileDialog
                 {
-                    Title = "Выберите проект TIA Portal",
-                    Filter = "TIA Portal Projects (*.ap19)|*.ap19",
-                    InitialDirectory = @"D:\Projects\"
+                    Filter = "Текстовые файлы (*.txt)|*.txt",
+                    Title = "Сохранить лог",
+                    FileName = $"TiaExporter_Log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt"
                 };
 
-                if (openFileDialog.ShowDialog() != true)
+                if (saveFileDialog.ShowDialog() == true)
                 {
-                    MessageBox.Show("Файл проекта не выбран!", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
+                    File.WriteAllText(saveFileDialog.FileName, txtLog.Text);
+                    MessageBox.Show($"Лог успешно сохранен в файл: {saveFileDialog.FileName}",
+                        "Сохранение лога", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-
-                projectPath = openFileDialog.FileName;
-                ProjectNameTextBlock.Text = Path.GetFileName(projectPath);
             }
-
-            // 🔹 Отключаем кнопки во время экспорта
-            ProgressBar.Visibility = Visibility.Visible;
-            ExportFromTIAButton.IsEnabled = false;
-            LoadTagsButton.IsEnabled = false;
-            StartMonitoringButton.IsEnabled = false;
-
-            try
+            catch (Exception ex)
             {
-                await tiaHelper.ExportProjectToXmlAsync(projectPath);
-                MessageBox.Show("Экспорт завершен!", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                // 🔹 После экспорта загружаем теги
-                await Task.Run(() => tiaHelper.GetTagsAndDB());
-                UpdateTagTreeView();
-            }
-            finally
-            {
-                // 🔹 Включаем кнопки после завершения
-                ProgressBar.Visibility = Visibility.Hidden;
-                ExportFromTIAButton.IsEnabled = true;
-                LoadTagsButton.IsEnabled = true;
-                StartMonitoringButton.IsEnabled = selectedTags.Count > 0;
+                MessageBox.Show($"Ошибка при сохранении лога: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private async void LoadTagsButton_Click(object sender, RoutedEventArgs e)
+        #endregion
+
+        #region Обработчики кнопок UI
+
+        /// <summary>
+        /// Обработчик кнопки "Подключиться"
+        /// </summary>
+        private async void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
-            if (!tiaHelper.AreTagsAvailable())
-            {
-                MessageBox.Show("Теги отсутствуют. Сначала экспортируйте их из TIA.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            await _viewModel.ConnectAsync();
+        }
 
-            // 🔹 Отключаем кнопки во время загрузки
-            ProgressBar.Visibility = Visibility.Visible;
-            LoadTagsButton.IsEnabled = false;
-            ExportFromTIAButton.IsEnabled = false;
-            StartMonitoringButton.IsEnabled = false;
-            TagsTreeView.Items.Clear();
+        /// <summary>
+        /// Обработчик кнопки "Отключиться"
+        /// </summary>
+        private void BtnDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.Disconnect();
+        }
 
-            try
-            {
-                await Task.Run(() => tiaHelper.GetTagsAndDB()); // Загружаем теги и DB
-                UpdateTagTreeView();
+        /// <summary>
+        /// Обработчик кнопки "Получить ПЛК"
+        /// </summary>
+        private async void BtnGetPlcs_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.GetPlcsAsync();
+        }
 
-                StatusTextBlock.Text = $"Статус: Загружено {tiaHelper.PlcData.Tags.Count} тегов, {tiaHelper.PlcData.DataBlocks.Count} DB";
-                LogMessage($"Загружено {tiaHelper.PlcData.Tags.Count} тегов, {tiaHelper.PlcData.DataBlocks.Count} DB.");
-            }
-            finally
+        /// <summary>
+        /// Обработчик кнопки "Получить теги ПЛК"
+        /// </summary>
+        private async void BtnGetPlcTags_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.GetPlcTagsAsync();
+        }
+
+        /// <summary>
+        /// Обработчик кнопки "Получить DB"
+        /// </summary>
+        private async void BtnGetDbs_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.GetDataBlocksAsync();
+        }
+
+        /// <summary>
+        /// Обработчик кнопки "Получить теги DB"
+        /// </summary>
+        private async void BtnGetDbTags_Click(object sender, RoutedEventArgs e)
+        {
+            await _viewModel.GetDbTagsAsync();
+        }
+
+        /// <summary>
+        /// Обработчик кнопки "Экспорт тегов"
+        /// </summary>
+        private async void BtnExportTags_Click(object sender, RoutedEventArgs e)
+        {
+            SaveFileDialog saveFileDialog = new SaveFileDialog
             {
-                // 🔹 Включаем кнопки после загрузки
-                ProgressBar.Visibility = Visibility.Hidden;
-                LoadTagsButton.IsEnabled = true;
-                ExportFromTIAButton.IsEnabled = true;
-                StartMonitoringButton.IsEnabled = selectedTags.Count > 0;
+                Filter = "CSV-файлы (*.csv)|*.csv",
+                Title = "Экспорт тегов",
+                FileName = $"Tags_Export_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                await _viewModel.ExportTagsAsync(saveFileDialog.FileName);
             }
         }
 
-        private void LogMessage(string message) => File.AppendAllText("log.txt", $"{DateTime.Now}: {message}\n");
+        /// <summary>
+        /// Обработчик кнопки "Сохранить лог"
+        /// </summary>
+        private void BtnSaveLog_Click(object sender, RoutedEventArgs e)
+        {
+            SaveLogToFile();
+        }
 
-        private void LogError(string errorMessage) => File.AppendAllText("log.txt", $"{DateTime.Now} [ERROR]: {errorMessage}\n");
+        /// <summary>
+        /// Обработчик кнопки "Очистить лог"
+        /// </summary>
+        private void BtnClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            txtLog.Clear();
+        }
+
+        /// <summary>
+        /// Обработчик закрытия окна
+        /// </summary>
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            _viewModel.Disconnect();
+        }
+
+        #endregion
     }
 }
