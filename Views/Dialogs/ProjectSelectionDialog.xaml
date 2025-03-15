@@ -1,4 +1,4 @@
-﻿<Window x:Class="SiemensTrend.Views.Dialogs.ProjectSelectionDialog"
+﻿<Window x:Class="SiemensTrend.Views.ProjectSelectionDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Выбор проекта" Height="300" Width="400"
