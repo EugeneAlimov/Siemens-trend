@@ -6,10 +6,8 @@ using System.Threading.Tasks;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.ViewModels;
 using SiemensTrend.Communication.TIA;
-using SiemensTrend.Views;
+
 namespace SiemensTrend.Views
-
-
 {
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
@@ -45,6 +43,71 @@ namespace SiemensTrend.Views
 
             // Инициализируем начальное состояние
             UpdateConnectionState();
+        }
+
+        /// <summary>
+        /// Показ диалога выбора проекта TIA Portal
+        /// </summary>
+        private void ShowProjectSelectionDialog(List<string> projects)
+        {
+            try
+            {
+                // Создаем экземпляр диалога выбора проекта
+                var dialog = new ProjectSelectionDialog(projects);
+
+                // Настраиваем владельца диалога
+                dialog.Owner = this;
+
+                // Показываем диалог
+                bool? result = dialog.ShowDialog();
+
+                if (result == true && !string.IsNullOrEmpty(dialog.SelectedProject))
+                {
+                    // Пользователь выбрал проект, подключаемся к нему
+                    _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject}...";
+                    _ = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при выборе проекта: {ex.Message}");
+                MessageBox.Show($"Ошибка при выборе проекта: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Показ диалога открытия проекта TIA Portal
+        /// </summary>
+        private void ShowOpenProjectDialog()
+        {
+            try
+            {
+                // Создаем диалог открытия файла
+                var openFileDialog = new OpenFileDialog
+                {
+                    Filter = "TIA Portal Проекты (*.ap*)|*.ap*",
+                    Title = "Открыть проект TIA Portal",
+                    CheckFileExists = true
+                };
+
+                // Показываем диалог
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    string projectPath = openFileDialog.FileName;
+                    _logger.Info($"Выбран проект для открытия: {projectPath}");
+
+                    // Запускаем процесс открытия проекта и подключения к нему
+                    _viewModel.StatusMessage = $"Открытие проекта: {Path.GetFileNameWithoutExtension(projectPath)}...";
+                    _ = _viewModel.OpenTiaProjectAsync(projectPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при открытии проекта: {ex.Message}");
+                MessageBox.Show($"Ошибка при открытии проекта: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         /// <summary>
@@ -114,70 +177,6 @@ namespace SiemensTrend.Views
             }
         }
 
-        /// <summary>
-        /// Показ диалога выбора проекта TIA Portal
-        /// </summary>
-        private void ShowProjectSelectionDialog(List<string> projects)
-        {
-            try
-            {
-                // Создаем экземпляр диалога выбора проекта
-                var dialog = new ProjectSelectionDialog(projects);
-
-                // Настраиваем владельца диалога, чтобы он был модальным
-                dialog.Owner = this;
-
-                // Показываем диалог
-                bool? result = dialog.ShowDialog();
-
-                if (result == true && !string.IsNullOrEmpty(dialog.SelectedProject))
-                {
-                    // Пользователь выбрал проект, подключаемся к нему
-                    _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject}...";
-                    _ = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при выборе проекта: {ex.Message}");
-                MessageBox.Show($"Ошибка при выборе проекта: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        /// <summary>
-        /// Показ диалога открытия проекта TIA Portal
-        /// </summary>
-        private void ShowOpenProjectDialog()
-        {
-            try
-            {
-                // Создаем диалог открытия файла
-                var openFileDialog = new OpenFileDialog
-                {
-                    Filter = "TIA Portal Проекты (*.ap*)|*.ap*",
-                    Title = "Открыть проект TIA Portal",
-                    CheckFileExists = true
-                };
-
-                // Показываем диалог
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    string projectPath = openFileDialog.FileName;
-                    _logger.Info($"Выбран проект для открытия: {projectPath}");
-
-                    // Запускаем процесс открытия проекта и подключения к нему
-                    _viewModel.StatusMessage = $"Открытие проекта: {Path.GetFileNameWithoutExtension(projectPath)}...";
-                    _ = _viewModel.OpenTiaProjectAsync(projectPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при открытии проекта: {ex.Message}");
-                MessageBox.Show($"Ошибка при открытии проекта: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
         /// <summary>
         /// Обработчик нажатия кнопки "Отключиться"
         /// </summary>

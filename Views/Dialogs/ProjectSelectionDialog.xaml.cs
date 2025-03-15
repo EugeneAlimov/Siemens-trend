@@ -1,13 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.Windows;
+using SiemensTrend.Communication.TIA;
 
 namespace SiemensTrend.Views
 {
     public partial class ProjectSelectionDialog : Window
     {
-        public string SelectedProject { get; private set; }
+        public TiaProjectInfo SelectedProject { get; private set; }
 
-        public ProjectSelectionDialog(List<string> projects)
+        public ProjectSelectionDialog(List<TiaProjectInfo> projects)
         {
             InitializeComponent();
 
@@ -30,7 +31,7 @@ namespace SiemensTrend.Views
         {
             if (lstProjects.SelectedItem != null)
             {
-                SelectedProject = lstProjects.SelectedItem.ToString();
+                SelectedProject = (TiaProjectInfo)lstProjects.SelectedItem;
                 DialogResult = true;
             }
             else

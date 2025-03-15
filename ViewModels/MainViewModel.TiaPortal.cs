@@ -18,7 +18,7 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Список проектов TIA Portal для выбора
         /// </summary>
-        public List<string> TiaProjects { get; private set; }
+        public List<TiaProjectInfo> TiaProjects { get; private set; }
 
         /// <summary>
         /// Соединение с TIA Portal
@@ -38,65 +38,75 @@ namespace SiemensTrend.ViewModels
                     _tiaPortalService = new TiaPortalCommunicationService(_logger);
                 }
 
-                // Получаем список открытых проектов
-                StatusMessage = "Получение списка открытых проектов...";
+                // Подключаемся к TIA Portal
+                bool connected = await _tiaPortalService.ConnectAsync();
                 ProgressValue = 30;
 
-                // Список проектов получается из TiaPortalHelper
-                // Здесь нужно реализовать метод получения списка открытых проектов
-                List<string> openProjects = await Task.Run(() => GetOpenTiaProjects());
-
-                ProgressValue = 50;
-
-                // Проверяем количество открытых проектов
-                if (openProjects.Count == 0)
+                if (!connected)
                 {
-                    // Нет открытых проектов, предлагаем выбрать файл проекта
-                    StatusMessage = "Открытые проекты не найдены. Выберите файл проекта...";
-                    ProgressValue = 60;
+                    // Получаем список открытых проектов
+                    StatusMessage = "Получение списка открытых проектов...";
+                    List<TiaProjectInfo> openProjects = _tiaPortalService.GetOpenProjects();
+                    ProgressValue = 50;
 
-                    // Возвращаем false чтобы в MainWindow вызвать диалог выбора проекта
-                    IsLoading = false;
-                    return false;
-                }
-                else if (openProjects.Count == 1)
-                {
-                    // Один проект - подключаемся к нему
-                    StatusMessage = $"Подключение к проекту: {openProjects[0]}...";
-                    ProgressValue = 70;
-
-                    // Подключаемся к проекту
-                    bool result = await _tiaPortalService.ConnectAsync();
-
-                    if (result)
+                    // Проверяем количество открытых проектов
+                    if (openProjects.Count == 0)
                     {
-                        // Успешное подключение
-                        StatusMessage = $"Подключено к проекту: {openProjects[0]}";
-                        ProgressValue = 100;
-                        IsConnected = true;
-                        return true;
+                        // Нет открытых проектов, предлагаем выбрать файл проекта
+                        StatusMessage = "Открытые проекты не найдены. Выберите файл проекта...";
+                        ProgressValue = 60;
+
+                        // Возвращаем false чтобы в MainWindow вызвать диалог выбора проекта
+                        IsLoading = false;
+                        return false;
+                    }
+                    else if (openProjects.Count == 1)
+                    {
+                        // Один проект - подключаемся к нему
+                        StatusMessage = $"Подключение к проекту: {openProjects[0].Name}...";
+                        ProgressValue = 70;
+
+                        // Подключаемся к проекту
+                        bool result = _tiaPortalService.ConnectToProject(openProjects[0]);
+
+                        if (result)
+                        {
+                            // Успешное подключение
+                            StatusMessage = $"Подключено к проекту: {openProjects[0].Name}";
+                            ProgressValue = 100;
+                            IsConnected = true;
+                            return true;
+                        }
+                        else
+                        {
+                            // Ошибка подключения
+                            StatusMessage = "Ошибка при подключении к TIA Portal";
+                            ProgressValue = 0;
+                            IsConnected = false;
+                            return false;
+                        }
                     }
                     else
                     {
-                        // Ошибка подключения
-                        StatusMessage = "Ошибка при подключении к TIA Portal";
-                        ProgressValue = 0;
-                        IsConnected = false;
+                        // Несколько проектов - возвращаем список для выбора
+                        StatusMessage = "Найдено несколько открытых проектов. Выберите один...";
+                        ProgressValue = 60;
+
+                        // Сохраняем список проектов для последующего выбора
+                        TiaProjects = openProjects;
+
+                        // Возвращаем false чтобы в MainWindow показать диалог выбора
+                        IsLoading = false;
                         return false;
                     }
                 }
                 else
                 {
-                    // Несколько проектов - возвращаем список для выбора
-                    StatusMessage = "Найдено несколько открытых проектов. Выберите один...";
-                    ProgressValue = 60;
-
-                    // Сохраняем список проектов для последующего выбора
-                    TiaProjects = new List<string>(openProjects);
-
-                    // Возвращаем false чтобы в MainWindow показать диалог выбора
-                    IsLoading = false;
-                    return false;
+                    // Успешное подключение
+                    StatusMessage = "Подключено к TIA Portal";
+                    ProgressValue = 100;
+                    IsConnected = true;
+                    return true;
                 }
             }
             catch (Exception ex)
@@ -118,14 +128,14 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Подключение к конкретному проекту TIA Portal
         /// </summary>
-        /// <param name="projectName">Имя проекта</param>
+        /// <param name="projectInfo">Информация о проекте</param>
         /// <returns>True если подключение успешно</returns>
-        public async Task<bool> ConnectToSpecificTiaProjectAsync(string projectName)
+        public async Task<bool> ConnectToSpecificTiaProjectAsync(TiaProjectInfo projectInfo)
         {
             try
             {
                 IsLoading = true;
-                StatusMessage = $"Подключение к проекту {projectName}...";
+                StatusMessage = $"Подключение к проекту {projectInfo.Name}...";
                 ProgressValue = 60;
 
                 // Создаем сервис TIA Portal если еще не создан
@@ -134,14 +144,13 @@ namespace SiemensTrend.ViewModels
                     _tiaPortalService = new TiaPortalCommunicationService(_logger);
                 }
 
-                // Здесь нужно дополнить TiaPortalCommunicationService
-                // для поддержки подключения к конкретному проекту
-                bool result = await _tiaPortalService.ConnectAsync();
+                // Подключаемся к проекту
+                bool result = _tiaPortalService.ConnectToProject(projectInfo);
 
                 if (result)
                 {
                     // Успешное подключение
-                    StatusMessage = $"Подключено к проекту: {projectName}";
+                    StatusMessage = $"Подключено к проекту: {projectInfo.Name}";
                     ProgressValue = 100;
                     IsConnected = true;
                     return true;
@@ -157,8 +166,8 @@ namespace SiemensTrend.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.Error($"Ошибка при подключении к проекту {projectName}: {ex.Message}");
-                StatusMessage = $"Ошибка при подключении к проекту {projectName}";
+                _logger.Error($"Ошибка при подключении к проекту {projectInfo.Name}: {ex.Message}");
+                StatusMessage = ($"Ошибка при подключении к проекту {projectInfo.Name}");
                 ProgressValue = 0;
                 IsConnected = false;
                 return false;
@@ -188,16 +197,26 @@ namespace SiemensTrend.ViewModels
                     _tiaPortalService = new TiaPortalCommunicationService(_logger);
                 }
 
-                // Здесь будет реальное открытие проекта через TIA Openness API
-                // Пока просто имитируем с задержкой
-                await Task.Delay(1500);
+                // Открываем проект
+                bool result = await _tiaPortalService.OpenProjectAsync(projectPath);
 
-                StatusMessage = "Проект TIA Portal открыт успешно";
-                ProgressValue = 100;
-
-                // Подключаемся к открытому проекту
-                string projectName = Path.GetFileNameWithoutExtension(projectPath);
-                return await ConnectToSpecificTiaProjectAsync(projectName);
+                if (result)
+                {
+                    // Успешное открытие
+                    string projectName = Path.GetFileNameWithoutExtension(projectPath);
+                    StatusMessage = $"Проект TIA Portal открыт успешно: {projectName}";
+                    ProgressValue = 100;
+                    IsConnected = true;
+                    return true;
+                }
+                else
+                {
+                    // Ошибка открытия
+                    StatusMessage = "Ошибка при открытии проекта TIA Portal";
+                    ProgressValue = 0;
+                    IsConnected = false;
+                    return false;
+                }
             }
             catch (Exception ex)
             {
@@ -205,36 +224,11 @@ namespace SiemensTrend.ViewModels
                 StatusMessage = "Ошибка при открытии проекта TIA Portal";
                 ProgressValue = 0;
                 IsConnected = false;
-
-                IsLoading = false;
                 return false;
             }
             finally
             {
                 IsLoading = false;
-            }
-        }
-
-        /// <summary>
-        /// Получение списка открытых проектов TIA Portal
-        /// </summary>
-        /// <returns>Список имен открытых проектов</returns>
-        private List<string> GetOpenTiaProjects()
-        {
-            try
-            {
-                // В реальной реализации здесь будет взаимодействие с TIA Openness API
-                // Для начала возвращаем тестовый список
-                return new List<string>
-                {
-                    "Test_Project1",
-                    "Test_Project2"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении списка проектов TIA Portal: {ex.Message}");
-                return new List<string>();
             }
         }
     }
