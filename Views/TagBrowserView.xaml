@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SiemensTrend.Views"
+             xmlns:vm="clr-namespace:SiemensTrend.ViewModels"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="300">
     <Grid>
@@ -15,34 +16,30 @@
 
         <!-- Панель инструментов -->
         <ToolBar Grid.Row="0">
-            <Button Content="Обновить" Margin="3" Padding="5,3"/>
+            <Button Content="Обновить" 
+                    Margin="3" Padding="5,3"
+                    Command="{Binding RefreshCommand}"/>
             <Separator/>
-            <Button Content="Добавить" Margin="3" Padding="5,3"/>
-            <Button Content="Удалить" Margin="3" Padding="5,3"/>
+            <Button Content="Добавить" 
+                    Margin="3" Padding="5,3"
+                    Command="{Binding AddTagCommand}"
+                    CommandParameter="{Binding ElementName=treeView, Path=SelectedItem}"/>
         </ToolBar>
 
         <!-- Дерево тегов -->
-        <TreeView Grid.Row="1" Margin="5">
-            <TreeViewItem Header="ПЛК Теги" IsExpanded="True">
-                <TreeViewItem Header="Таблица 1">
-                    <TreeViewItem Header="Тег 1"/>
-                    <TreeViewItem Header="Тег 2"/>
-                </TreeViewItem>
-                <TreeViewItem Header="Таблица 2">
-                    <TreeViewItem Header="Тег 3"/>
-                    <TreeViewItem Header="Тег 4"/>
-                </TreeViewItem>
-            </TreeViewItem>
-            <TreeViewItem Header="Блоки данных" IsExpanded="True">
-                <TreeViewItem Header="DB1">
-                    <TreeViewItem Header="Переменная 1"/>
-                    <TreeViewItem Header="Переменная 2"/>
-                </TreeViewItem>
-                <TreeViewItem Header="DB2">
-                    <TreeViewItem Header="Переменная 3"/>
-                    <TreeViewItem Header="Переменная 4"/>
-                </TreeViewItem>
-            </TreeViewItem>
+        <TreeView Grid.Row="1" Margin="5" x:Name="treeView"
+                  ItemsSource="{Binding RootItems}">
+            <TreeView.ItemTemplate>
+                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                    <TextBlock Text="{Binding Header}" />
+                </HierarchicalDataTemplate>
+            </TreeView.ItemTemplate>
+            <TreeView.ItemContainerStyle>
+                <Style TargetType="{x:Type TreeViewItem}">
+                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                </Style>
+            </TreeView.ItemContainerStyle>
         </TreeView>
 
         <!-- Строка поиска -->
@@ -52,8 +49,18 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBox Grid.Column="0" Margin="0,0,5,0" VerticalContentAlignment="Center" 
-                     Padding="3" ToolTip="Введите текст для поиска"/>
+                     Padding="3" ToolTip="Введите текст для поиска"
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
             <Button Grid.Column="1" Content="Поиск" Padding="5,3"/>
         </Grid>
+
+        <!-- Индикатор загрузки -->
+        <Border Grid.Row="1" Background="#80FFFFFF" 
+                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisConverter}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="Загрузка тегов..." HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                <ProgressBar IsIndeterminate="True" Width="200" Height="15"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

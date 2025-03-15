@@ -38,75 +38,60 @@ namespace SiemensTrend.ViewModels
                     _tiaPortalService = new TiaPortalCommunicationService(_logger);
                 }
 
-                // Подключаемся к TIA Portal
-                bool connected = await _tiaPortalService.ConnectAsync();
-                ProgressValue = 30;
+                // Получаем список открытых проектов
+                StatusMessage = "Получение списка открытых проектов...";
+                List<TiaProjectInfo> openProjects = _tiaPortalService.GetOpenProjects();
+                ProgressValue = 50;
 
-                if (!connected)
+                // Проверяем количество открытых проектов
+                if (openProjects.Count == 0)
                 {
-                    // Получаем список открытых проектов
-                    StatusMessage = "Получение списка открытых проектов...";
-                    List<TiaProjectInfo> openProjects = _tiaPortalService.GetOpenProjects();
-                    ProgressValue = 50;
+                    // Нет открытых проектов, предлагаем выбрать файл проекта
+                    StatusMessage = "Открытые проекты не найдены. Выберите файл проекта...";
+                    ProgressValue = 60;
 
-                    // Проверяем количество открытых проектов
-                    if (openProjects.Count == 0)
+                    // Возвращаем false чтобы в MainWindow вызвать диалог выбора проекта
+                    IsLoading = false;
+                    return false;
+                }
+                else if (openProjects.Count == 1)
+                {
+                    // Один проект - подключаемся к нему
+                    StatusMessage = $"Подключение к проекту: {openProjects[0].Name}...";
+                    ProgressValue = 70;
+
+                    // Подключаемся к проекту
+                    bool result = _tiaPortalService.ConnectToProject(openProjects[0]);
+
+                    if (result)
                     {
-                        // Нет открытых проектов, предлагаем выбрать файл проекта
-                        StatusMessage = "Открытые проекты не найдены. Выберите файл проекта...";
-                        ProgressValue = 60;
-
-                        // Возвращаем false чтобы в MainWindow вызвать диалог выбора проекта
-                        IsLoading = false;
-                        return false;
-                    }
-                    else if (openProjects.Count == 1)
-                    {
-                        // Один проект - подключаемся к нему
-                        StatusMessage = $"Подключение к проекту: {openProjects[0].Name}...";
-                        ProgressValue = 70;
-
-                        // Подключаемся к проекту
-                        bool result = _tiaPortalService.ConnectToProject(openProjects[0]);
-
-                        if (result)
-                        {
-                            // Успешное подключение
-                            StatusMessage = $"Подключено к проекту: {openProjects[0].Name}";
-                            ProgressValue = 100;
-                            IsConnected = true;
-                            return true;
-                        }
-                        else
-                        {
-                            // Ошибка подключения
-                            StatusMessage = "Ошибка при подключении к TIA Portal";
-                            ProgressValue = 0;
-                            IsConnected = false;
-                            return false;
-                        }
+                        // Успешное подключение
+                        StatusMessage = $"Подключено к проекту: {openProjects[0].Name}";
+                        ProgressValue = 100;
+                        IsConnected = true;
+                        return true;
                     }
                     else
                     {
-                        // Несколько проектов - возвращаем список для выбора
-                        StatusMessage = "Найдено несколько открытых проектов. Выберите один...";
-                        ProgressValue = 60;
-
-                        // Сохраняем список проектов для последующего выбора
-                        TiaProjects = openProjects;
-
-                        // Возвращаем false чтобы в MainWindow показать диалог выбора
-                        IsLoading = false;
+                        // Ошибка подключения
+                        StatusMessage = "Ошибка при подключении к TIA Portal";
+                        ProgressValue = 0;
+                        IsConnected = false;
                         return false;
                     }
                 }
                 else
                 {
-                    // Успешное подключение
-                    StatusMessage = "Подключено к TIA Portal";
-                    ProgressValue = 100;
-                    IsConnected = true;
-                    return true;
+                    // Несколько проектов - возвращаем список для выбора
+                    StatusMessage = "Найдено несколько открытых проектов. Выберите один...";
+                    ProgressValue = 60;
+
+                    // Сохраняем список проектов для последующего выбора
+                    TiaProjects = openProjects;
+
+                    // Возвращаем false чтобы в MainWindow показать диалог выбора
+                    IsLoading = false;
+                    return false;
                 }
             }
             catch (Exception ex)
@@ -115,8 +100,6 @@ namespace SiemensTrend.ViewModels
                 StatusMessage = "Ошибка при подключении к TIA Portal";
                 ProgressValue = 0;
                 IsConnected = false;
-
-                IsLoading = false;
                 return false;
             }
             finally
@@ -124,7 +107,6 @@ namespace SiemensTrend.ViewModels
                 IsLoading = false;
             }
         }
-
         /// <summary>
         /// Подключение к конкретному проекту TIA Portal
         /// </summary>

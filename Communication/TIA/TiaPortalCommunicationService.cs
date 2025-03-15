@@ -3,8 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Siemens.Collaboration.Net.Logging;
 using Siemens.Engineering;
+using Siemens.Engineering.HW.Features;
+using Siemens.Engineering.HW;
 using Siemens.Engineering.SW;
+using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Tags;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 
@@ -77,6 +82,7 @@ namespace SiemensTrend.Communication.TIA
         /// Конструктор
         /// </summary>
         /// <param name="logger">Логер</param>
+
         public TiaPortalCommunicationService(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -425,7 +431,250 @@ namespace SiemensTrend.Communication.TIA
         {
             return Task.CompletedTask;
         }
+
+        using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Siemens.Engineering;
+using Siemens.Engineering.SW;
+using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Tags;
+using Siemens.Engineering.HW;
+using Siemens.Engineering.HW.Features;
+using SiemensTrend.Core.Logging;
+using SiemensTrend.Core.Models;
+
+namespace SiemensTrend.Communication.TIA
+    {
+        public class TiaPortalCommunicationService : ICommunicationService
+        {
+            // Существующий код...
+
+            /// <summary>
+            /// Получение PlcSoftware из проекта
+            /// </summary>
+            public PlcSoftware GetPlcSoftware()
+            {
+                if (_project == null)
+                {
+                    _logger.Error("Ошибка: Проект TIA не открыт.");
+                    return null;
+                }
+
+                _logger.Info($"Поиск PLC Software в проекте {_project.Name}...");
+
+                foreach (Device device in _project.Devices)
+                {
+                    _logger.Info($"Проверка устройства: {device.Name}");
+
+                    foreach (DeviceItem deviceItem in device.DeviceItems)
+                    {
+                        var softwareContainer = deviceItem.GetService<SoftwareContainer>();
+
+                        if (softwareContainer?.Software is PlcSoftware plcSoftware)
+                        {
+                            _logger.Info($"✅ Найден PLC Software в устройстве: {device.Name}");
+                            return plcSoftware;
+                        }
+                    }
+                }
+
+                _logger.Error("❌ Ошибка: PLC Software не найдено в проекте.");
+                return null;
+            }
+
+            /// <summary>
+            /// Получение всех таблиц тегов из PLC
+            /// </summary>
+            public List<PlcTagTable> GetAllTagTables()
+            {
+                var result = new List<PlcTagTable>();
+                var plcSoftware = GetPlcSoftware();
+
+                if (plcSoftware == null)
+                    return result;
+
+                // Рекурсивная функция для обхода групп таблиц тегов
+                void CollectTagTables(PlcTagTableGroup group)
+                {
+                    // Добавляем таблицы из текущей группы
+                    foreach (var table in group.TagTables)
+                    {
+                        result.Add(table);
+                    }
+
+                    // Рекурсивно обходим подгруппы
+                    foreach (var subgroup in group.Groups)
+                    {
+                        if (subgroup is PlcTagTableSystemGroup systemGroup)
+                        {
+                            CollectTagTables(systemGroup);
+                        }
+                        else if (subgroup is PlcTagTableUserGroup userGroup)
+                        {
+                            CollectTagTables(userGroup);
+                        }
+                    }
+                }
+
+                // Начинаем с корневой группы
+                CollectTagTables(plcSoftware.TagTableGroup);
+
+                _logger.Info($"Найдено {result.Count} таблиц тегов");
+                return result;
+            }
+
+            /// <summary>
+            /// Получение всех блоков данных из PLC
+            /// </summary>
+            public List<DataBlock> GetAllDataBlocks()
+            {
+                var result = new List<DataBlock>();
+                var plcSoftware = GetPlcSoftware();
+
+                if (plcSoftware == null)
+                    return result;
+
+                // Рекурсивная функция для обхода групп блоков
+                void CollectDataBlocks(PlcBlockGroup group)
+                {
+                    // Добавляем блоки данных из текущей группы
+                    foreach (var block in group.Blocks)
+                    {
+                        if (block is DataBlock db)
+                        {
+                            result.Add(db);
+                        }
+                    }
+
+                    // Рекурсивно обходим подгруппы
+                    foreach (var subgroup in group.Groups)
+                    {
+                        CollectDataBlocks(subgroup);
+                    }
+                }
+
+                // Начинаем с корневой группы
+                CollectDataBlocks(plcSoftware.BlockGroup);
+
+                _logger.Info($"Найдено {result.Count} блоков данных");
+                return result;
+            }
+
+            /// <summary>
+            /// Чтение данных блока DB
+            /// </summary>
+            public DbTagCollection ReadDataBlockTags(DataBlock db)
+            {
+                var result = new DbTagCollection
+                {
+                    Name = db.Name,
+                    IsOptimized = db.MemoryLayout == MemoryLayout.Optimized
+                };
+
+                try
+                {
+                    if (db.Interface == null || !db.Interface.Members.Any())
+                    {
+                        _logger.Warn($"DB {db.Name} не имеет переменных");
+                        return result;
+                    }
+
+                    foreach (var member in db.Interface.Members)
+                    {
+                        string name = member.Name;
+                        string dataType = member.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
+
+                        var tag = new DbTag
+                        {
+                            Name = name,
+                            FullName = $"{db.Name}.{name}",
+                            DataType = GetTagDataType(dataType),
+                            Address = db.MemoryLayout == MemoryLayout.Optimized ? "Optimized" : "Standard",
+                            DbName = db.Name,
+                            IsOptimized = db.MemoryLayout == MemoryLayout.Optimized
+                        };
+
+                        result.Tags.Add(tag);
+                    }
+
+                    _logger.Info($"Прочитано {result.Tags.Count} тегов из DB {db.Name}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Ошибка при чтении DB {db.Name}: {ex.Message}");
+                }
+
+                return result;
+            }
+
+            /// <summary>
+            /// Чтение тегов из таблицы тегов
+            /// </summary>
+            public PlcTagCollection ReadPlcTagTable(PlcTagTable tagTable)
+            {
+                var result = new PlcTagCollection
+                {
+                    Name = tagTable.Name
+                };
+
+                try
+                {
+                    foreach (var tag in tagTable.Tags)
+                    {
+                        string name = tag.Name;
+                        string dataType = tag.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
+                        string address = tag.GetAttribute("LogicalAddress")?.ToString() ?? "";
+
+                        var plcTag = new PlcTag
+                        {
+                            Name = name,
+                            DataType = GetTagDataType(dataType),
+                            Address = address,
+                            TableName = tagTable.Name
+                        };
+
+                        result.Tags.Add(plcTag);
+                    }
+
+                    _logger.Info($"Прочитано {result.Tags.Count} тегов из таблицы {tagTable.Name}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Ошибка при чтении таблицы тегов {tagTable.Name}: {ex.Message}");
+                }
+
+                return result;
+            }
+
+            /// <summary>
+            /// Конвертация строкового типа данных в TagDataType
+            /// </summary>
+            private TagDataType GetTagDataType(string dataTypeString)
+            {
+                if (string.IsNullOrEmpty(dataTypeString))
+                    return TagDataType.Other;
+
+                dataTypeString = dataTypeString.ToLower();
+
+                if (dataTypeString.Contains("bool"))
+                    return TagDataType.Bool;
+                else if (dataTypeString.Contains("int") && !dataTypeString.Contains("dint"))
+                    return TagDataType.Int;
+                else if (dataTypeString.Contains("dint"))
+                    return TagDataType.DInt;
+                else if (dataTypeString.Contains("real"))
+                    return TagDataType.Real;
+                else
+                    return TagDataType.Other;
+            }
+
+            // Остальные методы...
+        }
     }
+}
 
     /// <summary>
     /// Информация о проекте TIA Portal
