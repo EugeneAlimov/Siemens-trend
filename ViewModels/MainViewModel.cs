@@ -1,19 +1,12 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-using System.Windows.Input;
-using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Collections.Generic;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.S7;
-using SiemensTrend.Views.Dialogs;
-using System.Windows;
-
-
-
 
 namespace SiemensTrend.ViewModels
 {
@@ -197,100 +190,100 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Обработчик нажатия кнопки "Подключиться"
         /// </summary>
-        private async void BtnConnect_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Пытаемся подключиться к TIA Portal
-                bool connected = await _viewModel.ConnectToTiaPortalAsync();
+        //private async void BtnConnect_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        // Пытаемся подключиться к TIA Portal
+        //        bool connected = await this.ConnectToTiaPortalAsync();
 
-                if (!connected)
-                {
-                    // Проверяем, есть ли список проектов для выбора
-                    if (_viewModel.TiaProjects != null && _viewModel.TiaProjects.Count > 0)
-                    {
-                        // Есть несколько открытых проектов, показываем диалог выбора
-                        ShowProjectSelectionDialog(_viewModel.TiaProjects);
-                    }
-                    else
-                    {
-                        // Нет открытых проектов, предлагаем открыть файл проекта
-                        ShowOpenProjectDialog();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при подключении: {ex.Message}");
-                MessageBox.Show($"Ошибка при подключении: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //        if (!connected)
+        //        {
+        //            // Проверяем, есть ли список проектов для выбора
+        //            if (this.TiaProjects != null && this.TiaProjects.Count > 0)
+        //            {
+        //                // Есть несколько открытых проектов, показываем диалог выбора
+        //                ShowProjectSelectionDialog(this.TiaProjects);
+        //            }
+        //            else
+        //            {
+        //                // Нет открытых проектов, предлагаем открыть файл проекта
+        //                ShowOpenProjectDialog();
+        //            }
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при подключении: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при подключении: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
         /// <summary>
         /// Показ диалога выбора проекта TIA Portal
         /// </summary>
-        private void ShowProjectSelectionDialog(List<string> projects)
-        {
-            try
-            {
-                // Создаем экземпляр диалога выбора проекта
-                var dialog = new ProjectSelectionDialog(projects);
+        //private void ShowProjectSelectionDialog(List<string> projects)
+        //{
+        //    try
+        //    {
+        //        // Создаем экземпляр диалога выбора проекта
+        //        var dialog = new ProjectSelectionDialog(projects);
 
-                // Настраиваем владельца диалога, чтобы он был модальным
-                dialog.Owner = this;
+        //        // Настраиваем владельца диалога, чтобы он был модальным
+        //        dialog.Owner = this;
 
-                // Показываем диалог
-                bool? result = dialog.ShowDialog();
+        //        // Показываем диалог
+        //        bool? result = dialog.ShowDialog();
 
-                if (result == true && !string.IsNullOrEmpty(dialog.SelectedProject))
-                {
-                    // Пользователь выбрал проект, подключаемся к нему
-                    _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject}...";
-                    _ = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при выборе проекта: {ex.Message}");
-                MessageBox.Show($"Ошибка при выборе проекта: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //        if (result == true && !string.IsNullOrEmpty(dialog.SelectedProject))
+        //        {
+        //            // Пользователь выбрал проект, подключаемся к нему
+        //            this.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject}...";
+        //            _ = this.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject);
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при выборе проекта: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при выборе проекта: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
-        /// <summary>
-        /// Показ диалога открытия проекта TIA Portal
-        /// </summary>
-        private void ShowOpenProjectDialog()
-        {
-            try
-            {
-                // Создаем диалог открытия файла
-                var openFileDialog = new Microsoft.Win32.OpenFileDialog
-                {
-                    Filter = "TIA Portal Проекты (*.ap*)|*.ap*",
-                    Title = "Открыть проект TIA Portal",
-                    CheckFileExists = true
-                };
+        ///// <summary>
+        ///// Показ диалога открытия проекта TIA Portal
+        ///// </summary>
+        //private void ShowOpenProjectDialog()
+        //{
+        //    try
+        //    {
+        //        // Создаем диалог открытия файла
+        //        var openFileDialog = new Microsoft.Win32.OpenFileDialog
+        //        {
+        //            Filter = "TIA Portal Проекты (*.ap*)|*.ap*",
+        //            Title = "Открыть проект TIA Portal",
+        //            CheckFileExists = true
+        //        };
 
-                // Показываем диалог
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    string projectPath = openFileDialog.FileName;
-                    _logger.Info($"Выбран проект для открытия: {projectPath}");
+        //        // Показываем диалог
+        //        if (openFileDialog.ShowDialog() == true)
+        //        {
+        //            string projectPath = openFileDialog.FileName;
+        //            _logger.Info($"Выбран проект для открытия: {projectPath}");
 
-                    // Запускаем процесс открытия проекта и подключения к нему
-                    _viewModel.StatusMessage = $"Открытие проекта: {Path.GetFileNameWithoutExtension(projectPath)}...";
-                    _ = _viewModel.OpenTiaProjectAsync(projectPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при открытии проекта: {ex.Message}");
-                MessageBox.Show($"Ошибка при открытии проекта: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //            // Запускаем процесс открытия проекта и подключения к нему
+        //            this.StatusMessage = $"Открытие проекта: {Path.GetFileNameWithoutExtension(projectPath)}...";
+        //            _ = this.OpenTiaProjectAsync(projectPath);
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при открытии проекта: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при открытии проекта: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
         /// <summary>
         /// Загрузка тегов
