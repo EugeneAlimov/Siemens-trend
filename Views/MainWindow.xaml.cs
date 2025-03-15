@@ -46,37 +46,6 @@ namespace SiemensTrend.Views
         }
 
         /// <summary>
-        /// Показ диалога выбора проекта TIA Portal
-        /// </summary>
-        private void ShowProjectSelectionDialog(List<string> projects)
-        {
-            try
-            {
-                // Создаем экземпляр диалога выбора проекта
-                var dialog = new ProjectSelectionDialog(projects);
-
-                // Настраиваем владельца диалога
-                dialog.Owner = this;
-
-                // Показываем диалог
-                bool? result = dialog.ShowDialog();
-
-                if (result == true && !string.IsNullOrEmpty(dialog.SelectedProject))
-                {
-                    // Пользователь выбрал проект, подключаемся к нему
-                    _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject}...";
-                    _ = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при выборе проекта: {ex.Message}");
-                MessageBox.Show($"Ошибка при выборе проекта: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        /// <summary>
         /// Показ диалога открытия проекта TIA Portal
         /// </summary>
         private void ShowOpenProjectDialog()
@@ -173,6 +142,37 @@ namespace SiemensTrend.Views
             {
                 _logger.Error($"Ошибка при подключении: {ex.Message}");
                 MessageBox.Show($"Ошибка при подключении: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Показ диалога выбора проекта TIA Portal
+        /// </summary>
+        private void ShowProjectSelectionDialog(List<TiaProjectInfo> projects)
+        {
+            try
+            {
+                // Создаем экземпляр диалога выбора проекта
+                var dialog = new ProjectSelectionDialog(projects);
+
+                // Настраиваем владельца диалога, чтобы он был модальным
+                dialog.Owner = this;
+
+                // Показываем диалог
+                bool? result = dialog.ShowDialog();
+
+                if (result == true && dialog.SelectedProject != null)
+                {
+                    // Пользователь выбрал проект, подключаемся к нему
+                    _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject.Name}...";
+                    _ = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при выборе проекта: {ex.Message}");
+                MessageBox.Show($"Ошибка при выборе проекта: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
