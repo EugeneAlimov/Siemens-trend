@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Windows;
 
-namespace SiemensTrend.Views.Dialogs
+namespace SiemensTrend.Views
 {
     public partial class ProjectSelectionDialog : Window
     {
