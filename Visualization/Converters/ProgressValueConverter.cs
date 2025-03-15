@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Windows.Data;
 
-namespace SiemensTagExporter
+namespace SiemensTrend.Visualization.Converters
 {
     /// <summary>
     /// Конвертер для определения, должен ли прогресс-бар быть в режиме неопределенного времени

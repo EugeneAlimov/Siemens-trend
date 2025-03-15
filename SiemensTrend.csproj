@@ -2,10 +2,10 @@
 
   <PropertyGroup>
 
-<StartupObject>Siemens_trend.App</StartupObject>
+<StartupObject>SiemensTrend.App</StartupObject>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
-    <RootNamespace>Siemens_trend</RootNamespace>
+    <RootNamespace>SiemensTrend</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>Latest</LangVersion>
@@ -39,6 +39,17 @@
     <PackageReference Include="SkiaSharp.Views" Version="3.118.0-preview.2.3" />
     <PackageReference Include="SkiaSharp.Views.WindowsForms" Version="3.118.0-preview.2.3" />
     <PackageReference Include="SkiaSharp.Views.WPF" Version="3.118.0-preview.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Alerts\Models\" />
+    <Folder Include="Alerts\Services\" />
+    <Folder Include="Communication\OpcUa\" />
+    <Folder Include="Core\Extensions\" />
+    <Folder Include="Core\Interfaces\" />
+    <Folder Include="TagManagement\Models\" />
+    <Folder Include="TagManagement\Services\" />
+    <Folder Include="Visualization\Controls\" />
   </ItemGroup>
 
 </Project>

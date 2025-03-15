@@ -2,102 +2,64 @@
 using System.IO;
 using System.Reflection;
 using System.Windows;
-using Microsoft.Win32;
+using SiemensTrend.Core.Logging;
 
-namespace Siemens_trend
+namespace SiemensTrend
 {
     public partial class App : Application
     {
-        private const string LogFile = "log.txt";
+        private static Logger _logger;
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-            Log("🚀 OnStartup вызван!");
-            Log("🚀 Приложение Siemens Trend запущено");
 
-            AppDomain.CurrentDomain.AssemblyResolve += MyResolver;
+            // Инициализируем логер
+            _logger = new Logger("application.log");
+            _logger.Info("Приложение запущено");
 
-            // Принудительно загружаем DLL (если получится)
-            LoadSiemensDLL();
-
-            // Открываем главное окно
-            MainWindow mainWindow = new MainWindow();
-            mainWindow.Show();
+            // Регистрируем обработчик для загрузки сборок Siemens.Engineering
+            AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
         }
 
-        private static void LoadSiemensDLL()
+        private static Assembly ResolveAssembly(object sender, ResolveEventArgs args)
         {
-            string tiaPath = @"C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19";
-            string dllPath = Path.Combine(tiaPath, "Siemens.Engineering.dll");
+            _logger.Debug($"Запрос на загрузку сборки: {args.Name}");
 
-            Log($"[LoadSiemensDLL] Проверяем: {dllPath}");
-
-            if (File.Exists(dllPath))
-            {
-                try
-                {
-                    Assembly.LoadFrom(dllPath);
-                    Log("✅ [LoadSiemensDLL] Siemens.Engineering.dll загружен успешно!");
-                }
-                catch (Exception ex)
-                {
-                    Log($"❌ [LoadSiemensDLL] Ошибка загрузки DLL: {ex.Message}");
-                }
-            }
-            else
-            {
-                Log($"❌ [LoadSiemensDLL] Файл НЕ НАЙДЕН: {dllPath}");
-            }
-        }
-
-        private static Assembly? MyResolver(object sender, ResolveEventArgs args)
-        {
             string assemblyName = new AssemblyName(args.Name).Name;
-            Log($"[AssemblyResolve] Запрос на загрузку: {args.Name}");
 
+            // Обрабатываем только сборки Siemens.Engineering
+            if (!assemblyName.StartsWith("Siemens.Engineering"))
+                return null;
+
+            // Пути поиска сборок Siemens.Engineering
             string[] searchPaths = new[]
             {
                 @"C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19",
-                @"C:\Program Files\Siemens\Automation\Portal V19\Bin\PublicAPI",
-                @"C:\Program Files\Siemens\Automation\Portal V19\Bin\PublicAPI\Client"
+                @"C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18",
+                @"C:\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17",
+                @"C:\Program Files\Siemens\Automation\Portal V16\PublicAPI\V16"
             };
 
-            if (assemblyName.StartsWith("Siemens trend.resources"))
+            foreach (string path in searchPaths)
             {
-                string culture = new AssemblyName(args.Name).CultureName;
-                string resourcePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, culture, $"{assemblyName}.dll");
+                string dllPath = Path.Combine(path, $"{assemblyName}.dll");
 
-                if (File.Exists(resourcePath))
-                {
-                    Log($"[AssemblyResolve] Загружаем {resourcePath}");
-                    return Assembly.LoadFrom(resourcePath);
-                }
-                else
-                {
-                    Log($"[AssemblyResolve] ❌ Файл ресурсов НЕ НАЙДЕН: {resourcePath}");
-                }
-            };
-
-            foreach (string basePath in searchPaths)
-            {
-                string dllPath = Path.Combine(basePath, $"{assemblyName}.dll");
                 if (File.Exists(dllPath))
                 {
-                    Log($"[AssemblyResolve] Загружаем {dllPath}");
+                    _logger.Info($"Загружена сборка: {dllPath}");
                     return Assembly.LoadFrom(dllPath);
                 }
             }
 
-            Log($"[AssemblyResolve] ❌ Не удалось загрузить: {assemblyName}");
+            _logger.Error($"Не удалось найти сборку: {assemblyName}");
             return null;
         }
 
-        private static void Log(string message)
+        protected override void OnExit(ExitEventArgs e)
         {
-            string logMessage = $"{DateTime.Now:HH:mm:ss} {message}";
-            File.AppendAllText(LogFile, logMessage + Environment.NewLine);
-            Console.WriteLine(logMessage);
+            base.OnExit(e);
+            _logger.Info("Приложение завершено");
         }
     }
 }
