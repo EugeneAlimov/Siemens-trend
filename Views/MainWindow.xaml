@@ -1,13 +1,13 @@
-﻿<Window x:Class="SiemensTagExporter.MainWindow"
+﻿<Window x:Class="SiemensTrend.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:SiemensTagExporter"
+        xmlns:local="clr-namespace:SiemensTrend.Views"
+        xmlns:viewModels="clr-namespace:SiemensTrend.ViewModels"
         mc:Ignorable="d"
-        Title="Siemens Tag Exporter" Height="700" Width="1000"
-        WindowStartupLocation="CenterScreen"
-        Closing="Window_Closing">
+        Title="Siemens Trend Monitor" Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

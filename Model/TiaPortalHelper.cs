@@ -1136,15 +1136,16 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Xml;
 using System.Xml.Linq;
-using Siemens.Collaboration.Net.Logging;
 using Siemens.Engineering;
 using Siemens.Engineering.HW;
-using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.Tags;
+using Siemens.Engineering.HW.Features; // Важно для SoftwareContainer
 
-namespace SiemensTagExporter
+using Siemens_trend.Utils;  // Добавьте эту директиву для доступа к ILogger
+
+namespace Siemens_trend.Classes
 {
     /// <summary>
     /// Делегат для событий прогресса
@@ -1329,22 +1330,73 @@ namespace SiemensTagExporter
         /// </summary>
         /// <param name="autoStart">Запускать ли TIA Portal если он не запущен</param>
         /// <returns>Успешность подключения</returns>
-        public bool Connect(bool autoStart = false)
+        //public bool Connect(bool autoStart = false)
+        //{
+        //    try
+        //    {
+        //        // Получаем список запущенных процессов TIA Portal
+        //        IList<TiaPortalProcess> processes = TiaPortal.GetProcesses();
+
+        //        if (processes.Count == 0)
+        //        {
+        //            if (!autoStart)
+        //            {
+        //                _logger.Error("TIA Portal не запущен. Запустите TIA Portal и откройте проект.");
+        //                return false;
+        //            }
+
+        //            // Запускаем новый экземпляр, если разрешено автозапуском
+        //            _logger.Info("Запуск нового экземпляра TIA Portal...");
+        //            _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
+        //            _logger.Info("TIA Portal запущен.");
+        //        }
+        //        else
+        //        {
+        //            // Подключаемся к первому найденному экземпляру
+        //            _tiaPortal = processes[0].Attach();
+        //            _logger.Info($"Подключено к существующему экземпляру TIA Portal.");
+        //        }
+
+        //        // Проверяем наличие открытых проектов
+        //        if (_tiaPortal.Projects.Count == 0)
+        //        {
+        //            _logger.Error("Нет открытых проектов в TIA Portal.");
+        //            return false;
+        //        }
+
+        //        // Получаем первый открытый проект
+        //        _project = _tiaPortal.Projects[0];
+        //        _logger.Info($"Подключено к проекту: {_project.Name}");
+
+        //        _isConnected = true;
+        //        Connected?.Invoke(this, EventArgs.Empty);
+        //        return true;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при подключении к TIA Portal: {ex.Message}");
+        //        _isConnected = false;
+        //        return false;
+        //    }
+        //}
+
+        /// <summary>
+        /// Открывает проект TIA Portal
+        /// </summary>
+        /// <param name="projectPath">Путь к файлу проекта (.ap*)</param>
+        /// <returns>true, если открытие успешно</returns>
+        public bool OpenProject(string projectPath)
         {
             try
             {
-                // Получаем список запущенных процессов TIA Portal
+                _logger.Info($"Открытие проекта: {projectPath}");
+
+                // Проверяем, запущен ли TIA Portal
                 IList<TiaPortalProcess> processes = TiaPortal.GetProcesses();
 
+                // Если TIA Portal не запущен, запускаем его
                 if (processes.Count == 0)
                 {
-                    if (!autoStart)
-                    {
-                        _logger.Error("TIA Portal не запущен. Запустите TIA Portal и откройте проект.");
-                        return false;
-                    }
-
-                    // Запускаем новый экземпляр, если разрешено автозапуском
                     _logger.Info("Запуск нового экземпляра TIA Portal...");
                     _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
                     _logger.Info("TIA Portal запущен.");
@@ -1356,20 +1408,192 @@ namespace SiemensTagExporter
                     _logger.Info($"Подключено к существующему экземпляру TIA Portal.");
                 }
 
-                // Проверяем наличие открытых проектов
-                if (_tiaPortal.Projects.Count == 0)
+                // Открываем проект
+                _project = _tiaPortal.Projects.Open(new FileInfo(projectPath));
+                _logger.Info($"Проект успешно открыт: {_project.Name}");
+
+                _isConnected = true;
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при открытии проекта: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Получает список открытых проектов
+        /// </summary>
+        /// <returns>Список имен открытых проектов</returns>
+        public List<string> GetOpenProjects()
+        {
+            List<string> projects = new List<string>();
+
+            try
+            {
+                // Проверяем, запущен ли TIA Portal
+                IList<TiaPortalProcess> processes = TiaPortal.GetProcesses();
+
+                if (processes.Count == 0)
                 {
-                    _logger.Error("Нет открытых проектов в TIA Portal.");
+                    _logger.Info("TIA Portal не запущен.");
+                    return projects;
+                }
+
+                // Подключаемся к первому найденному экземпляру
+                var tiaPortal = processes[0].Attach();
+
+                // Получаем список открытых проектов
+                foreach (var project in tiaPortal.Projects)
+                {
+                    projects.Add(project.Name);
+                }
+
+                _logger.Info($"Найдено открытых проектов: {projects.Count}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении списка открытых проектов: {ex.Message}");
+            }
+
+            return projects;
+        }
+
+        /// <summary>
+        /// Подключается к выбранному проекту по имени
+        /// </summary>
+        /// <param name="projectName">Имя проекта</param>
+        /// <returns>true, если подключение успешно</returns>
+        public bool ConnectToProject(string projectName)
+        {
+            try
+            {
+                _logger.Info($"Подключение к проекту: {projectName}");
+
+                // Проверяем, запущен ли TIA Portal
+                IList<TiaPortalProcess> processes = TiaPortal.GetProcesses();
+
+                if (processes.Count == 0)
+                {
+                    _logger.Error("TIA Portal не запущен.");
                     return false;
                 }
 
-                // Получаем первый открытый проект
-                _project = _tiaPortal.Projects[0];
-                _logger.Info($"Подключено к проекту: {_project.Name}");
+                // Подключаемся к первому найденному экземпляру
+                _tiaPortal = processes[0].Attach();
 
-                _isConnected = true;
-                Connected?.Invoke(this, EventArgs.Empty);
-                return true;
+                // Ищем проект с указанным именем
+                foreach (var project in _tiaPortal.Projects)
+                {
+                    if (project.Name == projectName)
+                    {
+                        _project = project;
+                        _logger.Info($"Подключено к проекту: {_project.Name}");
+
+                        _isConnected = true;
+                        Connected?.Invoke(this, EventArgs.Empty);
+
+                        return true;
+                    }
+                }
+
+                _logger.Error($"Проект с именем '{projectName}' не найден.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при подключении к проекту: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Свойство для получения количества открытых проектов
+        /// </summary>
+        public int ProjectCount
+        {
+            get
+            {
+                try
+                {
+                    // Проверяем, запущен ли TIA Portal
+                    IList<TiaPortalProcess> processes = TiaPortal.GetProcesses();
+
+                    if (processes.Count == 0)
+                    {
+                        return 0;
+                    }
+
+                    // Подключаемся к первому найденному экземпляру
+                    var tiaPortal = processes[0].Attach();
+
+                    return tiaPortal.Projects.Count;
+                }
+                catch
+                {
+                    return 0;
+                }
+            }
+        }
+
+        public async Task<bool> ConnectAsync(bool autoStart = false)
+        {
+            try
+            {
+                // Выполняем подключение к TIA Portal в фоновом потоке
+                return await Task.Run(() =>
+                {
+                    try
+                    {
+                        // Получаем список запущенных процессов TIA Portal
+                        IList<TiaPortalProcess> processes = TiaPortal.GetProcesses();
+
+                        if (processes.Count == 0)
+                        {
+                            if (!autoStart)
+                            {
+                                _logger.Error("TIA Portal не запущен. Запустите TIA Portal и откройте проект.");
+                                return false;
+                            }
+
+                            // Запускаем новый экземпляр, если разрешено автозапуском
+                            _logger.Info("Запуск нового экземпляра TIA Portal...");
+                            _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
+                            _logger.Info("TIA Portal запущен.");
+                        }
+                        else
+                        {
+                            // Подключаемся к первому найденному экземпляру
+                            _tiaPortal = processes[0].Attach();
+                            _logger.Info($"Подключено к существующему экземпляру TIA Portal.");
+                        }
+
+                        // Проверяем наличие открытых проектов
+                        if (_tiaPortal.Projects.Count == 0)
+                        {
+                            _logger.Error("Нет открытых проектов в TIA Portal.");
+                            return false;
+                        }
+
+                        // Получаем первый открытый проект
+                        _project = _tiaPortal.Projects[0];
+                        _logger.Info($"Подключено к проекту: {_project.Name}");
+
+                        _isConnected = true;
+
+                        // Важно: не вызываем события здесь, так как это может привести к обновлению UI
+                        // из неправильного потока. Будем вызывать события после завершения асинхронной операции.
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Ошибка при подключении к TIA Portal: {ex.Message}");
+                        _isConnected = false;
+                        return false;
+                    }
+                });
             }
             catch (Exception ex)
             {

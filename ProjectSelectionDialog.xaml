@@ -1,0 +1,23 @@
+﻿<Window x:Class="Siemens_trend.ProjectSelectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Выбор проекта" Height="300" Width="400"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Выберите проект для подключения:" Margin="0,0,0,10"/>
+
+        <ListBox Grid.Row="1" Name="lstProjects" Margin="0,0,0,10"
+                 SelectedIndex="0" SelectionMode="Single"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Name="btnCancel" Content="Отмена" Width="80" Margin="0,0,10,0" Click="BtnCancel_Click"/>
+            <Button Name="btnOk" Content="OK" Width="80" Click="BtnOk_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
