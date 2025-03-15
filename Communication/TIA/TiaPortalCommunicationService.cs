@@ -150,6 +150,40 @@ namespace SiemensTrend.Communication.TIA
             }
         }
 
+        // Добавьте в класс TiaPortalCommunicationService
+        private T ExecuteInUIThread<T>(Func<T> action)
+        {
+            if (System.Threading.Thread.CurrentThread.GetApartmentState() == System.Threading.ApartmentState.STA)
+            {
+                // Уже в STA-потоке, просто выполняем
+                return action();
+            }
+            else
+            {
+                // Создаем TaskCompletionSource для получения результата
+                var tcs = new TaskCompletionSource<T>();
+
+                // Используем DispatcherInvoke для выполнения в UI-потоке
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        var result = action();
+                        tcs.SetResult(result);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.SetException(ex);
+                    }
+                });
+
+                return tcs.Task.Result;
+            }
+        }
+
+        // Использование:
+        // _project = ExecuteInUIThread(() => _tiaPortal.Projects.Open(new FileInfo(projectPath)));
+
         /// <summary>
         /// Открытие проекта TIA Portal
         /// </summary>
@@ -167,38 +201,40 @@ namespace SiemensTrend.Communication.TIA
                     return false;
                 }
 
-                // Проверяем наличие запущенных экземпляров TIA Portal
-                var processes = GetRunningTiaPortalInstances();
+                // Создаем новый экземпляр TIA Portal с UI интерфейсом
+                _logger.Info("🚀 Запускаем TIA Portal...");
+                _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
 
-                // Создаем новый экземпляр TIA Portal, если нет запущенных
-                if (processes.Count == 0)
-                {
-                    _logger.Info("Запуск нового экземпляра TIA Portal...");
-                    _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
-                }
-                else
-                {
-                    // Используем первый найденный экземпляр
-                    _logger.Info("Подключение к существующему экземпляру TIA Portal...");
-                    _tiaPortal = processes[0].Attach();
-                }
+                // ВАЖНО: Вызываем синхронно, БЕЗ использования Task.Run
+                _logger.Info("📂 Открываем проект...");
+                _project = _tiaPortal.Projects.Open(new FileInfo(projectPath));
 
-                // Открываем проект
-                await Task.Run(() =>
-                {
-                    _project = _tiaPortal.Projects.Open(new FileInfo(projectPath));
-                });
+                // Эта строка сделает метод "псевдо-асинхронным" и позволит UI не замораживаться
+                await Task.Yield();
 
                 // Сохраняем путь к проекту
                 ProjectPath = projectPath;
 
-                _logger.Info($"Проект успешно открыт: {_project.Name}");
-                IsConnected = true;
-                return true;
+                if (_project != null)
+                {
+                    _logger.Info($"✅ Проект успешно открыт: {_project.Name}");
+                    IsConnected = true;
+                    return true;
+                }
+                else
+                {
+                    _logger.Error("❌ Ошибка: Проект не открылся.");
+                    IsConnected = false;
+                    return false;
+                }
             }
             catch (Exception ex)
             {
-                _logger.Error($"Ошибка при открытии проекта TIA Portal: {ex.Message}");
+                _logger.Error($"❌ Ошибка при открытии проекта TIA Portal: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутреннее исключение: {ex.InnerException.Message}");
+                }
                 IsConnected = false;
                 return false;
             }
