@@ -1,13 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-
-<StartupObject>SiemensTrend.App</StartupObject>
+    <StartupObject>SiemensTrend.App</StartupObject>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <RootNamespace>SiemensTrend</RootNamespace>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>Latest</LangVersion>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
@@ -22,15 +20,7 @@
     <PackageReference Include="LiveChartsCore" Version="2.0.0-rc5.4" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView" Version="2.0.0-rc5.4" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc5.4" />
-
-
-    <Reference Include="LiveCharts.Wpf">
-        <HintPath>C:\Users\crazy\.nuget\packages\livecharts.wpf\0.9.7\lib\net45\LiveCharts.Wpf.dll</HintPath>
-    </Reference>
-
-
     <PackageReference Include="OpenTK" Version="3.3.3" />
-
     <PackageReference Include="Siemens.Collaboration.Net.OperatingSystem.Windows" Version="3.0.1725521661" />
     <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Openness.Resolver" Version="1.1.1725480302" />
     <PackageReference Include="S7netplus" Version="0.20.0" />
@@ -51,5 +41,12 @@
     <Folder Include="TagManagement\Services\" />
     <Folder Include="Visualization\Controls\" />
   </ItemGroup>
+
+  <!-- Явно отключаем копирование Siemens.Engineering.dll в выходную папку -->
+  <Target Name="DisableCopyLocal" AfterTargets="ResolveReferences">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'Siemens.Engineering'" />
+    </ItemGroup>
+  </Target>
 
 </Project>
