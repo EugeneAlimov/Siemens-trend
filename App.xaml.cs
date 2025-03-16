@@ -24,6 +24,18 @@ namespace SiemensTrend
                 _logger = new Logger("application.log");
                 _logger.Info("Приложение запущено");
 
+                // Проверяем, что мы в STA потоке
+                if (System.Threading.Thread.CurrentThread.GetApartmentState() != System.Threading.ApartmentState.STA)
+                {
+                    _logger.Error("Приложение не запущено в режиме STA!");
+                    MessageBox.Show("Приложение должно быть запущено в STA режиме для работы с TIA Portal Openness.",
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    _logger.Info("Приложение запущено в режиме STA");
+                }
+
                 // Инициализация Assembly Resolver для Siemens.Engineering.dll
                 InitializeAssemblyResolver();
             }

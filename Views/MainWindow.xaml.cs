@@ -77,23 +77,56 @@ namespace SiemensTrend.Views
         /// <summary>
         /// Обновление состояния подключения в интерфейсе
         /// </summary>
+        //private void UpdateConnectionState()
+        //{
+        //    // Обновляем статус подключения
+        //    statusConnectionState.Text = _viewModel.IsConnected ? "Подключено" : "Отключено";
+        //    statusConnectionState.Foreground = _viewModel.IsConnected ?
+        //        System.Windows.Media.Brushes.Green : System.Windows.Media.Brushes.Red;
+
+        //    // Обновляем доступность кнопок
+        //    btnConnect.IsEnabled = !_viewModel.IsConnected;
+        //    btnDisconnect.IsEnabled = _viewModel.IsConnected;
+        //    btnGetPlcs.IsEnabled = _viewModel.IsConnected;
+        //    btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
+        //    btnGetDbs.IsEnabled = _viewModel.IsConnected;
+        //    btnGetDbTags.IsEnabled = _viewModel.IsConnected;
+        //    btnStartMonitoring.IsEnabled = _viewModel.IsConnected;
+        //    btnStopMonitoring.IsEnabled = _viewModel.IsConnected;
+        //    btnExportTags.IsEnabled = _viewModel.IsConnected;
+        //}
+
+        /// <summary>
+        /// Обновление состояния подключения в интерфейсе
+        /// </summary>
         private void UpdateConnectionState()
         {
-            // Обновляем статус подключения
-            statusConnectionState.Text = _viewModel.IsConnected ? "Подключено" : "Отключено";
-            statusConnectionState.Foreground = _viewModel.IsConnected ?
-                System.Windows.Media.Brushes.Green : System.Windows.Media.Brushes.Red;
+            try
+            {
+                // Обновляем статус подключения
+                statusConnectionState.Text = _viewModel.IsConnected ? "Подключено" : "Отключено";
+                statusConnectionState.Foreground = _viewModel.IsConnected ?
+                    System.Windows.Media.Brushes.Green : System.Windows.Media.Brushes.Red;
 
-            // Обновляем доступность кнопок
-            btnConnect.IsEnabled = !_viewModel.IsConnected;
-            btnDisconnect.IsEnabled = _viewModel.IsConnected;
-            btnGetPlcs.IsEnabled = _viewModel.IsConnected;
-            btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
-            btnGetDbs.IsEnabled = _viewModel.IsConnected;
-            btnGetDbTags.IsEnabled = _viewModel.IsConnected;
-            btnStartMonitoring.IsEnabled = _viewModel.IsConnected;
-            btnStopMonitoring.IsEnabled = _viewModel.IsConnected;
-            btnExportTags.IsEnabled = _viewModel.IsConnected;
+                // Обновляем название проекта
+                statusProjectName.Text = _viewModel.CurrentProjectName;
+
+                // Обновляем доступность кнопок
+                btnConnect.IsEnabled = !_viewModel.IsConnected;
+                btnDisconnect.IsEnabled = _viewModel.IsConnected;
+                btnGetPlcs.IsEnabled = _viewModel.IsConnected;
+                btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
+                btnGetDbs.IsEnabled = _viewModel.IsConnected;
+                btnGetDbTags.IsEnabled = _viewModel.IsConnected;
+                btnStartMonitoring.IsEnabled = _viewModel.IsConnected && _viewModel.MonitoredTags.Count > 0;
+                btnStopMonitoring.IsEnabled = _viewModel.IsConnected;
+                btnExportTags.IsEnabled = _viewModel.IsConnected &&
+                    (_viewModel.PlcTags.Count > 0 || _viewModel.DbTags.Count > 0);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при обновлении состояния подключения: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -119,6 +152,9 @@ namespace SiemensTrend.Views
             {
                 // Пытаемся подключиться к TIA Portal
                 bool connected = await _viewModel.ConnectToTiaPortalAsync();
+
+                // Обновляем состояние интерфейса
+                UpdateConnectionState();
 
                 if (!connected)
                 {
@@ -161,9 +197,25 @@ namespace SiemensTrend.Views
 
                 if (result == true && dialog.SelectedProject != null)
                 {
-                    // Пользователь выбрал проект, подключаемся к нему
+                    // Пользователь выбрал проект, подключаемся к нему в том же потоке (STA)
                     _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject.Name}...";
-                    _ = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject);
+
+                    // Выполняем подключение (не используем Task.Run!)
+                    bool success = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject).Result;
+
+                    // Обновляем интерфейс
+                    UpdateConnectionState();
+
+                    if (success)
+                    {
+                        _logger.Info($"Успешное подключение к проекту: {dialog.SelectedProject.Name}");
+                    }
+                    else
+                    {
+                        _logger.Error($"Не удалось подключиться к проекту: {dialog.SelectedProject.Name}");
+                        MessageBox.Show($"Не удалось подключиться к проекту: {dialog.SelectedProject.Name}",
+                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
             catch (Exception ex)
@@ -183,6 +235,9 @@ namespace SiemensTrend.Views
             {
                 // Выполняем отключение
                 _viewModel.Disconnect();
+
+                // Обновляем состояние интерфейса
+                UpdateConnectionState();
             }
             catch (Exception ex)
             {
@@ -227,41 +282,34 @@ namespace SiemensTrend.Views
             try
             {
                 _logger.Info("Запрос тегов ПЛК");
+
+                // Отключаем кнопку на время загрузки
+                btnGetPlcTags.IsEnabled = false;
+                // Показываем индикатор загрузки
+                _viewModel.IsLoading = true;
+                _viewModel.StatusMessage = "Получение тегов ПЛК...";
+                _viewModel.ProgressValue = 10;
+
                 await _viewModel.GetPlcTagsAsync();
+
                 _logger.Info($"Получено {_viewModel.PlcTags.Count} тегов ПЛК");
+                _viewModel.StatusMessage = $"Получено {_viewModel.PlcTags.Count} тегов ПЛК";
+                _viewModel.ProgressValue = 100;
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
                 MessageBox.Show($"Ошибка при получении тегов ПЛК: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                _viewModel.StatusMessage = "Ошибка при получении тегов ПЛК";
+                _viewModel.ProgressValue = 0;
             }
-        }
-
-        /// <summary>
-        /// Обработчик нажатия кнопки "Получить DB"
-        /// </summary>
-        private async void BtnGetDbs_Click(object sender, RoutedEventArgs e)
-        {
-            try
+            finally
             {
-                _logger.Info("Запрос списка блоков данных");
-
-                // Здесь будет вызов соответствующего метода ViewModel
-                // Например: await _viewModel.GetDataBlocksAsync();
-
-                // Пока просто выводим сообщение
-                _viewModel.StatusMessage = "Получение блоков данных...";
-                await Task.Delay(800); // Имитация работы
-                _viewModel.StatusMessage = "Блоки данных получены";
-
-                _logger.Info("Блоки данных получены");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении блоков данных: {ex.Message}");
-                MessageBox.Show($"Ошибка при получении блоков данных: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                // Включаем кнопку обратно
+                btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
+                // Скрываем индикатор загрузки
+                _viewModel.IsLoading = false;
             }
         }
 
@@ -274,21 +322,74 @@ namespace SiemensTrend.Views
             {
                 _logger.Info("Запрос тегов DB");
 
-                // Здесь будет вызов соответствующего метода ViewModel
-                // Например: await _viewModel.GetDbTagsAsync();
-
-                // Пока просто выводим сообщение
+                // Отключаем кнопку на время загрузки
+                btnGetDbTags.IsEnabled = false;
+                // Показываем индикатор загрузки
+                _viewModel.IsLoading = true;
                 _viewModel.StatusMessage = "Получение тегов DB...";
-                await Task.Delay(1200); // Имитация работы
-                _viewModel.StatusMessage = "Теги DB получены";
+                _viewModel.ProgressValue = 10;
 
-                _logger.Info("Теги DB получены");
+                await _viewModel.GetDbTagsAsync();
+
+                _logger.Info($"Получено {_viewModel.DbTags.Count} тегов DB");
+                _viewModel.StatusMessage = $"Получено {_viewModel.DbTags.Count} тегов DB";
+                _viewModel.ProgressValue = 100;
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при получении тегов DB: {ex.Message}");
                 MessageBox.Show($"Ошибка при получении тегов DB: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                _viewModel.StatusMessage = "Ошибка при получении тегов DB";
+                _viewModel.ProgressValue = 0;
+            }
+            finally
+            {
+                // Включаем кнопку обратно
+                btnGetDbTags.IsEnabled = _viewModel.IsConnected;
+                // Скрываем индикатор загрузки
+                _viewModel.IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Обработчик нажатия кнопки "Получить DB"
+        /// </summary>
+        private async void BtnGetDbs_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("Запрос списка блоков данных");
+
+                // Отключаем кнопку на время загрузки
+                btnGetDbs.IsEnabled = false;
+                // Показываем индикатор загрузки
+                _viewModel.IsLoading = true;
+                _viewModel.StatusMessage = "Получение блоков данных...";
+                _viewModel.ProgressValue = 10;
+
+                // Здесь в реальном проекте будет вызов к модели представления
+                await Task.Delay(800); // Имитация работы
+
+                _viewModel.StatusMessage = "Блоки данных получены";
+                _viewModel.ProgressValue = 100;
+
+                _logger.Info("Блоки данных получены");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении блоков данных: {ex.Message}");
+                MessageBox.Show($"Ошибка при получении блоков данных: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                _viewModel.StatusMessage = "Ошибка при получении блоков данных";
+                _viewModel.ProgressValue = 0;
+            }
+            finally
+            {
+                // Включаем кнопку обратно
+                btnGetDbs.IsEnabled = _viewModel.IsConnected;
+                // Скрываем индикатор загрузки
+                _viewModel.IsLoading = false;
             }
         }
 

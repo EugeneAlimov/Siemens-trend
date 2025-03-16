@@ -190,6 +190,19 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
+        /// Название текущего проекта
+        /// </summary>
+        public string CurrentProjectName
+        {
+            get
+            {
+                if (_tiaPortalService != null && _tiaPortalService.CurrentProject != null)
+                    return _tiaPortalService.CurrentProject.Name;
+                return "Нет проекта";
+            }
+        }
+
+        /// <summary>
         /// Максимальное количество тегов для мониторинга
         /// </summary>
         public int MaxMonitoredTags => 10;

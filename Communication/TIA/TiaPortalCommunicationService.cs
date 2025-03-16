@@ -548,13 +548,6 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
-                _logger.Info("Запуск нового экземпляра TIA Portal");
-                _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
-                _logger.Info("TIA Portal успешно запущен");
-
-                _project = _tiaPortal.Projects.Open(new FileInfo(projectPath));
-                _logger.Info($"Проект успешно открыт: {_project.Name}");
-
                 if (string.IsNullOrEmpty(projectPath))
                 {
                     _logger.Error("Ошибка: путь к проекту не может быть пустым");
@@ -754,12 +747,13 @@ namespace SiemensTrend.Communication.TIA
                 if (plcSoftware == null)
                 {
                     _logger.Error("Не удалось получить PlcSoftware - объект равен null");
-                    return new List<TagDefinition>();
+                    throw new Exception("Не удалось получить программное обеспечение ПЛК");
                 }
 
                 _logger.Info("PlcSoftware получен успешно");
 
-                var plcData = await _tagReader.ReadAllTagsAsync();
+                // ВАЖНО: Не используем многопоточность для Openness API
+                var plcData = await Task.FromResult(GetAllProjectTags());
                 _logger.Info($"Чтение завершено: найдено {plcData.PlcTags.Count} тегов ПЛК");
 
                 return plcData.PlcTags;
@@ -771,7 +765,7 @@ namespace SiemensTrend.Communication.TIA
                 {
                     _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
                 }
-                return new List<TagDefinition>();
+                throw; // Пробрасываем исключение дальше для обработки в UI
             }
         }
 
@@ -783,14 +777,60 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
-                var plcData = await GetAllProjectTagsAsync();
+                _logger.Info("Начало получения тегов блоков данных...");
+
+                var plcSoftware = GetPlcSoftware();
+                if (plcSoftware == null)
+                {
+                    _logger.Error("Не удалось получить PlcSoftware - объект равен null");
+                    throw new Exception("Не удалось получить программное обеспечение ПЛК");
+                }
+
+                _logger.Info("PlcSoftware получен успешно");
+
+                // ВАЖНО: Не используем многопоточность для Openness API
+                var plcData = await Task.FromResult(GetAllProjectTags());
+                _logger.Info($"Чтение завершено: найдено {plcData.DbTags.Count} тегов DB");
+
                 return plcData.DbTags;
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при получении тегов блоков данных: {ex.Message}");
-                return new List<TagDefinition>();
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
+                throw; // Пробрасываем исключение дальше для обработки в UI
             }
+        }
+
+        /// <summary>
+        /// Синхронный метод для получения всех тегов проекта
+        /// </summary>
+        private PlcData GetAllProjectTags()
+        {
+            _logger.Info("Запуск чтения всех тегов проекта");
+
+            if (!IsConnected || _project == null)
+            {
+                _logger.Error("Попытка получения тегов без подключения к TIA Portal");
+                throw new InvalidOperationException("Нет подключения к TIA Portal");
+            }
+
+            // Проверяем, создан ли читатель тегов
+            if (_tagReader == null)
+            {
+                _logger.Info("Создание нового экземпляра TiaPortalTagReader");
+                _tagReader = new TiaPortalTagReader(_logger, this);
+            }
+
+            // Получаем все теги (синхронно, без Task.Run)
+            var plcData = _tagReader.ReadAllTags();
+
+            _logger.Info($"Загружено {plcData.PlcTags.Count} тегов ПЛК и {plcData.DbTags.Count} тегов DB");
+
+            return plcData;
         }
 
         /// <summary>
