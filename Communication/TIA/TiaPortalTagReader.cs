@@ -274,7 +274,15 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Проверяем наличие интерфейса и членов
-                if (db.Interface == null || !db.Interface.Members.Any())
+                if (db.Interface == null)
+                {
+                    _logger.Warn($"Блок данных {db.Name} не имеет интерфейса");
+                    return;
+                }
+
+                // Проверяем, есть ли члены в интерфейсе
+                var members = db.Interface.GetComposition("Members");
+                if (members == null || !members.Cast<Member>().Any())
                 {
                     _logger.Warn($"Блок данных {db.Name} не имеет переменных");
                     return;
@@ -323,12 +331,19 @@ namespace SiemensTrend.Communication.TIA
                 // Получаем коллекцию членов блока данных
                 var members = memberContainer.GetComposition("Members");
 
-                if (members == null || members.Count() == 0)
+                if (members == null)
                 {
                     return;
                 }
 
-                foreach (var member in members.Cast<Member>())
+                // Преобразуем в список и проверяем, есть ли элементы
+                var membersList = members.Cast<Member>().ToList();
+                if (membersList.Count() == 0)
+                {
+                    return;
+                }
+
+                foreach (var member in membersList)
                 {
                     try
                     {
@@ -344,7 +359,14 @@ namespace SiemensTrend.Communication.TIA
                         // Проверяем наличие вложенных членов (структуры)
                         var nestedMembers = member.GetComposition("Members");
 
-                        if (nestedMembers != null && nestedMembers.Count() > 0)
+                        // Проверяем количество вложенных членов
+                        bool hasNestedMembers = false;
+                        if (nestedMembers != null)
+                        {
+                            hasNestedMembers = nestedMembers.Cast<Member>().Any();
+                        }
+
+                        if (hasNestedMembers)
                         {
                             // Рекурсивно обрабатываем вложенную структуру
                             ProcessDbMembers(member, dbName, memberPath, plcData, isOptimized, isUDT, isSafety);
