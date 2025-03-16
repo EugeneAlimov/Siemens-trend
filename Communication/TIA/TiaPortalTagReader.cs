@@ -9,9 +9,10 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.Tags;
+using Siemens.Engineering.SW.Blocks.Interface;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
-using Siemens.Engineering.SW.Blocks.Interface;
+using Siemens.Collaboration.Net.CoreExtensions.ExplicitExtensions;
 
 namespace SiemensTrend.Communication.TIA
 {
@@ -81,7 +82,6 @@ namespace SiemensTrend.Communication.TIA
 
                         // Читаем теги блоков данных
                         ReadDataBlocks(plcSoftware, plcData);
-
                     }
                     catch (Exception ex)
                     {
@@ -131,13 +131,13 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Обработка таблиц тегов в текущей группе
-                foreach (var tagTable in group.TagTables)
+                foreach (var tagTable in group.TagTables.Cast<PlcTagTable>())
                 {
                     ProcessTagTable(tagTable, plcData, parentPath);
                 }
 
                 // Рекурсивная обработка подгрупп
-                foreach (var subgroup in group.Groups)
+                foreach (var subgroup in group.Groups.Cast<PlcTagTableUserGroup>())
                 {
                     string newPath = string.IsNullOrEmpty(parentPath) ?
                         subgroup.Name : $"{parentPath}/{subgroup.Name}";
@@ -165,7 +165,7 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Обрабатываем каждый тег в таблице
-                foreach (var tag in tagTable.Tags)
+                foreach (var tag in tagTable.Tags.Cast<Siemens.Engineering.SW.Tags.PlcTag>())
                 {
                     try
                     {
@@ -244,7 +244,7 @@ namespace SiemensTrend.Communication.TIA
                 _logger.Debug($"Обработка группы блоков: {groupPath}");
 
                 // Обрабатываем блоки в текущей группе
-                foreach (var block in group.Blocks)
+                foreach (var block in group.Blocks.Cast<PlcBlock>())
                 {
                     if (block is DataBlock db)
                     {
@@ -253,7 +253,7 @@ namespace SiemensTrend.Communication.TIA
                 }
 
                 // Рекурсивная обработка подгрупп
-                foreach (var subgroup in group.Groups)
+                foreach (var subgroup in group.Groups.Cast<PlcBlockGroup>())
                 {
                     ProcessBlockGroup(subgroup, plcData, groupPath);
                 }
@@ -328,11 +328,11 @@ namespace SiemensTrend.Communication.TIA
                     return;
                 }
 
-                foreach (var member in members.Interface.Members.GetEnumerator<Member>().ToList())
+                foreach (var member in members.Cast<Member>())
                 {
                     try
                     {
-                        string name = member.GetAttribute("Name")?.ToString() ?? "Unknown";
+                        string name = member.Name;
                         string dataTypeString = member.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
 
                         // Полный путь к переменной
@@ -406,7 +406,7 @@ namespace SiemensTrend.Communication.TIA
                     writer.WriteLine($"<TagTable Name=\"{tagTable.Name}\">");
                     writer.WriteLine("  <Tags>");
 
-                    foreach (var tag in tagTable.Tags)
+                    foreach (var tag in tagTable.Tags.Cast<Siemens.Engineering.SW.Tags.PlcTag>())
                     {
                         string name = tag.Name;
                         string dataType = tag.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
