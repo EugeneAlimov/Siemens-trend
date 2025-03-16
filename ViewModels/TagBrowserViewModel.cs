@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using SiemensTrend.Communication.TIA;
@@ -19,6 +21,7 @@ namespace SiemensTrend.ViewModels
         private ObservableCollection<TreeViewItemViewModel> _rootItems;
         private string _searchText;
         private bool _isLoading;
+        private PlcData _plcData; // Хранилище данных ПЛК и DB
 
         /// <summary>
         /// Корневые элементы дерева
@@ -35,7 +38,13 @@ namespace SiemensTrend.ViewModels
         public string SearchText
         {
             get => _searchText;
-            set => SetProperty(ref _searchText, value);
+            set
+            {
+                if (SetProperty(ref _searchText, value) && !_isLoading)
+                {
+                    SearchTags(); // Вызываем поиск при изменении текста
+                }
+            }
         }
 
         /// <summary>
@@ -58,6 +67,11 @@ namespace SiemensTrend.ViewModels
         public ICommand AddTagCommand { get; }
 
         /// <summary>
+        /// Команда поиска
+        /// </summary>
+        public ICommand SearchCommand { get; }
+
+        /// <summary>
         /// Событие выбора тега для мониторинга
         /// </summary>
         public event EventHandler<TagDefinition> TagSelected;
@@ -69,12 +83,14 @@ namespace SiemensTrend.ViewModels
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _tiaService = tiaService ?? throw new ArgumentNullException(nameof(tiaService));
+            _plcData = new PlcData();
 
             RootItems = new ObservableCollection<TreeViewItemViewModel>();
 
             // Инициализируем команды
             RefreshCommand = new RelayCommand(RefreshTags);
             AddTagCommand = new RelayCommand<TreeViewItemViewModel>(AddTagToMonitoring);
+            SearchCommand = new RelayCommand(SearchTags);
 
             // Инициализируем дерево
             InitializeTree();
@@ -107,103 +123,37 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Обновление списка тегов
         /// </summary>
-        private async void RefreshTags()
+        public async void RefreshTags()
         {
             try
             {
                 IsLoading = true;
+                _logger.Info("Обновление дерева тегов...");
 
                 InitializeTree(); // Очищаем и создаем базовую структуру
 
                 var plcTagsNode = RootItems[0];
                 var dbTagsNode = RootItems[1];
 
-                // Выполняем в отдельном потоке, чтобы не блокировать UI
-                await Task.Run(() => {
-                    // Получаем все таблицы тегов
-                    var tagTables = _tiaService.GetAllTagTables();
+                try
+                {
+                    // Получаем данные из TIA Portal
+                    _plcData = await _tiaService.GetAllProjectTagsAsync();
+                    _logger.Info($"Получено {_plcData.PlcTags.Count} тегов ПЛК и {_plcData.DbTags.Count} тегов DB");
 
-                    // Группируем таблицы тегов
-                    foreach (var tagTable in tagTables)
-                    {
-                        var tableNode = new TreeViewItemViewModel
-                        {
-                            Header = tagTable.Name,
-                            IsExpanded = false
-                        };
+                    // Добавляем теги ПЛК в дерево
+                    AddPlcTagsToTree(_plcData.PlcTags, plcTagsNode);
 
-                        // Читаем теги из таблицы
-                        var plcTags = _tiaService.ReadPlcTagTable(tagTable);
+                    // Добавляем теги DB в дерево
+                    AddDbTagsToTree(_plcData.DbTags, dbTagsNode);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Ошибка при получении тегов из TIA Portal: {ex.Message}");
+                    // Падать не надо, просто показываем ошибку в логе
+                }
 
-                        // Добавляем теги в дерево
-                        foreach (var tag in plcTags.Tags)
-                        {
-                            var tagNode = new TreeViewItemViewModel
-                            {
-                                Header = tag.Name,
-                                IsExpanded = false,
-                                Tag = new TagDefinition
-                                {
-                                    Name = tag.Name,
-                                    Address = tag.Address,
-                                    DataType = tag.DataType,
-                                    GroupName = tag.TableName
-                                }
-                            };
-
-                            tableNode.Children.Add(tagNode);
-                        }
-
-                        // Добавляем узел таблицы только если есть теги
-                        if (tableNode.Children.Count > 0)
-                        {
-                            plcTagsNode.Children.Add(tableNode);
-                        }
-                    }
-
-                    // Получаем все блоки данных
-                    var dataBlocks = _tiaService.GetAllDataBlocks();
-
-                    // Группируем блоки данных
-                    foreach (var dataBlock in dataBlocks)
-                    {
-                        var dbNode = new TreeViewItemViewModel
-                        {
-                            Header = dataBlock.Name,
-                            IsExpanded = false
-                        };
-
-                        // Читаем теги из блока данных
-                        var dbTags = _tiaService.ReadDataBlockTags(dataBlock);
-
-                        // Добавляем теги в дерево
-                        foreach (var tag in dbTags.Tags)
-                        {
-                            var tagNode = new TreeViewItemViewModel
-                            {
-                                Header = tag.Name,
-                                IsExpanded = false,
-                                Tag = new TagDefinition
-                                {
-                                    Name = tag.FullName,
-                                    Address = tag.IsOptimized ? "Optimized" : tag.Address,
-                                    DataType = tag.DataType,
-                                    GroupName = tag.DbName
-                                }
-                            };
-
-                            dbNode.Children.Add(tagNode);
-                        }
-
-                        // Добавляем узел DB только если есть теги
-                        if (dbNode.Children.Count > 0)
-                        {
-                            dbTagsNode.Children.Add(dbNode);
-                        }
-                    }
-                });
-
-                _logger.Info("Дерево тегов обновлено");
+                _logger.Info("Дерево тегов обновлено успешно");
             }
             catch (Exception ex)
             {
@@ -213,6 +163,112 @@ namespace SiemensTrend.ViewModels
             {
                 IsLoading = false;
             }
+        }
+
+        /// <summary>
+        /// Добавить теги ПЛК в дерево
+        /// </summary>
+        private void AddPlcTagsToTree(List<TagDefinition> plcTags, TreeViewItemViewModel plcTagsNode)
+        {
+            // Группируем ПЛК теги по таблицам
+            var plcTagsByTable = plcTags
+                .GroupBy(t => t.GroupName)
+                .OrderBy(g => g.Key);
+
+            foreach (var group in plcTagsByTable)
+            {
+                var tableNode = new TreeViewItemViewModel
+                {
+                    Header = group.Key ?? "Неизвестная таблица",
+                    IsExpanded = false
+                };
+
+                // Добавляем теги в дерево
+                foreach (var tag in group.OrderBy(t => t.Name))
+                {
+                    var tagNode = new TreeViewItemViewModel
+                    {
+                        Header = tag.Name,
+                        IsExpanded = false,
+                        Tag = tag
+                    };
+
+                    tableNode.Children.Add(tagNode);
+                }
+
+                // Добавляем узел таблицы только если есть теги
+                if (tableNode.Children.Count > 0)
+                {
+                    plcTagsNode.Children.Add(tableNode);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Добавить теги DB в дерево
+        /// </summary>
+        private void AddDbTagsToTree(List<TagDefinition> dbTags, TreeViewItemViewModel dbTagsNode)
+        {
+            // Группируем DB теги по блокам данных
+            var dbTagsByBlock = dbTags
+                .GroupBy(t => t.GroupName)
+                .OrderBy(g => g.Key);
+
+            foreach (var group in dbTagsByBlock)
+            {
+                var isOptimized = group.Any(t => t.IsOptimized);
+                var isSafety = group.Any(t => t.IsSafety);
+                var isUdt = group.Any(t => t.IsUDT);
+
+                var dbNode = new TreeViewItemViewModel
+                {
+                    Header = (group.Key ?? "Неизвестный DB") +
+                             (isOptimized ? " (Optimized)" : "") +
+                             (isSafety ? " (Safety)" : "") +
+                             (isUdt ? " (UDT)" : ""),
+                    IsExpanded = false
+                };
+
+                // Добавляем теги в дерево
+                foreach (var tag in group.OrderBy(t => t.Name))
+                {
+                    // Получаем только имя переменной (без имени DB)
+                    string displayName = GetTagDisplayName(tag.Name, group.Key);
+
+                    var tagNode = new TreeViewItemViewModel
+                    {
+                        Header = displayName,
+                        IsExpanded = false,
+                        Tag = tag
+                    };
+
+                    dbNode.Children.Add(tagNode);
+                }
+
+                // Добавляем узел DB только если есть теги
+                if (dbNode.Children.Count > 0)
+                {
+                    dbTagsNode.Children.Add(dbNode);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Получить отображаемое имя тега (без префикса DB)
+        /// </summary>
+        private string GetTagDisplayName(string fullName, string dbName)
+        {
+            if (string.IsNullOrEmpty(fullName))
+                return "Unknown";
+
+            // Если имя начинается с имени DB и точки, удаляем эту часть
+            if (!string.IsNullOrEmpty(dbName) && fullName.StartsWith(dbName + "."))
+            {
+                return fullName.Substring(dbName.Length + 1);
+            }
+
+            // Иначе возвращаем как есть
+            return fullName;
         }
 
         /// <summary>
@@ -240,80 +296,51 @@ namespace SiemensTrend.ViewModels
 
             try
             {
+                IsLoading = true;
                 _logger.Info($"Поиск тегов по запросу: {SearchText}");
 
                 string searchTextLower = SearchText.ToLower();
 
-                // Временно отключаем обновление, чтобы не вызывать множественные перерисовки
-                InitializeTree(); // Очищаем и создаем базовую структуру
+                // Сбрасываем дерево
+                InitializeTree();
 
                 var plcTagsNode = RootItems[0];
                 var dbTagsNode = RootItems[1];
 
-                // Получаем все теги (для демо просто используем то, что есть)
-                var allTags = _tiaService.GetTagsFromProjectAsync().Result;
-
                 // Фильтруем по строке поиска
-                var filteredTags = allTags.Where(tag =>
+                var filteredPlcTags = _plcData.PlcTags.Where(tag =>
                     tag.Name.ToLower().Contains(searchTextLower) ||
                     tag.Address.ToLower().Contains(searchTextLower) ||
                     (tag.Comment != null && tag.Comment.ToLower().Contains(searchTextLower))).ToList();
 
-                // Группируем отфильтрованные теги
-                var plcTags = filteredTags.Where(t => !t.GroupName.StartsWith("DB")).ToList();
-                var dbTags = filteredTags.Where(t => t.GroupName.StartsWith("DB")).ToList();
+                var filteredDbTags = _plcData.DbTags.Where(tag =>
+                    tag.Name.ToLower().Contains(searchTextLower) ||
+                    tag.Address.ToLower().Contains(searchTextLower) ||
+                    (tag.Comment != null && tag.Comment.ToLower().Contains(searchTextLower))).ToList();
 
-                // Группируем PLC теги по таблицам
-                var plcTagsByTable = plcTags.GroupBy(t => t.GroupName);
-                foreach (var group in plcTagsByTable)
+                // Добавляем отфильтрованные теги в дерево
+                AddPlcTagsToTree(filteredPlcTags, plcTagsNode);
+                AddDbTagsToTree(filteredDbTags, dbTagsNode);
+
+                // Разворачиваем узлы для результатов поиска
+                foreach (var node in plcTagsNode.Children)
                 {
-                    var tableNode = new TreeViewItemViewModel
-                    {
-                        Header = group.Key,
-                        IsExpanded = true
-                    };
-
-                    foreach (var tag in group)
-                    {
-                        tableNode.Children.Add(new TreeViewItemViewModel
-                        {
-                            Header = tag.Name,
-                            IsExpanded = false,
-                            Tag = tag
-                        });
-                    }
-
-                    plcTagsNode.Children.Add(tableNode);
+                    node.IsExpanded = true;
+                }
+                foreach (var node in dbTagsNode.Children)
+                {
+                    node.IsExpanded = true;
                 }
 
-                // Группируем DB теги по блокам данных
-                var dbTagsByBlock = dbTags.GroupBy(t => t.GroupName);
-                foreach (var group in dbTagsByBlock)
-                {
-                    var dbNode = new TreeViewItemViewModel
-                    {
-                        Header = group.Key,
-                        IsExpanded = true
-                    };
-
-                    foreach (var tag in group)
-                    {
-                        dbNode.Children.Add(new TreeViewItemViewModel
-                        {
-                            Header = tag.Name,
-                            IsExpanded = false,
-                            Tag = tag
-                        });
-                    }
-
-                    dbTagsNode.Children.Add(dbNode);
-                }
-
-                _logger.Info($"Найдено {filteredTags.Count} тегов");
+                _logger.Info($"Найдено {filteredPlcTags.Count + filteredDbTags.Count} тегов по запросу");
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
+            }
+            finally
+            {
+                IsLoading = false;
             }
         }
     }

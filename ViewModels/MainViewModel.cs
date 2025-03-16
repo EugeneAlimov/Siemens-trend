@@ -7,6 +7,7 @@ using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.S7;
+using System.Windows;
 
 namespace SiemensTrend.ViewModels
 {
@@ -328,6 +329,160 @@ namespace SiemensTrend.ViewModels
             {
                 _logger.Error($"Ошибка при остановке мониторинга: {ex.Message}");
                 StatusMessage = "Ошибка при остановке мониторинга";
+            }
+        }
+
+        /// <summary>
+        /// Получение тегов ПЛК
+        /// </summary>
+        public async Task GetPlcTagsAsync()
+        {
+            if (!IsConnected || _tiaPortalService == null)
+            {
+                _logger.Error("Невозможно получить теги ПЛК без подключения к TIA Portal");
+                return;
+            }
+
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Получение тегов ПЛК...";
+                ProgressValue = 10;
+
+                // Получаем теги ПЛК
+                var plcTags = await _tiaPortalService.GetPlcTagsAsync();
+                ProgressValue = 90;
+
+                // Обновляем отображение тегов ПЛК
+                // Если у вас есть коллекция для отображения тегов ПЛК, обновите её:
+                // PlcTags = new ObservableCollection<TagDefinition>(plcTags);
+
+                StatusMessage = $"Получено {plcTags.Count} тегов ПЛК";
+                ProgressValue = 100;
+
+                _logger.Info($"Теги ПЛК получены успешно: {plcTags.Count} тегов");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
+                StatusMessage = "Ошибка получения тегов ПЛК";
+                ProgressValue = 0;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Получение тегов блоков данных
+        /// </summary>
+        public async Task GetDbTagsAsync()
+        {
+            if (!IsConnected || _tiaPortalService == null)
+            {
+                _logger.Error("Невозможно получить теги DB без подключения к TIA Portal");
+                return;
+            }
+
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Получение тегов блоков данных...";
+                ProgressValue = 10;
+
+                // Получаем теги DB
+                var dbTags = await _tiaPortalService.GetDbTagsAsync();
+                ProgressValue = 90;
+
+                // Обновляем отображение тегов DB
+                // Если у вас есть коллекция для отображения тегов DB, обновите её:
+                // DbTags = new ObservableCollection<TagDefinition>(dbTags);
+
+                StatusMessage = $"Получено {dbTags.Count} тегов блоков данных";
+                ProgressValue = 100;
+
+                _logger.Info($"Теги блоков данных получены успешно: {dbTags.Count} тегов");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении тегов блоков данных: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
+                StatusMessage = "Ошибка получения тегов блоков данных";
+                ProgressValue = 0;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Обработчик нажатия кнопки "Получить теги ПЛК"
+        /// </summary>
+        private async void BtnGetPlcTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("Запрос тегов ПЛК");
+
+                // Проверяем инициализацию TagBrowserViewModel
+                if (_viewModel.TagBrowserViewModel != null)
+                {
+                    // Загружаем теги через обозреватель тегов
+                    _viewModel.StatusMessage = "Загрузка тегов ПЛК...";
+                    _viewModel.TagBrowserViewModel.RefreshTags();
+                    _viewModel.StatusMessage = "Теги ПЛК получены";
+                }
+                else
+                {
+                    // Используем метод для прямого получения тегов ПЛК
+                    await _viewModel.GetPlcTagsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
+                MessageBox.Show($"Ошибка при получении тегов ПЛК: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Обработчик нажатия кнопки "Получить теги DB"
+        /// </summary>
+        private async void BtnGetDbTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("Запрос тегов DB");
+
+                // Проверяем инициализацию TagBrowserViewModel
+                if (_viewModel.TagBrowserViewModel != null)
+                {
+                    // Загружаем теги через обозреватель тегов
+                    _viewModel.StatusMessage = "Загрузка тегов DB...";
+                    _viewModel.TagBrowserViewModel.RefreshTags();
+                    _viewModel.StatusMessage = "Теги DB получены";
+                }
+                else
+                {
+                    // Используем метод для прямого получения тегов DB
+                    await _viewModel.GetDbTagsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении тегов DB: {ex.Message}");
+                MessageBox.Show($"Ошибка при получении тегов DB: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
