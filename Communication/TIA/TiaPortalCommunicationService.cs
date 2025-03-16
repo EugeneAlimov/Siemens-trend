@@ -474,12 +474,12 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 _logger.Info("Запуск нового экземпляра TIA Portal");
-
+                
                 // Запускаем асинхронно, чтобы не блокировать UI
                 await Task.Run(() => {
                     _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
                 });
-
+                
                 _logger.Info("TIA Portal успешно запущен");
                 return true;
             }
@@ -509,8 +509,20 @@ namespace SiemensTrend.Communication.TIA
                 _tiaPortal = projectInfo.TiaPortalInstance;
                 _project = projectInfo.Project;
 
-                // Создаем читатель тегов
+                // Проверяем, что проект действительно открыт
+                if (_project == null)
+                {
+                    _logger.Error("Ошибка: Объект проекта равен null после подключения");
+                    return false;
+                }
+
+                // Создаем читатель тегов с явной проверкой
                 _tagReader = new TiaPortalTagReader(_logger, this);
+                if (_tagReader == null)
+                {
+                    _logger.Error("Ошибка: Не удалось создать TiaPortalTagReader");
+                    return false;
+                }
 
                 _isConnected = true;
                 _logger.Info($"Успешное подключение к проекту: {_project.Name}");
@@ -520,6 +532,10 @@ namespace SiemensTrend.Communication.TIA
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при подключении к проекту: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
                 _isConnected = false;
                 return false;
             }
@@ -532,6 +548,13 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
+                _logger.Info("Запуск нового экземпляра TIA Portal");
+                _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
+                _logger.Info("TIA Portal успешно запущен");
+
+                _project = _tiaPortal.Projects.Open(new FileInfo(projectPath));
+                _logger.Info($"Проект успешно открыт: {_project.Name}");
+
                 if (string.IsNullOrEmpty(projectPath))
                 {
                     _logger.Error("Ошибка: путь к проекту не может быть пустым");
@@ -578,7 +601,7 @@ namespace SiemensTrend.Communication.TIA
                 {
                     // Создаем читатель тегов
                     _tagReader = new TiaPortalTagReader(_logger, this);
-
+                    
                     _isConnected = true;
                     _logger.Info($"Проект успешно открыт: {_project.Name}");
                     return true;
@@ -632,37 +655,49 @@ namespace SiemensTrend.Communication.TIA
                 return null;
             }
 
-            try
+            _logger.Info($"Поиск PLC Software в проекте {_project.Name}");
+            _logger.Info($"Количество устройств в проекте: {_project.Devices.Count}");
+
+            foreach (var device in _project.Devices)
             {
-                _logger.Info($"Поиск PLC Software в проекте {_project.Name}");
+                _logger.Info($"Проверка устройства: {device.Name} (Тип: {device.TypeIdentifier})");
+                _logger.Info($"Количество элементов устройства: {device.DeviceItems.Count}");
 
-                foreach (var device in _project.Devices)
+                foreach (var deviceItem in device.DeviceItems)
                 {
-                    _logger.Debug($"Проверка устройства: {device.Name}");
+                    _logger.Info($"Проверка элемента устройства: {deviceItem.Name}");
 
-                    // Перебираем все элементы устройства
-                    foreach (var deviceItem in device.DeviceItems)
+                    try
                     {
-                        // Пытаемся получить контейнер программного обеспечения
                         var softwareContainer = deviceItem.GetService<SoftwareContainer>();
-
-                        // Проверяем, является ли ПО программным обеспечением ПЛК
-                        if (softwareContainer?.Software is PlcSoftware plcSoftware)
+                        if (softwareContainer != null)
                         {
-                            _logger.Info($"Найден PLC Software в устройстве: {device.Name}");
-                            return plcSoftware;
+                            _logger.Info("SoftwareContainer получен");
+
+                            if (softwareContainer.Software is PlcSoftware plcSoftware)
+                            {
+                                _logger.Info($"Найден PLC Software в устройстве: {device.Name}");
+                                return plcSoftware;
+                            }
+                            else
+                            {
+                                _logger.Info($"SoftwareContainer не содержит PlcSoftware");
+                            }
+                        }
+                        else
+                        {
+                            _logger.Info($"Не удалось получить SoftwareContainer для элемента {deviceItem.Name}");
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Ошибка при проверке элемента устройства {deviceItem.Name}: {ex.Message}");
+                    }
                 }
+            }
 
-                _logger.Warn("PLC Software не найдено в проекте");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при поиске PLC Software: {ex.Message}");
-                return null;
-            }
+            _logger.Error("PLC Software не найдено в проекте");
+            return null;
         }
 
         /// <summary>
@@ -680,7 +715,7 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 _logger.Info("Запуск чтения всех тегов проекта");
-
+                
                 // Проверяем, создан ли читатель тегов
                 if (_tagReader == null)
                 {
@@ -713,12 +748,29 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
-                var plcData = await GetAllProjectTagsAsync();
+                _logger.Info("Начало получения тегов ПЛК...");
+
+                var plcSoftware = GetPlcSoftware();
+                if (plcSoftware == null)
+                {
+                    _logger.Error("Не удалось получить PlcSoftware - объект равен null");
+                    return new List<TagDefinition>();
+                }
+
+                _logger.Info("PlcSoftware получен успешно");
+
+                var plcData = await _tagReader.ReadAllTagsAsync();
+                _logger.Info($"Чтение завершено: найдено {plcData.PlcTags.Count} тегов ПЛК");
+
                 return plcData.PlcTags;
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
                 return new List<TagDefinition>();
             }
         }
@@ -803,7 +855,7 @@ namespace SiemensTrend.Communication.TIA
             {
                 // Получаем тип ПЛК из свойств устройства
                 string deviceType = "Unknown";
-
+                
                 if (device.TypeIdentifier.Contains("S7-1200"))
                 {
                     deviceType = "S7-1200";
@@ -828,7 +880,7 @@ namespace SiemensTrend.Communication.TIA
                 {
                     deviceType = "S7-1500F";
                 }
-
+                
                 return deviceType;
             }
             catch

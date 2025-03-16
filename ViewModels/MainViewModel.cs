@@ -368,12 +368,6 @@ namespace SiemensTrend.ViewModels
         /// </summary>
         public async Task GetPlcTagsAsync()
         {
-            if (!IsConnected || _tiaPortalService == null)
-            {
-                _logger.Error("Невозможно получить теги ПЛК без подключения к TIA Portal");
-                return;
-            }
-
             try
             {
                 IsLoading = true;
@@ -386,6 +380,8 @@ namespace SiemensTrend.ViewModels
 
                 // Обновляем отображение тегов ПЛК
                 PlcTags.Clear();
+                _logger.Info($"Начинаем добавление {plcTags.Count} тегов ПЛК в UI коллекцию");
+
                 foreach (var tag in plcTags)
                 {
                     PlcTags.Add(tag);
@@ -399,10 +395,6 @@ namespace SiemensTrend.ViewModels
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
-                }
                 StatusMessage = "Ошибка получения тегов ПЛК";
                 ProgressValue = 0;
             }

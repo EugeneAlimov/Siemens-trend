@@ -835,7 +835,7 @@ namespace SiemensTrend.Communication.TIA
                 }
 
                 // Выполняем чтение тегов в отдельном потоке для избежания блокировки UI
-                await Task.Run(() => {
+                //await Task.Run(() => {
                     try
                     {
                         // Читаем теги ПЛК
@@ -851,7 +851,7 @@ namespace SiemensTrend.Communication.TIA
                     {
                         _logger.Error($"Ошибка при чтении тегов в фоновом потоке: {ex.Message}");
                     }
-                });
+                //});
 
                 _logger.Info($"Чтение тегов завершено: {plcData.PlcTags.Count} тегов ПЛК, {plcData.DbTags.Count} тегов DB");
             }
