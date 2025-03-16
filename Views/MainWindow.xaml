@@ -111,10 +111,10 @@
                               AutoGenerateColumns="False" IsReadOnly="True" 
                               AlternatingRowBackground="LightGray">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Таблица" Binding="{Binding TableName}" Width="120"/>
+                            <DataGridTextColumn Header="Таблица" Binding="{Binding GroupName}" Width="120"/>
                             <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="150"/>
                             <DataGridTextColumn Header="Тип данных" Binding="{Binding DataType}" Width="100"/>
-                            <DataGridTextColumn Header="Адрес" Binding="{Binding LogicalAddress}" Width="100"/>
+                            <DataGridTextColumn Header="Адрес" Binding="{Binding Address}" Width="100"/>
                             <DataGridTextColumn Header="Комментарий" Binding="{Binding Comment}" Width="*"/>
                             <DataGridTemplateColumn Header="Действия" Width="80">
                                 <DataGridTemplateColumn.CellTemplate>

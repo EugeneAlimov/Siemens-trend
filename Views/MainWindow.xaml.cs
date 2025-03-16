@@ -23,24 +23,18 @@ namespace SiemensTrend.Views
             InitializeComponent();
 
             // Создаем логер
+            // Создаем логер
             _logger = new Logger();
 
             // Создаем и устанавливаем модель представления
             _viewModel = new MainViewModel(_logger);
             DataContext = _viewModel;
 
-            // Подписываемся на изменение состояния подключения
-            _viewModel.PropertyChanged += (sender, args) =>
-            {
-                if (args.PropertyName == nameof(_viewModel.IsConnected))
-                {
-                    UpdateConnectionState();
-                }
-                else if (args.PropertyName == nameof(_viewModel.IsLoading))
-                {
-                    UpdateLoadingIndicator();
-                }
-            };
+            // Инициализируем TagBrowserViewModel
+            _viewModel.InitializeTagBrowser();
+
+            // Устанавливаем DataContext для TagBrowserView
+            tagBrowser.DataContext = _viewModel.TagBrowserViewModel;
 
             // Инициализируем начальное состояние
             UpdateConnectionState();
@@ -233,16 +227,8 @@ namespace SiemensTrend.Views
             try
             {
                 _logger.Info("Запрос тегов ПЛК");
-
-                // Здесь будет вызов соответствующего метода ViewModel
-                // Например: await _viewModel.GetPlcTagsAsync();
-
-                // Пока просто выводим сообщение
-                _viewModel.StatusMessage = "Получение тегов ПЛК...";
-                await Task.Delay(1000); // Имитация работы
-                _viewModel.StatusMessage = "Теги ПЛК получены";
-
-                _logger.Info("Теги ПЛК получены");
+                await _viewModel.GetPlcTagsAsync();
+                _logger.Info($"Получено {_viewModel.PlcTags.Count} тегов ПЛК");
             }
             catch (Exception ex)
             {
