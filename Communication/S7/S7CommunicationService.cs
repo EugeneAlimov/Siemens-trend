@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
-using SiemensTrend.Communication;
 
 namespace SiemensTrend.Communication.S7
 {

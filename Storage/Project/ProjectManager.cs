@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 using SiemensTrend.Core.Logging;
-using SiemensTrend.Core.Models;
 
 namespace SiemensTrend.Storage.Project
 {

@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Logging;

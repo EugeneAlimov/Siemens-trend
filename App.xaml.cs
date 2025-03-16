@@ -2,9 +2,8 @@
 using System.IO;
 using System.Reflection;
 using System.Windows;
-using SiemensTrend.Core.Logging;
-using Siemens.Collaboration.Net.TiaPortal.Openness.Resolver;
 using Siemens.Collaboration.Net;
+using SiemensTrend.Core.Logging;
 
 namespace SiemensTrend
 {

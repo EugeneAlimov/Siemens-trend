@@ -1,12 +1,12 @@
 ﻿using System;
-using System.IO;
-using System.Windows;
 using System.Collections.Generic;
-using Microsoft.Win32;
+using System.IO;
 using System.Threading.Tasks;
+using System.Windows;
+using Microsoft.Win32;
+using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.ViewModels;
-using SiemensTrend.Communication.TIA;
 
 namespace SiemensTrend.Views
 {

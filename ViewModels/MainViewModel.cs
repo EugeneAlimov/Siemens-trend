@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.ObjectModel;
-using System.Threading.Tasks;
-using System.IO;
-using System.Collections.Generic;
 using System.Linq; // Добавлено для методов Any(), Where() и т.д.
-using SiemensTrend.Core.Logging;
-using SiemensTrend.Core.Models;
+using System.Threading.Tasks;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.S7;
-using System.Windows;
+using SiemensTrend.Core.Logging;
+using SiemensTrend.Core.Models;
 
 namespace SiemensTrend.ViewModels
 {

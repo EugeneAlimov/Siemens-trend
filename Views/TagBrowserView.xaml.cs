@@ -1,5 +1,4 @@
 ﻿using System.Windows.Controls;
-using SiemensTrend.ViewModels;
 
 namespace SiemensTrend.Views
 {

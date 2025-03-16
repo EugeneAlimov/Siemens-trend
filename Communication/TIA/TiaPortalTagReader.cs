@@ -1,18 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.IO;
 using Siemens.Engineering;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
-using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Blocks.Interface;
+using Siemens.Engineering.SW.Tags;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
-using Siemens.Collaboration.Net.CoreExtensions.ExplicitExtensions;
 
 namespace SiemensTrend.Communication.TIA
 {
@@ -131,18 +130,18 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Обработка таблиц тегов в текущей группе
-                foreach (var tagTable in group.TagTables.Cast<PlcTagTable>())
+                foreach (var tagTable in group.TagTables)
                 {
-                    ProcessTagTable(tagTable, plcData, parentPath);
+                    ProcessTagTable(tagTable as PlcTagTable, plcData, parentPath);
                 }
 
                 // Рекурсивная обработка подгрупп
-                foreach (var subgroup in group.Groups.Cast<PlcTagTableUserGroup>())
+                foreach (var subgroup in group.Groups)
                 {
                     string newPath = string.IsNullOrEmpty(parentPath) ?
                         subgroup.Name : $"{parentPath}/{subgroup.Name}";
 
-                    ProcessTagTableGroup(subgroup, plcData, newPath);
+                    ProcessTagTableGroup(subgroup as PlcTagTableUserGroup, plcData, newPath);
                 }
             }
             catch (Exception ex)
@@ -156,6 +155,12 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         private void ProcessTagTable(PlcTagTable tagTable, PlcData plcData, string groupPath)
         {
+            if (tagTable == null)
+            {
+                _logger.Warn("Получена пустая таблица тегов");
+                return;
+            }
+
             _logger.Info($"Обработка таблицы тегов: {tagTable.Name}");
 
             // Полный путь к таблице
@@ -165,15 +170,23 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Обрабатываем каждый тег в таблице
-                foreach (var tag in tagTable.Tags.Cast<Siemens.Engineering.SW.Tags.PlcTag>())
+                foreach (var tag in tagTable.Tags)
                 {
                     try
                     {
+                        // Приводим к типу PlcTag
+                        var plcTag = tag as Siemens.Engineering.SW.Tags.PlcTag;
+                        if (plcTag == null) continue;
+
                         // Получаем атрибуты тега
-                        string name = tag.Name;
-                        string dataTypeString = tag.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
-                        string address = tag.GetAttribute("LogicalAddress")?.ToString() ?? "";
-                        string comment = tag.GetAttribute("Comment")?.ToString() ?? "";
+                        string name = plcTag.Name;
+                        string dataTypeString = "Unknown";
+                        string address = "";
+                        string comment = "";
+
+                        try { dataTypeString = GetMultilingualText(plcTag.DataTypeName); } catch { }
+                        try { address = plcTag.LogicalAddress; } catch { }
+                        try { comment = GetMultilingualText(plcTag.Comment); } catch { }
 
                         // Конвертируем строковый тип данных в TagDataType
                         TagDataType dataType = ConvertToTagDataType(dataTypeString);
@@ -195,7 +208,7 @@ namespace SiemensTrend.Communication.TIA
                     }
                     catch (Exception ex)
                     {
-                        _logger.Error($"Ошибка при обработке тега {tag.Name}: {ex.Message}");
+                        _logger.Error($"Ошибка при обработке тега: {ex.Message}");
                     }
                 }
 
@@ -208,6 +221,61 @@ namespace SiemensTrend.Communication.TIA
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при обработке таблицы тегов {tagTable.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Получение строкового значения из объекта MultilingualText
+        /// </summary>
+        private string GetMultilingualText(object multilingualTextObj)
+        {
+            try
+            {
+                if (multilingualTextObj == null)
+                    return string.Empty;
+
+                // Если это уже string, просто возвращаем его
+                if (multilingualTextObj is string textString)
+                    return textString;
+
+                // Если это MultilingualText, используем ToString() или другой доступный метод
+                if (multilingualTextObj is Siemens.Engineering.MultilingualText mlText)
+                {
+                    // В зависимости от версии API, доступ к тексту может различаться
+                    try
+                    {
+                        // Пытаемся использовать доступные свойства
+                        var itemsProperty = mlText.GetType().GetProperty("Items");
+                        if (itemsProperty != null)
+                        {
+                            // У MultilingualText может быть словарь Items[culture]
+                            var items = itemsProperty.GetValue(mlText) as System.Collections.IDictionary;
+                            if (items != null && items.Count > 0)
+                            {
+                                // Берем первый элемент словаря
+                                foreach (var key in items.Keys)
+                                {
+                                    var value = items[key];
+                                    if (value != null)
+                                        return value.ToString();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Если не получилось, пробуем простой ToString
+                        return mlText.ToString();
+                    }
+                }
+
+                // Для других объектов просто преобразуем в строку
+                return multilingualTextObj.ToString();
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 
@@ -244,7 +312,7 @@ namespace SiemensTrend.Communication.TIA
                 _logger.Debug($"Обработка группы блоков: {groupPath}");
 
                 // Обрабатываем блоки в текущей группе
-                foreach (var block in group.Blocks.Cast<PlcBlock>())
+                foreach (var block in group.Blocks)
                 {
                     if (block is DataBlock db)
                     {
@@ -253,9 +321,9 @@ namespace SiemensTrend.Communication.TIA
                 }
 
                 // Рекурсивная обработка подгрупп
-                foreach (var subgroup in group.Groups.Cast<PlcBlockGroup>())
+                foreach (var subgroup in group.Groups)
                 {
-                    ProcessBlockGroup(subgroup, plcData, groupPath);
+                    ProcessBlockGroup(subgroup as PlcBlockGroup, plcData, groupPath);
                 }
             }
             catch (Exception ex)
@@ -273,16 +341,26 @@ namespace SiemensTrend.Communication.TIA
 
             try
             {
-                // Проверяем наличие интерфейса и членов
+                // Проверяем наличие интерфейса
                 if (db.Interface == null)
                 {
                     _logger.Warn($"Блок данных {db.Name} не имеет интерфейса");
                     return;
                 }
 
-                // Проверяем, есть ли члены в интерфейсе
-                var members = db.Interface.GetComposition("Members");
-                if (members == null || !members.Cast<Member>().Any())
+                // Проверяем наличие членов в блоке данных
+                bool hasMembers = false;
+                try
+                {
+                    // В новых версиях TIA Portal доступ к членам осуществляется через свойство Members
+                    hasMembers = db.Interface.Members != null && db.Interface.Members.Count() > 0;
+                }
+                catch
+                {
+                    _logger.Warn($"Не удалось получить члены блока данных {db.Name}");
+                }
+
+                if (!hasMembers)
                 {
                     _logger.Warn($"Блок данных {db.Name} не имеет переменных");
                     return;
@@ -297,7 +375,7 @@ namespace SiemensTrend.Communication.TIA
 
                 try
                 {
-                    var programmingLanguage = db.GetAttribute("ProgrammingLanguage")?.ToString();
+                    var programmingLanguage = GetMultilingualText(db.GetAttribute("ProgrammingLanguage"));
                     isSafety = programmingLanguage == "F_DB";
                 }
                 catch
@@ -328,27 +406,107 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
-                // Получаем коллекцию членов блока данных
-                var members = memberContainer.GetComposition("Members");
+                // Пытаемся получить члены различными способами в зависимости от версии API
+                IEnumerable<Member> members = null;
 
-                if (members == null)
+                // Попытка 1: Используем свойство Members для PlcBlockInterface
+                if (memberContainer is PlcBlockInterface plcBlockInterface)
                 {
-                    return;
+                    members = plcBlockInterface.Members;
                 }
-
-                // Преобразуем в список и проверяем, есть ли элементы
-                var membersList = members.Cast<Member>().ToList();
-                if (membersList.Count() == 0)
-                {
-                    return;
-                }
-
-                foreach (var member in membersList)
+                // Попытка 2: Используем метод GetMembers() или другой способ для других типов
+                else
                 {
                     try
                     {
+                        // Используем reflection для попытки вызова метода Members или GetMembers
+                        var membersProperty = memberContainer.GetType().GetProperty("Members");
+                        if (membersProperty != null)
+                        {
+                            var membersObj = membersProperty.GetValue(memberContainer);
+                            if (membersObj is IEnumerable<Member> membersList)
+                            {
+                                members = membersList;
+                            }
+                        }
+                        else
+                        {
+                            // Пробуем получить доступ к членам через GetComposition (старый API)
+                            try
+                            {
+                                var getCompositionMethod = memberContainer.GetType().GetMethod("GetComposition");
+                                if (getCompositionMethod != null)
+                                {
+                                    var membersObj = getCompositionMethod.Invoke(memberContainer, new object[] { "Members" });
+
+                                    // Пытаемся преобразовать в список членов через LINQ
+                                    if (membersObj != null)
+                                    {
+                                        var enumerableType = membersObj.GetType();
+                                        var castMethod = typeof(Enumerable).GetMethod("Cast").MakeGenericMethod(typeof(Member));
+                                        members = (IEnumerable<Member>)castMethod.Invoke(null, new object[] { membersObj });
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                _logger.Warn("Не удалось получить доступ к членам через GetComposition");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn($"Ошибка при получении членов: {ex.Message}");
+                    }
+                }
+
+                // Проверяем, получили ли мы члены
+                if (members == null || !members.Any())
+                {
+                    return;
+                }
+
+                // Обрабатываем каждый член
+                foreach (var member in members)
+                {
+                    try
+                    {
+                        if (member == null) continue;
+
                         string name = member.Name;
-                        string dataTypeString = member.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
+
+                        // Получаем тип данных через различные методы API
+                        string dataTypeString = "Unknown";
+                        try
+                        {
+                            var dataTypeNameProp = member.GetType().GetProperty("DataTypeName");
+                            if (dataTypeNameProp != null)
+                            {
+                                var dataTypeObj = dataTypeNameProp.GetValue(member);
+                                dataTypeString = GetMultilingualText(dataTypeObj);
+                            }
+                            else
+                            {
+                                // Альтернативный подход - через GetAttribute
+                                try
+                                {
+                                    var getAttributeMethod = member.GetType().GetMethod("GetAttribute");
+                                    if (getAttributeMethod != null)
+                                    {
+                                        var dataTypeObj = getAttributeMethod.Invoke(member, new object[] { "DataTypeName" });
+                                        dataTypeString = GetMultilingualText(dataTypeObj);
+                                    }
+                                }
+                                catch
+                                {
+                                    // Игнорируем ошибки
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Игнорируем ошибки при получении типа данных
+                        }
 
                         // Полный путь к переменной
                         string memberPath = string.IsNullOrEmpty(parentPath) ? name : $"{parentPath}.{name}";
@@ -356,30 +514,102 @@ namespace SiemensTrend.Communication.TIA
                         // Полное имя переменной с именем блока данных
                         string fullName = $"{dbName}.{memberPath}";
 
-                        // Проверяем наличие вложенных членов (структуры)
-                        var nestedMembers = member.GetComposition("Members");
-
-                        // Проверяем количество вложенных членов
+                        // Проверяем, есть ли у члена вложенные элементы
                         bool hasNestedMembers = false;
-                        if (nestedMembers != null)
+                        IEngineeringObject nestedMemberContainer = null;
+
+                        try
                         {
-                            hasNestedMembers = nestedMembers.Cast<Member>().Any();
+                            // Пытаемся найти интерфейс или вложенные члены через reflection
+                            var interfaceProp = member.GetType().GetProperty("Interface");
+                            if (interfaceProp != null)
+                            {
+                                nestedMemberContainer = interfaceProp.GetValue(member) as IEngineeringObject;
+                                if (nestedMemberContainer != null)
+                                {
+                                    // Проверяем, есть ли члены в интерфейсе
+                                    var nestedMembersProp = nestedMemberContainer.GetType().GetProperty("Members");
+                                    if (nestedMembersProp != null)
+                                    {
+                                        var nestedMembersObj = nestedMembersProp.GetValue(nestedMemberContainer);
+                                        hasNestedMembers = nestedMembersObj != null &&
+                                                          (nestedMembersObj as IEnumerable<object>)?.Any() == true;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Пробуем получить через атрибуты или другие способы
+                                try
+                                {
+                                    var getAttributeMethod = member.GetType().GetMethod("GetAttribute");
+                                    if (getAttributeMethod != null)
+                                    {
+                                        nestedMemberContainer = getAttributeMethod.Invoke(member, new object[] { "Interface" }) as IEngineeringObject;
+                                        if (nestedMemberContainer != null)
+                                        {
+                                            hasNestedMembers = true; // Предполагаем, что если есть интерфейс, то есть и члены
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // Игнорируем ошибки
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Игнорируем ошибки при попытке определить вложенные члены
                         }
 
-                        if (hasNestedMembers)
+                        if (hasNestedMembers && nestedMemberContainer != null)
                         {
                             // Рекурсивно обрабатываем вложенную структуру
-                            ProcessDbMembers(member, dbName, memberPath, plcData, isOptimized, isUDT, isSafety);
+                            ProcessDbMembers(nestedMemberContainer, dbName, memberPath, plcData, isOptimized, isUDT, isSafety);
                         }
                         else
                         {
+                            // Получаем комментарий
+                            string comment = "";
+                            try
+                            {
+                                var commentProp = member.GetType().GetProperty("Comment");
+                                if (commentProp != null)
+                                {
+                                    var commentObj = commentProp.GetValue(member);
+                                    comment = GetMultilingualText(commentObj);
+                                }
+                                else
+                                {
+                                    // Альтернативно через GetAttribute
+                                    try
+                                    {
+                                        var getAttributeMethod = member.GetType().GetMethod("GetAttribute");
+                                        if (getAttributeMethod != null)
+                                        {
+                                            var commentObj = getAttributeMethod.Invoke(member, new object[] { "Comment" });
+                                            comment = GetMultilingualText(commentObj);
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        // Игнорируем ошибки
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Игнорируем ошибки при получении комментария
+                            }
+
                             // Создаем и добавляем тег блока данных
                             var dbTag = new TagDefinition
                             {
                                 Name = fullName,
                                 Address = isOptimized ? "Optimized" : "Standard",
                                 DataType = ConvertToTagDataType(dataTypeString),
-                                Comment = member.GetAttribute("Comment")?.ToString() ?? "",
+                                Comment = comment,
                                 GroupName = dbName,
                                 IsOptimized = isOptimized,
                                 IsUDT = isUDT || dataTypeString.StartsWith("UDT_") || dataTypeString.Contains("type"),
@@ -428,12 +658,19 @@ namespace SiemensTrend.Communication.TIA
                     writer.WriteLine($"<TagTable Name=\"{tagTable.Name}\">");
                     writer.WriteLine("  <Tags>");
 
-                    foreach (var tag in tagTable.Tags.Cast<Siemens.Engineering.SW.Tags.PlcTag>())
+                    foreach (var tag in tagTable.Tags)
                     {
-                        string name = tag.Name;
-                        string dataType = tag.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
-                        string address = tag.GetAttribute("LogicalAddress")?.ToString() ?? "";
-                        string comment = tag.GetAttribute("Comment")?.ToString() ?? "";
+                        var plcTag = tag as Siemens.Engineering.SW.Tags.PlcTag;
+                        if (plcTag == null) continue;
+
+                        string name = plcTag.Name;
+                        string dataType = "Unknown";
+                        string address = "";
+                        string comment = "";
+
+                        try { dataType = GetMultilingualText(plcTag.DataTypeName); } catch { }
+                        try { address = plcTag.LogicalAddress; } catch { }
+                        try { comment = GetMultilingualText(plcTag.Comment); } catch { }
 
                         writer.WriteLine($"    <Tag Name=\"{name}\" DataType=\"{dataType}\" Address=\"{address}\" Comment=\"{comment}\" />");
                     }
