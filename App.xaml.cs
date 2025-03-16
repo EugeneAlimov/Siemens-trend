@@ -1,6 +1,4 @@
 ﻿using System;
-using System.IO;
-using System.Reflection;
 using System.Windows;
 using SiemensTrend.Core.Logging;
 
@@ -18,42 +16,19 @@ namespace SiemensTrend
             _logger = new Logger("application.log");
             _logger.Info("Приложение запущено");
 
-            // Регистрируем обработчик для загрузки сборок Siemens.Engineering
-            AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
-        }
-
-        private static Assembly ResolveAssembly(object sender, ResolveEventArgs args)
-        {
-            _logger.Debug($"Запрос на загрузку сборки: {args.Name}");
-
-            string assemblyName = new AssemblyName(args.Name).Name;
-
-            // Обрабатываем только сборки Siemens.Engineering
-            if (!assemblyName.StartsWith("Siemens.Engineering"))
-                return null;
-
-            // Пути поиска сборок Siemens.Engineering
-            string[] searchPaths = new[]
+            try
             {
-                @"C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19",
-                @"C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18",
-                @"C:\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17",
-                @"C:\Program Files\Siemens\Automation\Portal V16\PublicAPI\V16"
-            };
-
-            foreach (string path in searchPaths)
-            {
-                string dllPath = Path.Combine(path, $"{assemblyName}.dll");
-
-                if (File.Exists(dllPath))
-                {
-                    _logger.Info($"Загружена сборка: {dllPath}");
-                    return Assembly.LoadFrom(dllPath);
-                }
+                // Инициализируем резолвер для сборок Siemens.Engineering из пакета
+                _logger.Info("Инициализация резолвера Siemens.Engineering");
+                Siemens.Collaboration.Net.TiaPortal.Openness.Resolver.Api.Global.Openness().Initialize();
             }
-
-            _logger.Error($"Не удалось найти сборку: {assemblyName}");
-            return null;
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при инициализации резолвера: {ex.Message}");
+                MessageBox.Show($"Ошибка при инициализации резолвера Siemens.Engineering: {ex.Message}\n\n" +
+                                "Убедитесь, что установлен TIA Portal и переустановите приложение.",
+                                "Ошибка инициализации", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         protected override void OnExit(ExitEventArgs e)

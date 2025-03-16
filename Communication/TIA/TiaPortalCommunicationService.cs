@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Siemens.Collaboration.Net.Logging;
 using Siemens.Engineering;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.HW;
@@ -82,10 +81,42 @@ namespace SiemensTrend.Communication.TIA
         /// Конструктор
         /// </summary>
         /// <param name="logger">Логер</param>
-
         public TiaPortalCommunicationService(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        /// <summary>
+        /// Вспомогательный метод для выполнения кода в UI-потоке (STA)
+        /// </summary>
+        private T ExecuteInUIThread<T>(Func<T> action)
+        {
+            if (System.Threading.Thread.CurrentThread.GetApartmentState() == System.Threading.ApartmentState.STA)
+            {
+                // Уже в STA-потоке, просто выполняем
+                return action();
+            }
+            else
+            {
+                // Создаем TaskCompletionSource для получения результата
+                var tcs = new TaskCompletionSource<T>();
+
+                // Используем DispatcherInvoke для выполнения в UI-потоке
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        var result = action();
+                        tcs.SetResult(result);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.SetException(ex);
+                    }
+                });
+
+                return tcs.Task.Result;
+            }
         }
 
         /// <summary>
@@ -156,40 +187,6 @@ namespace SiemensTrend.Communication.TIA
             }
         }
 
-        // Добавьте в класс TiaPortalCommunicationService
-        private T ExecuteInUIThread<T>(Func<T> action)
-        {
-            if (System.Threading.Thread.CurrentThread.GetApartmentState() == System.Threading.ApartmentState.STA)
-            {
-                // Уже в STA-потоке, просто выполняем
-                return action();
-            }
-            else
-            {
-                // Создаем TaskCompletionSource для получения результата
-                var tcs = new TaskCompletionSource<T>();
-
-                // Используем DispatcherInvoke для выполнения в UI-потоке
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                {
-                    try
-                    {
-                        var result = action();
-                        tcs.SetResult(result);
-                    }
-                    catch (Exception ex)
-                    {
-                        tcs.SetException(ex);
-                    }
-                });
-
-                return tcs.Task.Result;
-            }
-        }
-
-        // Использование:
-        // _project = ExecuteInUIThread(() => _tiaPortal.Projects.Open(new FileInfo(projectPath)));
-
         /// <summary>
         /// Открытие проекта TIA Portal
         /// </summary>
@@ -211,9 +208,8 @@ namespace SiemensTrend.Communication.TIA
                 _logger.Info("🚀 Запускаем TIA Portal...");
                 _tiaPortal = new TiaPortal(TiaPortalMode.WithUserInterface);
 
-                // ВАЖНО: Вызываем синхронно, БЕЗ использования Task.Run
-                _logger.Info("📂 Открываем проект...");
-                _project = _tiaPortal.Projects.Open(new FileInfo(projectPath));
+                // ВАЖНО: Используем UI поток для операций с TIA Portal
+                _project = ExecuteInUIThread(() => _tiaPortal.Projects.Open(new FileInfo(projectPath)));
 
                 // Эта строка сделает метод "псевдо-асинхронным" и позволит UI не замораживаться
                 await Task.Yield();
@@ -339,7 +335,224 @@ namespace SiemensTrend.Communication.TIA
             }
         }
 
-        // Остальные методы остаются без изменений...
+        /// <summary>
+        /// Получение PlcSoftware из проекта
+        /// </summary>
+        public PlcSoftware GetPlcSoftware()
+        {
+            if (_project == null)
+            {
+                _logger.Error("Ошибка: Проект TIA не открыт.");
+                return null;
+            }
+
+            _logger.Info($"Поиск PLC Software в проекте {_project.Name}...");
+
+            foreach (Device device in _project.Devices)
+            {
+                _logger.Info($"Проверка устройства: {device.Name}");
+
+                foreach (DeviceItem deviceItem in device.DeviceItems)
+                {
+                    var softwareContainer = deviceItem.GetService<SoftwareContainer>();
+
+                    if (softwareContainer?.Software is PlcSoftware plcSoftware)
+                    {
+                        _logger.Info($"✅ Найден PLC Software в устройстве: {device.Name}");
+                        return plcSoftware;
+                    }
+                }
+            }
+
+            _logger.Error("❌ Ошибка: PLC Software не найдено в проекте.");
+            return null;
+        }
+
+        /// <summary>
+        /// Получение всех таблиц тегов из PLC
+        /// </summary>
+        public List<PlcTagTable> GetAllTagTables()
+        {
+            var result = new List<PlcTagTable>();
+            var plcSoftware = GetPlcSoftware();
+
+            if (plcSoftware == null)
+                return result;
+
+            // Рекурсивная функция для обхода групп таблиц тегов
+            void CollectTagTables(PlcTagTableGroup group)
+            {
+                // Добавляем таблицы из текущей группы
+                foreach (var table in group.TagTables)
+                {
+                    result.Add(table);
+                }
+
+                // Рекурсивно обходим подгруппы
+                foreach (var subgroup in group.Groups)
+                {
+                    if (subgroup is PlcTagTableSystemGroup systemGroup)
+                    {
+                        CollectTagTables(systemGroup);
+                    }
+                    else if (subgroup is PlcTagTableUserGroup userGroup)
+                    {
+                        CollectTagTables(userGroup);
+                    }
+                }
+            }
+
+            // Начинаем с корневой группы
+            CollectTagTables(plcSoftware.TagTableGroup);
+
+            _logger.Info($"Найдено {result.Count} таблиц тегов");
+            return result;
+        }
+
+        /// <summary>
+        /// Получение всех блоков данных из PLC
+        /// </summary>
+        public List<DataBlock> GetAllDataBlocks()
+        {
+            var result = new List<DataBlock>();
+            var plcSoftware = GetPlcSoftware();
+
+            if (plcSoftware == null)
+                return result;
+
+            // Рекурсивная функция для обхода групп блоков
+            void CollectDataBlocks(PlcBlockGroup group)
+            {
+                // Добавляем блоки данных из текущей группы
+                foreach (var block in group.Blocks)
+                {
+                    if (block is DataBlock db)
+                    {
+                        result.Add(db);
+                    }
+                }
+
+                // Рекурсивно обходим подгруппы
+                foreach (var subgroup in group.Groups)
+                {
+                    CollectDataBlocks(subgroup);
+                }
+            }
+
+            // Начинаем с корневой группы
+            CollectDataBlocks(plcSoftware.BlockGroup);
+
+            _logger.Info($"Найдено {result.Count} блоков данных");
+            return result;
+        }
+
+        /// <summary>
+        /// Чтение данных блока DB
+        /// </summary>
+        public DbTagCollection ReadDataBlockTags(DataBlock db)
+        {
+            var result = new DbTagCollection
+            {
+                Name = db.Name,
+                IsOptimized = db.MemoryLayout == MemoryLayout.Optimized
+            };
+
+            try
+            {
+                if (db.Interface == null || !db.Interface.Members.Any())
+                {
+                    _logger.Warn($"DB {db.Name} не имеет переменных");
+                    return result;
+                }
+
+                foreach (var member in db.Interface.Members)
+                {
+                    string name = member.Name;
+                    string dataType = member.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
+
+                    var tag = new DbTag
+                    {
+                        Name = name,
+                        FullName = $"{db.Name}.{name}",
+                        DataType = GetTagDataType(dataType),
+                        Address = db.MemoryLayout == MemoryLayout.Optimized ? "Optimized" : "Standard",
+                        DbName = db.Name,
+                        IsOptimized = db.MemoryLayout == MemoryLayout.Optimized
+                    };
+
+                    result.Tags.Add(tag);
+                }
+
+                _logger.Info($"Прочитано {result.Tags.Count} тегов из DB {db.Name}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при чтении DB {db.Name}: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Чтение тегов из таблицы тегов
+        /// </summary>
+        public PlcTagCollection ReadPlcTagTable(PlcTagTable tagTable)
+        {
+            var result = new PlcTagCollection
+            {
+                Name = tagTable.Name
+            };
+
+            try
+            {
+                foreach (var tag in tagTable.Tags)
+                {
+                    string name = tag.Name;
+                    string dataType = tag.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
+                    string address = tag.GetAttribute("LogicalAddress")?.ToString() ?? "";
+
+                    var plcTag = new PlcTag
+                    {
+                        Name = name,
+                        DataType = GetTagDataType(dataType),
+                        Address = address,
+                        TableName = tagTable.Name
+                    };
+
+                    result.Tags.Add(plcTag);
+                }
+
+                _logger.Info($"Прочитано {result.Tags.Count} тегов из таблицы {tagTable.Name}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при чтении таблицы тегов {tagTable.Name}: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Конвертация строкового типа данных в TagDataType
+        /// </summary>
+        private TagDataType GetTagDataType(string dataTypeString)
+        {
+            if (string.IsNullOrEmpty(dataTypeString))
+                return TagDataType.Other;
+
+            dataTypeString = dataTypeString.ToLower();
+
+            if (dataTypeString.Contains("bool"))
+                return TagDataType.Bool;
+            else if (dataTypeString.Contains("int") && !dataTypeString.Contains("dint"))
+                return TagDataType.Int;
+            else if (dataTypeString.Contains("dint"))
+                return TagDataType.DInt;
+            else if (dataTypeString.Contains("real"))
+                return TagDataType.Real;
+            else
+                return TagDataType.Other;
+        }
 
         /// <summary>
         /// Получение тегов из проекта TIA Portal
@@ -360,36 +573,41 @@ namespace SiemensTrend.Communication.TIA
 
                 await Task.Run(() =>
                 {
-                    // Здесь будет реальный код для получения тегов из проекта
-                    // Это сложная задача, требующая обхода древовидной структуры проекта
-
-                    // Пока возвращаем тестовые данные
-                    tagList.Add(new TagDefinition
+                    // Получаем все таблицы тегов
+                    var tagTables = GetAllTagTables();
+                    foreach (var table in tagTables)
                     {
-                        Name = "Motor1_Speed",
-                        Address = "DB1.DBD0",
-                        DataType = TagDataType.Real,
-                        GroupName = "Motors",
-                        Comment = "Speed of motor 1"
-                    });
+                        var plcTags = ReadPlcTagTable(table);
+                        foreach (var tag in plcTags.Tags)
+                        {
+                            tagList.Add(new TagDefinition
+                            {
+                                Name = tag.Name,
+                                Address = tag.Address,
+                                DataType = tag.DataType,
+                                GroupName = tag.TableName,
+                                Comment = tag.Comment
+                            });
+                        }
+                    }
 
-                    tagList.Add(new TagDefinition
+                    // Получаем все блоки данных
+                    var dataBlocks = GetAllDataBlocks();
+                    foreach (var db in dataBlocks)
                     {
-                        Name = "Motor1_Running",
-                        Address = "DB1.DBX4.0",
-                        DataType = TagDataType.Bool,
-                        GroupName = "Motors",
-                        Comment = "Motor 1 running status"
-                    });
-
-                    tagList.Add(new TagDefinition
-                    {
-                        Name = "Temperature",
-                        Address = "DB2.DBD0",
-                        DataType = TagDataType.Real,
-                        GroupName = "Sensors",
-                        Comment = "Temperature sensor"
-                    });
+                        var dbTags = ReadDataBlockTags(db);
+                        foreach (var tag in dbTags.Tags)
+                        {
+                            tagList.Add(new TagDefinition
+                            {
+                                Name = tag.Name,
+                                Address = "DB" + db.Name.Substring(db.Name.IndexOf(' ') + 1) + "." + tag.Address,
+                                DataType = tag.DataType,
+                                GroupName = tag.DbName,
+                                Comment = "DB Tag"
+                            });
+                        }
+                    }
                 });
 
                 _logger.Info($"Получено {tagList.Count} тегов из проекта");
@@ -403,23 +621,21 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Чтение значения тега
+        /// Чтение значения тега (не поддерживается в TIA Portal Openness)
         /// </summary>
         public Task<object> ReadTagAsync(TagDefinition tag)
         {
-            // В текущей реализации TIA Portal используется только для 
-            // извлечения структуры проекта, а не для онлайн доступа к данным
+            // TIA Portal Openness не поддерживает чтение тегов в реальном времени
             _logger.Warn("TIA Portal Openness не поддерживает чтение тегов в реальном времени");
             return Task.FromResult<object>(null);
         }
 
         /// <summary>
-        /// Начало мониторинга тегов
+        /// Начало мониторинга тегов (не поддерживается в TIA Portal Openness)
         /// </summary>
         public Task StartMonitoringAsync(IEnumerable<TagDefinition> tags)
         {
-            // В текущей реализации TIA Portal используется только для 
-            // извлечения структуры проекта, а не для онлайн доступа к данным
+            // TIA Portal Openness не поддерживает мониторинг тегов в реальном времени
             _logger.Warn("TIA Portal Openness не поддерживает мониторинг тегов в реальном времени");
             return Task.CompletedTask;
         }
@@ -430,288 +646,6 @@ namespace SiemensTrend.Communication.TIA
         public Task StopMonitoringAsync()
         {
             return Task.CompletedTask;
-        }
-
-        using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using Siemens.Engineering;
-using Siemens.Engineering.SW;
-using Siemens.Engineering.SW.Blocks;
-using Siemens.Engineering.SW.Tags;
-using Siemens.Engineering.HW;
-using Siemens.Engineering.HW.Features;
-using SiemensTrend.Core.Logging;
-using SiemensTrend.Core.Models;
-
-namespace SiemensTrend.Communication.TIA
-    {
-        public class TiaPortalCommunicationService : ICommunicationService
-        {
-            // Существующий код...
-
-            /// <summary>
-            /// Получение PlcSoftware из проекта
-            /// </summary>
-            public PlcSoftware GetPlcSoftware()
-            {
-                if (_project == null)
-                {
-                    _logger.Error("Ошибка: Проект TIA не открыт.");
-                    return null;
-                }
-
-                _logger.Info($"Поиск PLC Software в проекте {_project.Name}...");
-
-                foreach (Device device in _project.Devices)
-                {
-                    _logger.Info($"Проверка устройства: {device.Name}");
-
-                    foreach (DeviceItem deviceItem in device.DeviceItems)
-                    {
-                        var softwareContainer = deviceItem.GetService<SoftwareContainer>();
-
-                        if (softwareContainer?.Software is PlcSoftware plcSoftware)
-                        {
-                            _logger.Info($"✅ Найден PLC Software в устройстве: {device.Name}");
-                            return plcSoftware;
-                        }
-                    }
-                }
-
-                _logger.Error("❌ Ошибка: PLC Software не найдено в проекте.");
-                return null;
-            }
-
-            /// <summary>
-            /// Получение всех таблиц тегов из PLC
-            /// </summary>
-            public List<PlcTagTable> GetAllTagTables()
-            {
-                var result = new List<PlcTagTable>();
-                var plcSoftware = GetPlcSoftware();
-
-                if (plcSoftware == null)
-                    return result;
-
-                // Рекурсивная функция для обхода групп таблиц тегов
-                void CollectTagTables(PlcTagTableGroup group)
-                {
-                    // Добавляем таблицы из текущей группы
-                    foreach (var table in group.TagTables)
-                    {
-                        result.Add(table);
-                    }
-
-                    // Рекурсивно обходим подгруппы
-                    foreach (var subgroup in group.Groups)
-                    {
-                        if (subgroup is PlcTagTableSystemGroup systemGroup)
-                        {
-                            CollectTagTables(systemGroup);
-                        }
-                        else if (subgroup is PlcTagTableUserGroup userGroup)
-                        {
-                            CollectTagTables(userGroup);
-                        }
-                    }
-                }
-
-                // Начинаем с корневой группы
-                CollectTagTables(plcSoftware.TagTableGroup);
-
-                _logger.Info($"Найдено {result.Count} таблиц тегов");
-                return result;
-            }
-
-            /// <summary>
-            /// Получение всех блоков данных из PLC
-            /// </summary>
-            public List<DataBlock> GetAllDataBlocks()
-            {
-                var result = new List<DataBlock>();
-                var plcSoftware = GetPlcSoftware();
-
-                if (plcSoftware == null)
-                    return result;
-
-                // Рекурсивная функция для обхода групп блоков
-                void CollectDataBlocks(PlcBlockGroup group)
-                {
-                    // Добавляем блоки данных из текущей группы
-                    foreach (var block in group.Blocks)
-                    {
-                        if (block is DataBlock db)
-                        {
-                            result.Add(db);
-                        }
-                    }
-
-                    // Рекурсивно обходим подгруппы
-                    foreach (var subgroup in group.Groups)
-                    {
-                        CollectDataBlocks(subgroup);
-                    }
-                }
-
-                // Начинаем с корневой группы
-                CollectDataBlocks(plcSoftware.BlockGroup);
-
-                _logger.Info($"Найдено {result.Count} блоков данных");
-                return result;
-            }
-
-            /// <summary>
-            /// Чтение данных блока DB
-            /// </summary>
-            public DbTagCollection ReadDataBlockTags(DataBlock db)
-            {
-                var result = new DbTagCollection
-                {
-                    Name = db.Name,
-                    IsOptimized = db.MemoryLayout == MemoryLayout.Optimized
-                };
-
-                try
-                {
-                    if (db.Interface == null || !db.Interface.Members.Any())
-                    {
-                        _logger.Warn($"DB {db.Name} не имеет переменных");
-                        return result;
-                    }
-
-                    foreach (var member in db.Interface.Members)
-                    {
-                        string name = member.Name;
-                        string dataType = member.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
-
-                        var tag = new DbTag
-                        {
-                            Name = name,
-                            FullName = $"{db.Name}.{name}",
-                            DataType = GetTagDataType(dataType),
-                            Address = db.MemoryLayout == MemoryLayout.Optimized ? "Optimized" : "Standard",
-                            DbName = db.Name,
-                            IsOptimized = db.MemoryLayout == MemoryLayout.Optimized
-                        };
-
-                        result.Tags.Add(tag);
-                    }
-
-                    _logger.Info($"Прочитано {result.Tags.Count} тегов из DB {db.Name}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"Ошибка при чтении DB {db.Name}: {ex.Message}");
-                }
-
-                return result;
-            }
-
-            /// <summary>
-            /// Чтение тегов из таблицы тегов
-            /// </summary>
-            public PlcTagCollection ReadPlcTagTable(PlcTagTable tagTable)
-            {
-                var result = new PlcTagCollection
-                {
-                    Name = tagTable.Name
-                };
-
-                try
-                {
-                    foreach (var tag in tagTable.Tags)
-                    {
-                        string name = tag.Name;
-                        string dataType = tag.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
-                        string address = tag.GetAttribute("LogicalAddress")?.ToString() ?? "";
-
-                        var plcTag = new PlcTag
-                        {
-                            Name = name,
-                            DataType = GetTagDataType(dataType),
-                            Address = address,
-                            TableName = tagTable.Name
-                        };
-
-                        result.Tags.Add(plcTag);
-                    }
-
-                    _logger.Info($"Прочитано {result.Tags.Count} тегов из таблицы {tagTable.Name}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"Ошибка при чтении таблицы тегов {tagTable.Name}: {ex.Message}");
-                }
-
-                return result;
-            }
-
-            /// <summary>
-            /// Конвертация строкового типа данных в TagDataType
-            /// </summary>
-            private TagDataType GetTagDataType(string dataTypeString)
-            {
-                if (string.IsNullOrEmpty(dataTypeString))
-                    return TagDataType.Other;
-
-                dataTypeString = dataTypeString.ToLower();
-
-                if (dataTypeString.Contains("bool"))
-                    return TagDataType.Bool;
-                else if (dataTypeString.Contains("int") && !dataTypeString.Contains("dint"))
-                    return TagDataType.Int;
-                else if (dataTypeString.Contains("dint"))
-                    return TagDataType.DInt;
-                else if (dataTypeString.Contains("real"))
-                    return TagDataType.Real;
-                else
-                    return TagDataType.Other;
-            }
-
-            // Остальные методы...
-        }
-    }
-}
-
-    /// <summary>
-    /// Информация о проекте TIA Portal
-    /// </summary>
-    public class TiaProjectInfo
-    {
-        /// <summary>
-        /// Имя проекта
-        /// </summary>
-        public string Name { get; set; }
-
-        /// <summary>
-        /// Путь к проекту
-        /// </summary>
-        public string Path { get; set; }
-
-        /// <summary>
-        /// Процесс TIA Portal
-        /// </summary>
-        public TiaPortalProcess TiaProcess { get; set; }
-
-        /// <summary>
-        /// Экземпляр TIA Portal
-        /// </summary>
-        public TiaPortal TiaPortalInstance { get; set; }
-
-        /// <summary>
-        /// Объект проекта
-        /// </summary>
-        public Project Project { get; set; }
-
-        /// <summary>
-        /// Строковое представление
-        /// </summary>
-        public override string ToString()
-        {
-            return Name;
         }
     }
 }
