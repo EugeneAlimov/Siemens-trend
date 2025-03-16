@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq; // Добавлено для методов Any(), Where() и т.д.
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using SiemensTrend.Communication;
@@ -26,6 +27,8 @@ namespace SiemensTrend.ViewModels
 
         private ObservableCollection<TagDefinition> _availableTags;
         private ObservableCollection<TagDefinition> _monitoredTags;
+        private ObservableCollection<TagDefinition> _plcTags;
+        private ObservableCollection<TagDefinition> _dbTags;
 
         /// <summary>
         /// Статус подключения
@@ -33,7 +36,7 @@ namespace SiemensTrend.ViewModels
         public bool IsConnected
         {
             get => _isConnected;
-            private set => SetProperty(ref _isConnected, value);
+            set => SetProperty(ref _isConnected, value);
         }
 
         /// <summary>
@@ -42,7 +45,7 @@ namespace SiemensTrend.ViewModels
         public bool IsLoading
         {
             get => _isLoading;
-            private set => SetProperty(ref _isLoading, value);
+            set => SetProperty(ref _isLoading, value);
         }
 
         /// <summary>
@@ -82,6 +85,29 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
+        /// Теги ПЛК
+        /// </summary>
+        public ObservableCollection<TagDefinition> PlcTags
+        {
+            get => _plcTags;
+            private set => SetProperty(ref _plcTags, value);
+        }
+
+        /// <summary>
+        /// Теги блоков данных
+        /// </summary>
+        public ObservableCollection<TagDefinition> DbTags
+        {
+            get => _dbTags;
+            private set => SetProperty(ref _dbTags, value);
+        }
+
+        /// <summary>
+        /// Модель представления для обозревателя тегов
+        /// </summary>
+        public TagBrowserViewModel TagBrowserViewModel { get; private set; }
+
+        /// <summary>
         /// Конструктор
         /// </summary>
         /// <param name="logger">Логер</param>
@@ -92,6 +118,8 @@ namespace SiemensTrend.ViewModels
             // Инициализируем коллекции
             AvailableTags = new ObservableCollection<TagDefinition>();
             MonitoredTags = new ObservableCollection<TagDefinition>();
+            PlcTags = new ObservableCollection<TagDefinition>();
+            DbTags = new ObservableCollection<TagDefinition>();
 
             // Инициализируем начальные значения
             IsConnected = false;
@@ -164,8 +192,6 @@ namespace SiemensTrend.ViewModels
             }
         }
 
-        // Добавляем эти свойства и методы
-
         /// <summary>
         /// Максимальное количество тегов для мониторинга
         /// </summary>
@@ -209,11 +235,19 @@ namespace SiemensTrend.ViewModels
             try
             {
                 _communicationService.Disconnect();
+
+                // Если есть TIA Portal сервис, отключаем и его
+                _tiaPortalService?.Disconnect();
+
                 StatusMessage = "Отключено от ПЛК";
 
                 // Очищаем списки тегов
                 AvailableTags.Clear();
                 MonitoredTags.Clear();
+                PlcTags.Clear();
+                DbTags.Clear();
+
+                IsConnected = false;
             }
             catch (Exception ex)
             {
@@ -354,8 +388,11 @@ namespace SiemensTrend.ViewModels
                 ProgressValue = 90;
 
                 // Обновляем отображение тегов ПЛК
-                // Если у вас есть коллекция для отображения тегов ПЛК, обновите её:
-                // PlcTags = new ObservableCollection<TagDefinition>(plcTags);
+                PlcTags.Clear();
+                foreach (var tag in plcTags)
+                {
+                    PlcTags.Add(tag);
+                }
 
                 StatusMessage = $"Получено {plcTags.Count} тегов ПЛК";
                 ProgressValue = 100;
@@ -400,8 +437,11 @@ namespace SiemensTrend.ViewModels
                 ProgressValue = 90;
 
                 // Обновляем отображение тегов DB
-                // Если у вас есть коллекция для отображения тегов DB, обновите её:
-                // DbTags = new ObservableCollection<TagDefinition>(dbTags);
+                DbTags.Clear();
+                foreach (var tag in dbTags)
+                {
+                    DbTags.Add(tag);
+                }
 
                 StatusMessage = $"Получено {dbTags.Count} тегов блоков данных";
                 ProgressValue = 100;
@@ -425,64 +465,16 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Обработчик нажатия кнопки "Получить теги ПЛК"
+        /// Инициализация обозревателя тегов
         /// </summary>
-        private async void BtnGetPlcTags_Click(object sender, RoutedEventArgs e)
+        public void InitializeTagBrowser()
         {
-            try
+            if (_tiaPortalService != null && TagBrowserViewModel == null)
             {
-                _logger.Info("Запрос тегов ПЛК");
+                TagBrowserViewModel = new TagBrowserViewModel(_logger, _tiaPortalService);
 
-                // Проверяем инициализацию TagBrowserViewModel
-                if (_viewModel.TagBrowserViewModel != null)
-                {
-                    // Загружаем теги через обозреватель тегов
-                    _viewModel.StatusMessage = "Загрузка тегов ПЛК...";
-                    _viewModel.TagBrowserViewModel.RefreshTags();
-                    _viewModel.StatusMessage = "Теги ПЛК получены";
-                }
-                else
-                {
-                    // Используем метод для прямого получения тегов ПЛК
-                    await _viewModel.GetPlcTagsAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
-                MessageBox.Show($"Ошибка при получении тегов ПЛК: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        /// <summary>
-        /// Обработчик нажатия кнопки "Получить теги DB"
-        /// </summary>
-        private async void BtnGetDbTags_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("Запрос тегов DB");
-
-                // Проверяем инициализацию TagBrowserViewModel
-                if (_viewModel.TagBrowserViewModel != null)
-                {
-                    // Загружаем теги через обозреватель тегов
-                    _viewModel.StatusMessage = "Загрузка тегов DB...";
-                    _viewModel.TagBrowserViewModel.RefreshTags();
-                    _viewModel.StatusMessage = "Теги DB получены";
-                }
-                else
-                {
-                    // Используем метод для прямого получения тегов DB
-                    await _viewModel.GetDbTagsAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении тегов DB: {ex.Message}");
-                MessageBox.Show($"Ошибка при получении тегов DB: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                // Подписываемся на событие выбора тега
+                TagBrowserViewModel.TagSelected += OnTagSelected;
             }
         }
     }

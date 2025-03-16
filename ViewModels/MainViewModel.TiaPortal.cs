@@ -107,6 +107,7 @@ namespace SiemensTrend.ViewModels
                 IsLoading = false;
             }
         }
+
         /// <summary>
         /// Подключение к конкретному проекту TIA Portal
         /// </summary>
