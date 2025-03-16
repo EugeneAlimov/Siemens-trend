@@ -1,174 +1,98 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.IO;
+using System.Reflection;
+using System.Windows;
+using SiemensTrend.Core.Logging;
+using Siemens.Collaboration.Net.TiaPortal.Openness.Resolver;
+using Siemens.Collaboration.Net;
 
-namespace SiemensTrend.Core.Models
+namespace SiemensTrend
 {
     /// <summary>
-    /// Тип данных тега
+    /// Логика взаимодействия для App.xaml
     /// </summary>
-    public enum TagDataType
+    public partial class App : Application
     {
-        Bool,   // Логический тип (BOOL)
-        Int,    // Целое число (INT)
-        DInt,   // Двойное целое (DINT)
-        Real,   // Число с плавающей точкой (REAL)
-        String, // Строка
-        UDT,    // Пользовательский тип данных
-        Other   // Другой тип данных
-    }
+        private static Logger _logger;
 
-    /// <summary>
-    /// Определение тега для мониторинга
-    /// </summary>
-    public class TagDefinition
-    {
-        /// <summary>
-        /// Уникальный идентификатор тега
-        /// </summary>
-        public Guid Id { get; set; } = Guid.NewGuid();
-
-        /// <summary>
-        /// Имя тега
-        /// </summary>
-        public string Name { get; set; }
-
-        /// <summary>
-        /// Адрес тега
-        /// </summary>
-        public string Address { get; set; }
-
-        /// <summary>
-        /// Тип данных
-        /// </summary>
-        public TagDataType DataType { get; set; }
-
-        /// <summary>
-        /// Комментарий
-        /// </summary>
-        public string Comment { get; set; }
-
-        /// <summary>
-        /// Группа тега (таблица, блок данных)
-        /// </summary>
-        public string GroupName { get; set; }
-
-        /// <summary>
-        /// Оптимизированный тег (для DB)
-        /// </summary>
-        public bool IsOptimized { get; set; }
-
-        /// <summary>
-        /// Является ли тег UDT (пользовательский тип данных)
-        /// </summary>
-        public bool IsUDT { get; set; }
-
-        /// <summary>
-        /// Является ли тег Safety (безопасность)
-        /// </summary>
-        public bool IsSafety { get; set; }
-
-        /// <summary>
-        /// Является ли тег тегом блока данных
-        /// </summary>
-        public bool IsDbTag => GroupName?.StartsWith("DB") == true || Name?.Contains(".") == true;
-
-        /// <summary>
-        /// Полное имя тега, включая группу
-        /// </summary>
-        public string FullName
+        protected override void OnStartup(StartupEventArgs e)
         {
-            get
+            base.OnStartup(e);
+
+            try
             {
-                if (string.IsNullOrEmpty(GroupName))
-                    return Name;
+                // Инициализируем логер
+                _logger = new Logger("application.log");
+                _logger.Info("Приложение запущено");
 
-                // Если имя уже содержит имя группы, возвращаем как есть
-                if (Name.StartsWith(GroupName + "."))
-                    return Name;
-
-                return $"{GroupName}.{Name}";
+                // Инициализация Assembly Resolver для Siemens.Engineering.dll
+                InitializeAssemblyResolver();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при запуске приложения: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        /// <summary>
-        /// Строковое представление
-        /// </summary>
-        public override string ToString()
+        private void InitializeAssemblyResolver()
         {
-            return $"{Name} : {DataType} @ {Address}";
-        }
-    }
-
-    /// <summary>
-    /// Класс для хранения данных ПЛК
-    /// </summary>
-    public class PlcData
-    {
-        /// <summary>
-        /// Теги ПЛК
-        /// </summary>
-        public List<TagDefinition> PlcTags { get; set; } = new List<TagDefinition>();
-
-        /// <summary>
-        /// Теги блоков данных
-        /// </summary>
-        public List<TagDefinition> DbTags { get; set; } = new List<TagDefinition>();
-
-        /// <summary>
-        /// Все теги (PlcTags + DbTags)
-        /// </summary>
-        public List<TagDefinition> AllTags
-        {
-            get
+            try
             {
-                var result = new List<TagDefinition>();
-                result.AddRange(PlcTags);
-                result.AddRange(DbTags);
-                return result;
+                _logger.Info("Инициализация Assembly Resolver");
+
+                // Используем NuGet пакет для резолва сборок Siemens.Engineering
+                Api.Global.Openness().Initialize();
+
+                _logger.Info("Assembly Resolver инициализирован успешно");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при инициализации Assembly Resolver: {ex.Message}");
+
+                // Резервный вариант - регистрируем собственный resolver
+                AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
             }
         }
 
-        /// <summary>
-        /// Очистка данных
-        /// </summary>
-        public void Clear()
+        private static Assembly ResolveAssembly(object sender, ResolveEventArgs args)
         {
-            PlcTags.Clear();
-            DbTags.Clear();
-        }
+            _logger.Debug($"Запрос на загрузку сборки: {args.Name}");
 
-        /// <summary>
-        /// Получение тега по имени
-        /// </summary>
-        public TagDefinition GetTagByName(string tagName)
-        {
-            if (string.IsNullOrEmpty(tagName))
+            string assemblyName = new AssemblyName(args.Name).Name;
+
+            // Обрабатываем только сборки Siemens.Engineering
+            if (!assemblyName.StartsWith("Siemens.Engineering"))
                 return null;
 
-            // Ищем сначала в PlcTags
-            var tag = PlcTags.FirstOrDefault(t => t.Name == tagName);
-            if (tag != null)
-                return tag;
+            // Пути поиска сборок Siemens.Engineering
+            string[] searchPaths = new[]
+            {
+                @"C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19",
+                @"C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18",
+                @"C:\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17",
+                @"C:\Program Files\Siemens\Automation\Portal V16\PublicAPI\V16"
+            };
 
-            // Затем в DbTags
-            return DbTags.FirstOrDefault(t => t.Name == tagName);
+            foreach (string path in searchPaths)
+            {
+                string dllPath = Path.Combine(path, $"{assemblyName}.dll");
+
+                if (File.Exists(dllPath))
+                {
+                    _logger.Info($"Загружена сборка: {dllPath}");
+                    return Assembly.LoadFrom(dllPath);
+                }
+            }
+
+            _logger.Error($"Не удалось найти сборку: {assemblyName}");
+            return null;
         }
 
-        /// <summary>
-        /// Поиск тегов по частичному совпадению имени
-        /// </summary>
-        public List<TagDefinition> FindTagsByPartialName(string partialName)
+        protected override void OnExit(ExitEventArgs e)
         {
-            if (string.IsNullOrEmpty(partialName))
-                return new List<TagDefinition>();
-
-            string lowercasePartialName = partialName.ToLower();
-
-            var result = new List<TagDefinition>();
-            result.AddRange(PlcTags.Where(t => t.Name.ToLower().Contains(lowercasePartialName)));
-            result.AddRange(DbTags.Where(t => t.Name.ToLower().Contains(lowercasePartialName)));
-            return result;
+            base.OnExit(e);
+            _logger.Info("Приложение завершено");
         }
     }
 }
