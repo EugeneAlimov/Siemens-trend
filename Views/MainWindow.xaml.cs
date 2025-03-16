@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Windows;
+using System.Collections.Generic;
 using Microsoft.Win32;
 using System.Threading.Tasks;
 using SiemensTrend.Core.Logging;
