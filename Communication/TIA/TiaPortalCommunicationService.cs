@@ -391,14 +391,7 @@ namespace SiemensTrend.Communication.TIA
                 // Рекурсивно обходим подгруппы
                 foreach (var subgroup in group.Groups)
                 {
-                    if (subgroup is PlcTagTableSystemGroup systemGroup)
-                    {
-                        CollectTagTables(systemGroup);
-                    }
-                    else if (subgroup is PlcTagTableUserGroup userGroup)
-                    {
-                        CollectTagTables(userGroup);
-                    }
+                    CollectTagTables(subgroup);
                 }
             }
 

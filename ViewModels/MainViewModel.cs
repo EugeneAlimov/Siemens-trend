@@ -166,11 +166,6 @@ namespace SiemensTrend.ViewModels
         // Добавляем эти свойства и методы
 
         /// <summary>
-        /// Теги, выбранные для мониторинга
-        /// </summary>
-        public ObservableCollection<TagDefinition> MonitoredTags { get; }
-
-        /// <summary>
         /// Максимальное количество тегов для мониторинга
         /// </summary>
         public int MaxMonitoredTags => 10;
@@ -200,19 +195,6 @@ namespace SiemensTrend.ViewModels
             // Добавляем тег в мониторинг
             MonitoredTags.Add(tag);
             _logger.Info($"Тег {tag.Name} добавлен в мониторинг");
-        }
-
-        /// <summary>
-        /// Удаление тега из мониторинга
-        /// </summary>
-        public void RemoveTagFromMonitoring(TagDefinition tag)
-        {
-            if (tag == null) return;
-
-            if (MonitoredTags.Remove(tag))
-            {
-                _logger.Info($"Тег {tag.Name} удален из мониторинга");
-            }
         }
 
         /// <summary>

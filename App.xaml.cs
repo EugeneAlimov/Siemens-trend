@@ -20,7 +20,7 @@ namespace SiemensTrend
             {
                 // Инициализируем резолвер для сборок Siemens.Engineering из пакета
                 _logger.Info("Инициализация резолвера Siemens.Engineering");
-                Siemens.Collaboration.Net.TiaPortal.Openness.Resolver.Api.Global.Openness().Initialize();
+                Siemens.Collaboration.Net.TiaPortal.Openness.Resolver.OpennessResolver.Initialize();
             }
             catch (Exception ex)
             {
@@ -36,5 +36,14 @@ namespace SiemensTrend
             base.OnExit(e);
             _logger.Info("Приложение завершено");
         }
+
+        // Если все же нужен пользовательский резолвер, добавьте этот метод
+        /*
+        private static System.Reflection.Assembly ResolveAssembly(object sender, ResolveEventArgs args)
+        {
+            // Ваш код резолвера
+            return null;
+        }
+        */
     }
 }
