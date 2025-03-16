@@ -11,6 +11,7 @@ using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.Tags;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
+using Siemens.Engineering.SW.Blocks.Interface;
 
 namespace SiemensTrend.Communication.TIA
 {
@@ -322,12 +323,12 @@ namespace SiemensTrend.Communication.TIA
                 // Получаем коллекцию членов блока данных
                 var members = memberContainer.GetComposition("Members");
 
-                if (members == null || members.Count == 0)
+                if (members == null || members.Count() == 0)
                 {
                     return;
                 }
 
-                foreach (var member in members)
+                foreach (var member in members.Interface.Members.GetEnumerator<Member>().ToList())
                 {
                     try
                     {
@@ -343,7 +344,7 @@ namespace SiemensTrend.Communication.TIA
                         // Проверяем наличие вложенных членов (структуры)
                         var nestedMembers = member.GetComposition("Members");
 
-                        if (nestedMembers != null && nestedMembers.Count > 0)
+                        if (nestedMembers != null && nestedMembers.Count() > 0)
                         {
                             // Рекурсивно обрабатываем вложенную структуру
                             ProcessDbMembers(member, dbName, memberPath, plcData, isOptimized, isUDT, isSafety);
