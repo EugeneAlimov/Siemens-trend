@@ -23,8 +23,8 @@ namespace SiemensTrend.ViewModels
         /// Соединение с TIA Portal
         /// </summary>
         /// <returns>True если подключение успешно</returns>
-        
-        public async Task<bool> ConnectToTiaPortalAsync()
+
+        public bool ConnectToTiaPortal()
         {
             try
             {
@@ -47,6 +47,7 @@ namespace SiemensTrend.ViewModels
                 // Получаем список открытых проектов
                 StatusMessage = "Получение списка открытых проектов...";
                 _logger.Info("Запрос списка открытых проектов");
+                // ВАЖНО: используем синхронные вызовы для TIA Portal API
                 List<Communication.TIA.TiaProjectInfo> openProjects = _tiaPortalService.GetOpenProjects();
                 _logger.Info($"Получено {openProjects.Count} открытых проектов");
                 ProgressValue = 50;
@@ -70,7 +71,7 @@ namespace SiemensTrend.ViewModels
                     _logger.Info($"Найден один открытый проект: {openProjects[0].Name}. Выполняем подключение.");
                     ProgressValue = 70;
 
-                    // ВАЖНО: Выполняем ConnectToProject синхронно (без Task.Run) напрямую в текущем потоке STA
+                    // ВАЖНО: Выполняем ConnectToProject синхронно напрямую в текущем потоке STA
                     bool result = _tiaPortalService.ConnectToProject(openProjects[0]);
 
                     if (result)
@@ -134,36 +135,36 @@ namespace SiemensTrend.ViewModels
         /// </summary>
         /// <param name="projectInfo">Информация о проекте</param>
         /// <returns>True если подключение успешно</returns>
-        public async Task<bool> ConnectToSpecificTiaProjectAsync(Communication.TIA.TiaProjectInfo projectInfo)
+        public bool ConnectToSpecificTiaProject(Communication.TIA.TiaProjectInfo projectInfo)
         {
             try
             {
                 if (projectInfo == null)
                 {
-                    _logger.Error("ConnectToSpecificTiaProjectAsync: projectInfo не может быть null");
+                    _logger.Error("ConnectToSpecificTiaProject: projectInfo не может быть null");
                     return false;
                 }
 
                 IsLoading = true;
                 StatusMessage = $"Подключение к проекту {projectInfo.Name}...";
-                _logger.Info($"ConnectToSpecificTiaProjectAsync: Подключение к проекту {projectInfo.Name}");
+                _logger.Info($"ConnectToSpecificTiaProject: Подключение к проекту {projectInfo.Name}");
                 ProgressValue = 60;
 
                 // Создаем сервис TIA Portal только если его еще нет
                 if (_tiaPortalService == null)
                 {
-                    _logger.Info("ConnectToSpecificTiaProjectAsync: Создание экземпляра TiaPortalCommunicationService");
+                    _logger.Info("ConnectToSpecificTiaProject: Создание экземпляра TiaPortalCommunicationService");
                     _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
                 }
 
-                // ВАЖНО: Выполняем ConnectToProject синхронно (без Task.Run) напрямую в текущем потоке STA
+                // ВАЖНО: Выполняем ConnectToProject синхронно в текущем STA-потоке
                 bool result = _tiaPortalService.ConnectToProject(projectInfo);
 
                 if (result)
                 {
                     // Успешное подключение
                     StatusMessage = $"Подключено к проекту: {projectInfo.Name}";
-                    _logger.Info($"ConnectToSpecificTiaProjectAsync: Успешное подключение к проекту: {projectInfo.Name}");
+                    _logger.Info($"ConnectToSpecificTiaProject: Успешное подключение к проекту: {projectInfo.Name}");
                     ProgressValue = 100;
                     IsConnected = true;
 
@@ -176,7 +177,7 @@ namespace SiemensTrend.ViewModels
                 {
                     // Ошибка подключения
                     StatusMessage = "Ошибка при подключении к TIA Portal";
-                    _logger.Error("ConnectToSpecificTiaProjectAsync: Ошибка при подключении к TIA Portal");
+                    _logger.Error("ConnectToSpecificTiaProject: Ошибка при подключении к TIA Portal");
                     ProgressValue = 0;
                     IsConnected = false;
                     return false;
@@ -184,10 +185,10 @@ namespace SiemensTrend.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.Error($"ConnectToSpecificTiaProjectAsync: Ошибка при подключении к проекту {projectInfo?.Name}: {ex.Message}");
+                _logger.Error($"ConnectToSpecificTiaProject: Ошибка при подключении к проекту {projectInfo?.Name}: {ex.Message}");
                 if (ex.InnerException != null)
                 {
-                    _logger.Error($"ConnectToSpecificTiaProjectAsync: Внутренняя ошибка: {ex.InnerException.Message}");
+                    _logger.Error($"ConnectToSpecificTiaProject: Внутренняя ошибка: {ex.InnerException.Message}");
                 }
                 StatusMessage = ($"Ошибка при подключении к проекту {projectInfo?.Name}");
                 ProgressValue = 0;
@@ -205,65 +206,74 @@ namespace SiemensTrend.ViewModels
         /// </summary>
         /// <param name="projectPath">Путь к файлу проекта TIA Portal</param>
         /// <returns>True если проект успешно открыт</returns>
-        public async Task<bool> OpenTiaProjectAsync(string projectPath)
+        public bool OpenTiaProject(string projectPath)
         {
             try
             {
                 if (string.IsNullOrEmpty(projectPath))
                 {
-                    _logger.Error("OpenTiaProjectAsync: путь к проекту не может быть пустым");
+                    _logger.Error("OpenTiaProject: путь к проекту не может быть пустым");
                     return false;
                 }
 
                 IsLoading = true;
                 StatusMessage = $"Открытие проекта TIA Portal...";
-                _logger.Info($"OpenTiaProjectAsync: Открытие проекта {projectPath}");
+                _logger.Info($"OpenTiaProject: Открытие проекта {projectPath}");
                 ProgressValue = 20;
 
                 // Создаем сервис TIA Portal только если его еще нет
                 if (_tiaPortalService == null)
                 {
-                    _logger.Info("OpenTiaProjectAsync: Создание экземпляра TiaPortalCommunicationService");
+                    _logger.Info("OpenTiaProject: Создание экземпляра TiaPortalCommunicationService");
                     _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
                 }
 
-                // ВАЖНО: Открытие проекта - это длительная операция
-                // Но мы НЕ используем Task.Run для TIA Portal API
+                // Предупреждаем пользователя о длительной операции
                 StatusMessage = "Открытие проекта TIA Portal. Это может занять некоторое время...";
                 ProgressValue = 30;
 
-                bool result = await _tiaPortalService.OpenProjectAsync(projectPath);
+                // Показываем индикатор прогресса
+                System.Windows.Application.Current.Dispatcher.Invoke(() => {
+                    _logger.Info("OpenTiaProject: Показываем индикатор прогресса");
+                });
 
-                if (result)
-                {
-                    // Успешное открытие
-                    string projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath);
-                    StatusMessage = $"Проект TIA Portal открыт успешно: {projectName}";
-                    _logger.Info($"OpenTiaProjectAsync: Проект успешно открыт: {projectName}");
-                    ProgressValue = 100;
-                    IsConnected = true;
+                // ВАЖНО: Открытие проекта выполняем синхронно
+                // Это может занять длительное время, но выполняется в текущем STA-потоке
+                // В MainWindow этот метод должен вызываться в обработчике события нажатия кнопки
+                _logger.Info("OpenTiaProject: Начинаем открытие проекта");
+                bool result = _tiaPortalService.OpenProjectSync(projectPath);
+                _logger.Info($"OpenTiaProject: Результат открытия проекта: {result}");
 
-                    // Инициализируем обозреватель тегов после успешного подключения
-                    InitializeTagBrowser();
+                // Обрабатываем результат и обновляем UI
+                System.Windows.Application.Current.Dispatcher.Invoke(() => {
+                    if (result)
+                    {
+                        string projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath);
+                        StatusMessage = $"Проект TIA Portal открыт успешно: {projectName}";
+                        _logger.Info($"OpenTiaProject: Проект успешно открыт: {projectName}");
+                        ProgressValue = 100;
+                        IsConnected = true;
 
-                    return true;
-                }
-                else
-                {
-                    // Ошибка открытия
-                    StatusMessage = "Ошибка при открытии проекта TIA Portal";
-                    _logger.Error("OpenTiaProjectAsync: Ошибка при открытии проекта TIA Portal");
-                    ProgressValue = 0;
-                    IsConnected = false;
-                    return false;
-                }
+                        // Инициализируем обозреватель тегов после успешного подключения
+                        InitializeTagBrowser();
+                    }
+                    else
+                    {
+                        StatusMessage = "Ошибка при открытии проекта TIA Portal";
+                        _logger.Error("OpenTiaProject: Ошибка при открытии проекта TIA Portal");
+                        ProgressValue = 0;
+                        IsConnected = false;
+                    }
+                });
+
+                return result;
             }
             catch (Exception ex)
             {
-                _logger.Error($"OpenTiaProjectAsync: Ошибка при открытии проекта TIA Portal: {ex.Message}");
+                _logger.Error($"OpenTiaProject: Ошибка при открытии проекта TIA Portal: {ex.Message}");
                 if (ex.InnerException != null)
                 {
-                    _logger.Error($"OpenTiaProjectAsync: Внутренняя ошибка: {ex.InnerException.Message}");
+                    _logger.Error($"OpenTiaProject: Внутренняя ошибка: {ex.InnerException.Message}");
                 }
                 StatusMessage = "Ошибка при открытии проекта TIA Portal";
                 ProgressValue = 0;
@@ -275,7 +285,5 @@ namespace SiemensTrend.ViewModels
                 IsLoading = false;
             }
         }
-
-
     }
 }

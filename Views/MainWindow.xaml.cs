@@ -63,7 +63,7 @@ namespace SiemensTrend.Views
 
                     // Запускаем процесс открытия проекта и подключения к нему
                     _viewModel.StatusMessage = $"Открытие проекта: {Path.GetFileNameWithoutExtension(projectPath)}...";
-                    _ = _viewModel.OpenTiaProjectAsync(projectPath);
+                    _ = _viewModel.OpenTiaProject(projectPath);
                 }
             }
             catch (Exception ex)
@@ -124,12 +124,15 @@ namespace SiemensTrend.Views
         /// <summary>
         /// Обработчик нажатия кнопки "Подключиться"
         /// </summary>
-        private async void BtnConnect_Click(object sender, RoutedEventArgs e)
+        private void BtnConnect_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Пытаемся подключиться к TIA Portal
-                bool connected = await _viewModel.ConnectToTiaPortalAsync();
+                // Временно отключаем кнопку, чтобы избежать повторных нажатий
+                btnConnect.IsEnabled = false;
+
+                // Пытаемся подключиться к TIA Portal синхронно
+                bool connected = _viewModel.ConnectToTiaPortal();
 
                 // Обновляем состояние интерфейса
                 UpdateConnectionState();
@@ -155,6 +158,11 @@ namespace SiemensTrend.Views
                 MessageBox.Show($"Ошибка при подключении: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally
+            {
+                // Восстанавливаем кнопку в любом случае
+                btnConnect.IsEnabled = !_viewModel.IsConnected;
+            }
         }
 
         /// <summary>
@@ -175,11 +183,11 @@ namespace SiemensTrend.Views
 
                 if (result == true && dialog.SelectedProject != null)
                 {
-                    // Пользователь выбрал проект, подключаемся к нему в том же потоке (STA)
+                    // Пользователь выбрал проект, подключаемся к нему
                     _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject.Name}...";
 
-                    // Выполняем подключение (не используем Task.Run!)
-                    bool success = _viewModel.ConnectToSpecificTiaProjectAsync(dialog.SelectedProject).Result;
+                    // Выполняем подключение синхронно (не используем await!)
+                    bool success = _viewModel.ConnectToSpecificTiaProject(dialog.SelectedProject);
 
                     // Обновляем интерфейс
                     UpdateConnectionState();
