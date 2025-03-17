@@ -77,28 +77,6 @@ namespace SiemensTrend.Views
         /// <summary>
         /// Обновление состояния подключения в интерфейсе
         /// </summary>
-        //private void UpdateConnectionState()
-        //{
-        //    // Обновляем статус подключения
-        //    statusConnectionState.Text = _viewModel.IsConnected ? "Подключено" : "Отключено";
-        //    statusConnectionState.Foreground = _viewModel.IsConnected ?
-        //        System.Windows.Media.Brushes.Green : System.Windows.Media.Brushes.Red;
-
-        //    // Обновляем доступность кнопок
-        //    btnConnect.IsEnabled = !_viewModel.IsConnected;
-        //    btnDisconnect.IsEnabled = _viewModel.IsConnected;
-        //    btnGetPlcs.IsEnabled = _viewModel.IsConnected;
-        //    btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
-        //    btnGetDbs.IsEnabled = _viewModel.IsConnected;
-        //    btnGetDbTags.IsEnabled = _viewModel.IsConnected;
-        //    btnStartMonitoring.IsEnabled = _viewModel.IsConnected;
-        //    btnStopMonitoring.IsEnabled = _viewModel.IsConnected;
-        //    btnExportTags.IsEnabled = _viewModel.IsConnected;
-        //}
-
-        /// <summary>
-        /// Обновление состояния подключения в интерфейсе
-        /// </summary>
         private void UpdateConnectionState()
         {
             try
@@ -283,9 +261,17 @@ namespace SiemensTrend.Views
             {
                 _logger.Info("Запрос тегов ПЛК");
 
+                // Проверяем соединение перед запросом тегов
+                if (!_viewModel.IsConnected)
+                {
+                    _logger.Warn("Попытка получить теги без установленного соединения");
+                    MessageBox.Show("Необходимо сначала подключиться к TIA Portal.",
+                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
                 // Отключаем кнопку на время загрузки
                 btnGetPlcTags.IsEnabled = false;
-                // Показываем индикатор загрузки
                 _viewModel.IsLoading = true;
                 _viewModel.StatusMessage = "Получение тегов ПЛК...";
                 _viewModel.ProgressValue = 10;
@@ -295,6 +281,14 @@ namespace SiemensTrend.Views
                 _logger.Info($"Получено {_viewModel.PlcTags.Count} тегов ПЛК");
                 _viewModel.StatusMessage = $"Получено {_viewModel.PlcTags.Count} тегов ПЛК";
                 _viewModel.ProgressValue = 100;
+
+                // Проверяем состояние соединения после получения тегов
+                if (!_viewModel.IsConnected)
+                {
+                    _logger.Warn("Соединение было потеряно после получения тегов");
+                    MessageBox.Show("Соединение с TIA Portal было потеряно. Пожалуйста, подключитесь снова.",
+                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
             catch (Exception ex)
             {
@@ -306,10 +300,9 @@ namespace SiemensTrend.Views
             }
             finally
             {
-                // Включаем кнопку обратно
                 btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
-                // Скрываем индикатор загрузки
                 _viewModel.IsLoading = false;
+                UpdateConnectionState();
             }
         }
 

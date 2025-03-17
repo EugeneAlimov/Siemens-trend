@@ -1620,15 +1620,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using Siemens.Engineering;
-using Siemens.Engineering.HW;
-using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
-using Siemens.Engineering.SW.Blocks.Interface;
 using Siemens.Engineering.SW.Tags;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
@@ -1636,37 +1631,20 @@ using SiemensTrend.Core.Models;
 namespace SiemensTrend.Communication.TIA
 {
     /// <summary>
-    /// Сервис для чтения тегов из проекта TIA Portal
+    /// Улучшенная реализация для чтения тегов из проекта TIA Portal
     /// </summary>
     public class TiaPortalTagReader
     {
         private readonly Logger _logger;
         private readonly TiaPortalCommunicationService _tiaService;
-        private readonly string _exportPath;
 
         /// <summary>
         /// Конструктор
         /// </summary>
-        public TiaPortalTagReader(Logger logger, TiaPortalCommunicationService tiaService, string exportPath = null)
+        public TiaPortalTagReader(Logger logger, TiaPortalCommunicationService tiaService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _tiaService = tiaService ?? throw new ArgumentNullException(nameof(tiaService));
-            _exportPath = exportPath ?? Path.Combine(Path.GetTempPath(), "SiemensTrend");
-
-            // Создаем директории для экспорта, если они не существуют
-            if (!string.IsNullOrEmpty(_exportPath))
-            {
-                try
-                {
-                    Directory.CreateDirectory(_exportPath);
-                    Directory.CreateDirectory(Path.Combine(_exportPath, "TagTables"));
-                    Directory.CreateDirectory(Path.Combine(_exportPath, "DB"));
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"Ошибка при создании директорий для экспорта: {ex.Message}");
-                }
-            }
         }
 
         /// <summary>
@@ -1685,20 +1663,24 @@ namespace SiemensTrend.Communication.TIA
                 if (plcSoftware == null)
                 {
                     _logger.Error("Не удалось получить PlcSoftware из проекта");
-                    throw new Exception("Не удалось получить программное обеспечение ПЛК из проекта");
+                    return plcData;
                 }
 
                 _logger.Info($"PlcSoftware получен успешно: {plcSoftware.Name}");
 
                 // Читаем теги ПЛК
                 _logger.Info("Начало чтения тегов ПЛК...");
-                ReadPlcTags(plcSoftware, plcData);
-                _logger.Info($"Теги ПЛК прочитаны успешно, найдено {plcData.PlcTags.Count} тегов");
+                int plcTagCount = 0;
+                int tableCount = 0;
+                ReadPlcTags(plcSoftware, plcData, ref tableCount, ref plcTagCount);
+                _logger.Info($"Теги ПЛК прочитаны успешно, найдено {plcData.PlcTags.Count} тегов в {tableCount} таблицах");
 
                 // Читаем теги блоков данных
                 _logger.Info("Начало чтения тегов DB...");
-                ReadDataBlocks(plcSoftware, plcData);
-                _logger.Info($"Теги DB прочитаны успешно, найдено {plcData.DbTags.Count} тегов");
+                int dbCount = 0;
+                int dbTagCount = 0;
+                ReadDataBlocks(plcSoftware, plcData, ref dbCount, ref dbTagCount);
+                _logger.Info($"Теги DB прочитаны успешно, найдено {plcData.DbTags.Count} тегов в {dbCount} блоках данных");
 
                 _logger.Info($"Чтение тегов завершено: {plcData.PlcTags.Count} тегов ПЛК, {plcData.DbTags.Count} тегов DB");
             }
@@ -1709,54 +1691,6 @@ namespace SiemensTrend.Communication.TIA
                 {
                     _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
                 }
-                throw; // Пробрасываем исключение дальше для обработки в UI
-            }
-
-            return plcData;
-        }
-
-        /// <summary>
-        /// Чтение всех тегов из проекта
-        /// </summary>
-        public async Task<PlcData> ReadAllTagsAsync()
-        {
-            var plcData = new PlcData();
-
-            try
-            {
-                _logger.Info("Чтение тегов из проекта TIA Portal...");
-
-                // Получаем программное обеспечение ПЛК
-                var plcSoftware = _tiaService.GetPlcSoftware();
-                if (plcSoftware == null)
-                {
-                    _logger.Error("Не удалось получить PlcSoftware из проекта");
-                    throw new Exception("Не удалось получить программное обеспечение ПЛК из проекта");
-                }
-
-                _logger.Info($"PlcSoftware получен успешно: {plcSoftware.Name}");
-
-                // ВАЖНО: НЕ используем Task.Run, так как Openness API требует STA потока
-                // Читаем теги ПЛК
-                _logger.Info("Начало чтения тегов ПЛК...");
-                ReadPlcTags(plcSoftware, plcData);
-                _logger.Info($"Теги ПЛК прочитаны успешно, найдено {plcData.PlcTags.Count} тегов");
-
-                // Читаем теги блоков данных
-                _logger.Info("Начало чтения тегов DB...");
-                ReadDataBlocks(plcSoftware, plcData);
-                _logger.Info($"Теги DB прочитаны успешно, найдено {plcData.DbTags.Count} тегов");
-
-                _logger.Info($"Чтение тегов завершено: {plcData.PlcTags.Count} тегов ПЛК, {plcData.DbTags.Count} тегов DB");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при чтении тегов: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
-                }
-                throw; // Пробрасываем исключение дальше для обработки в UI
             }
 
             return plcData;
@@ -1765,43 +1699,127 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Чтение тегов ПЛК из таблиц тегов
         /// </summary>
-        private void ReadPlcTags(PlcSoftware plcSoftware, PlcData plcData)
+        private void ReadPlcTags(PlcSoftware plcSoftware, PlcData plcData, ref int tableCount, ref int tagCount)
         {
-            _logger.Info("Чтение тегов ПЛК из таблиц тегов...");
-
             try
             {
-                // Получаем и обрабатываем все таблицы тегов
-                ProcessTagTableGroup(plcSoftware.TagTableGroup, plcData);
+                _logger.Info("Чтение тегов ПЛК из таблиц тегов...");
+
+                // Проверка параметров
+                if (plcSoftware == null)
+                {
+                    _logger.Error("Ошибка: plcSoftware не может быть null");
+                    return;
+                }
+
+                if (plcSoftware.TagTableGroup == null)
+                {
+                    _logger.Error("Ошибка: TagTableGroup не найдена в plcSoftware");
+                    return;
+                }
+
+                // Добавим подробное логирование
+                _logger.Info($"TagTableGroup найдена: {plcSoftware.TagTableGroup.Name}");
+
+                try
+                {
+                    // Логируем количество таблиц и групп перед обработкой
+                    _logger.Info($"Количество таблиц тегов: {plcSoftware.TagTableGroup.TagTables.Count}");
+                    _logger.Info($"Количество групп таблиц: {plcSoftware.TagTableGroup.Groups.Count}");
+
+                    ProcessTagTableGroup(plcSoftware.TagTableGroup, plcData, ref tableCount, ref tagCount);
+
+                    _logger.Info($"Обработано {tableCount} таблиц тегов, найдено {tagCount} тегов ПЛК");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Ошибка при обработке группы таблиц тегов: {ex.Message}");
+                    if (ex.InnerException != null)
+                    {
+                        _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                    }
+                }
 
                 _logger.Info($"Чтение тегов ПЛК завершено. Найдено {plcData.PlcTags.Count} тегов");
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при чтении тегов ПЛК: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
             }
         }
 
         /// <summary>
         /// Рекурсивная обработка групп таблиц тегов
         /// </summary>
-        private void ProcessTagTableGroup(PlcTagTableGroup group, PlcData plcData, string parentPath = "")
+        private void ProcessTagTableGroup(PlcTagTableGroup group, PlcData plcData, ref int tableCount, ref int tagCount, string parentPath = "")
         {
             try
             {
-                // Обработка таблиц тегов в текущей группе
-                foreach (var tagTable in group.TagTables)
+                // Проверка параметров
+                if (group == null)
                 {
-                    ProcessTagTable(tagTable as PlcTagTable, plcData, parentPath);
+                    _logger.Error("Ошибка: group не может быть null");
+                    return;
+                }
+
+                string groupName = string.IsNullOrEmpty(group.Name) ? "Default" : group.Name;
+                _logger.Info($"Обработка группы таблиц тегов: {groupName}");
+
+                // Обработка таблиц тегов в текущей группе
+                if (group.TagTables != null)
+                {
+                    foreach (var tagTable in group.TagTables)
+                    {
+                        try
+                        {
+                            var plcTagTable = tagTable as PlcTagTable;
+                            if (plcTagTable != null)
+                            {
+                                ProcessTagTable(plcTagTable, plcData, parentPath, ref tagCount);
+                                tableCount++;
+                            }
+                            else
+                            {
+                                _logger.Warn($"Таблица тегов не может быть приведена к типу PlcTagTable");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Error($"Ошибка при обработке таблицы тегов: {ex.Message}");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.Warn($"TagTables равен null в группе {groupName}");
                 }
 
                 // Рекурсивная обработка подгрупп
-                foreach (var subgroup in group.Groups)
+                if (group.Groups != null)
                 {
-                    string newPath = string.IsNullOrEmpty(parentPath) ?
-                        subgroup.Name : $"{parentPath}/{subgroup.Name}";
+                    foreach (var subgroup in group.Groups)
+                    {
+                        string newPath = string.IsNullOrEmpty(parentPath) ?
+                            subgroup.Name : $"{parentPath}/{subgroup.Name}";
 
-                    ProcessTagTableGroup(subgroup as PlcTagTableUserGroup, plcData, newPath);
+                        var userGroup = subgroup as PlcTagTableUserGroup;
+                        if (userGroup != null)
+                        {
+                            ProcessTagTableGroup(userGroup, plcData, ref tableCount, ref tagCount, newPath);
+                        }
+                        else
+                        {
+                            _logger.Warn($"Подгруппа не может быть приведена к типу PlcTagTableUserGroup");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.Warn($"Groups равен null в группе {groupName}");
                 }
             }
             catch (Exception ex)
@@ -1813,7 +1831,7 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Обработка таблицы тегов
         /// </summary>
-        private void ProcessTagTable(PlcTagTable tagTable, PlcData plcData, string groupPath)
+        private void ProcessTagTable(PlcTagTable tagTable, PlcData plcData, string groupPath, ref int tagCount)
         {
             if (tagTable == null)
             {
@@ -1823,12 +1841,17 @@ namespace SiemensTrend.Communication.TIA
 
             _logger.Info($"Обработка таблицы тегов: {tagTable.Name}");
 
-            // Полный путь к таблице
-            string fullTablePath = string.IsNullOrEmpty(groupPath) ?
-                tagTable.Name : $"{groupPath}/{tagTable.Name}";
-
             try
             {
+                // Проверяем наличие тегов в таблице
+                if (tagTable.Tags == null || tagTable.Tags.Count == 0)
+                {
+                    _logger.Warn($"Таблица тегов {tagTable.Name} не содержит тегов");
+                    return;
+                }
+
+                _logger.Info($"Количество тегов в таблице {tagTable.Name}: {tagTable.Tags.Count}");
+
                 // Обрабатываем каждый тег в таблице
                 foreach (var tag in tagTable.Tags)
                 {
@@ -1836,7 +1859,11 @@ namespace SiemensTrend.Communication.TIA
                     {
                         // Приводим к типу PlcTag
                         var plcTag = tag as Siemens.Engineering.SW.Tags.PlcTag;
-                        if (plcTag == null) continue;
+                        if (plcTag == null)
+                        {
+                            _logger.Debug($"Тег не может быть приведен к типу PlcTag, пропускаем");
+                            continue;
+                        }
 
                         // Получаем атрибуты тега
                         string name = plcTag.Name;
@@ -1844,14 +1871,14 @@ namespace SiemensTrend.Communication.TIA
                         string address = "";
                         string comment = "";
 
-                        try { dataTypeString = GetMultilingualText(plcTag.DataTypeName); } catch { }
-                        try { address = plcTag.LogicalAddress; } catch { }
-                        try { comment = GetMultilingualText(plcTag.Comment); } catch { }
+                        try { dataTypeString = GetMultilingualText(plcTag.DataTypeName); } catch (Exception ex) { _logger.Debug($"Ошибка при получении типа данных: {ex.Message}"); }
+                        try { address = plcTag.LogicalAddress; } catch (Exception ex) { _logger.Debug($"Ошибка при получении адреса: {ex.Message}"); }
+                        try { comment = GetMultilingualText(plcTag.Comment); } catch (Exception ex) { _logger.Debug($"Ошибка при получении комментария: {ex.Message}"); }
 
                         // Конвертируем строковый тип данных в TagDataType
                         TagDataType dataType = ConvertToTagDataType(dataTypeString);
 
-                        // Проверяем, нужно ли добавлять тег (по требованиям только bool, int, dint, real)
+                        // Проверяем, поддерживается ли тип данных
                         if (!IsSupportedTagType(dataType))
                         {
                             _logger.Debug($"Пропущен тег {name} с неподдерживаемым типом данных {dataTypeString}");
@@ -1871,6 +1898,7 @@ namespace SiemensTrend.Communication.TIA
                         };
 
                         plcData.PlcTags.Add(tagDefinition);
+                        tagCount++;
                         _logger.Debug($"Добавлен тег ПЛК: {name} ({dataTypeString}) @ {address}");
                     }
                     catch (Exception ex)
@@ -1886,73 +1914,91 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Получение строкового значения из объекта MultilingualText
-        /// </summary>
-        private string GetMultilingualText(object multilingualTextObj)
-        {
-            try
-            {
-                if (multilingualTextObj == null)
-                    return string.Empty;
-
-                // Если это уже string, просто возвращаем его
-                if (multilingualTextObj is string textString)
-                    return textString;
-
-                // Для других объектов просто преобразуем в строку
-                return multilingualTextObj.ToString();
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        /// <summary>
         /// Чтение блоков данных
         /// </summary>
-        private void ReadDataBlocks(PlcSoftware plcSoftware, PlcData plcData)
+        private void ReadDataBlocks(PlcSoftware plcSoftware, PlcData plcData, ref int dbCount, ref int tagCount)
         {
             _logger.Info("Чтение блоков данных...");
 
             try
             {
-                // Обрабатываем группы блоков данных
-                ProcessBlockGroup(plcSoftware.BlockGroup, plcData);
+                if (plcSoftware.BlockGroup == null)
+                {
+                    _logger.Error("Ошибка: BlockGroup не найдена в plcSoftware");
+                    return;
+                }
 
-                _logger.Info($"Чтение блоков данных завершено. Найдено {plcData.DbTags.Count} переменных DB");
+                _logger.Info($"BlockGroup найдена: {plcSoftware.BlockGroup.Name}");
+
+                // Обрабатываем группы блоков данных
+                ProcessBlockGroup(plcSoftware.BlockGroup, plcData, ref dbCount, ref tagCount);
+
+                _logger.Info($"Чтение блоков данных завершено. Найдено {plcData.DbTags.Count} переменных DB в {dbCount} блоках");
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при чтении блоков данных: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
             }
         }
 
         /// <summary>
         /// Рекурсивная обработка групп блоков
         /// </summary>
-        private void ProcessBlockGroup(PlcBlockGroup group, PlcData plcData, string parentPath = "")
+        private void ProcessBlockGroup(PlcBlockGroup group, PlcData plcData, ref int dbCount, ref int tagCount, string parentPath = "")
         {
             try
             {
+                if (group == null)
+                {
+                    _logger.Error("Ошибка: group не может быть null");
+                    return;
+                }
+
                 string groupPath = string.IsNullOrEmpty(parentPath) ?
                     group.Name : $"{parentPath}/{group.Name}";
 
                 _logger.Debug($"Обработка группы блоков: {groupPath}");
 
                 // Обрабатываем блоки в текущей группе
-                foreach (var block in group.Blocks)
+                if (group.Blocks != null)
                 {
-                    if (block is DataBlock db)
+                    foreach (var block in group.Blocks)
                     {
-                        ProcessDataBlock(db, plcData, groupPath);
+                        if (block is DataBlock db)
+                        {
+                            ProcessDataBlock(db, plcData, groupPath, ref tagCount);
+                            dbCount++;
+                        }
                     }
+                }
+                else
+                {
+                    _logger.Warn($"Blocks равен null в группе {group.Name}");
                 }
 
                 // Рекурсивная обработка подгрупп
-                foreach (var subgroup in group.Groups)
+                if (group.Groups != null)
                 {
-                    ProcessBlockGroup(subgroup as PlcBlockGroup, plcData, groupPath);
+                    foreach (var subgroup in group.Groups)
+                    {
+                        var plcBlockGroup = subgroup as PlcBlockGroup;
+                        if (plcBlockGroup != null)
+                        {
+                            ProcessBlockGroup(plcBlockGroup, plcData, ref dbCount, ref tagCount, groupPath);
+                        }
+                        else
+                        {
+                            _logger.Warn($"Подгруппа не может быть приведена к типу PlcBlockGroup");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.Warn($"Groups равен null в группе {group.Name}");
                 }
             }
             catch (Exception ex)
@@ -1964,8 +2010,14 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Обработка блока данных
         /// </summary>
-        private void ProcessDataBlock(DataBlock db, PlcData plcData, string groupPath)
+        private void ProcessDataBlock(DataBlock db, PlcData plcData, string groupPath, ref int tagCount)
         {
+            if (db == null)
+            {
+                _logger.Warn("Получен пустой блок данных");
+                return;
+            }
+
             _logger.Info($"Обработка блока данных: {db.Name}");
 
             try
@@ -1977,26 +2029,39 @@ namespace SiemensTrend.Communication.TIA
                     return;
                 }
 
-                // Проверяем наличие членов в блоке данных
-                var members = GetMembers(db.Interface);
-                if (members == null || !members.Any())
+                // Определяем, является ли блок оптимизированным
+                bool isOptimized = false;
+                try
                 {
-                    _logger.Warn($"Блок данных {db.Name} не имеет переменных");
-                    return;
+                    isOptimized = db.MemoryLayout == MemoryLayout.Optimized;
+                    _logger.Info($"Блок данных {db.Name} - {(isOptimized ? "оптимизированный" : "стандартный")}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Ошибка при определении типа блока данных: {ex.Message}");
                 }
 
-                // Определяем, является ли блок оптимизированным
-                bool isOptimized = IsOptimizedBlock(db);
-
                 // Определяем, является ли блок UDT или Safety
-                bool isUDT = groupPath.Contains("PLC data types") || IsUDTBlock(db);
-                bool isSafety = IsSafetyBlock(db);
+                bool isUDT = groupPath.Contains("PLC data types");
+                bool isSafety = false;
 
-                _logger.Info($"Блок данных {db.Name} - {(isOptimized ? "оптимизированный" : "стандартный")}, " +
-                            $"UDT: {isUDT}, Safety: {isSafety}");
+                try
+                {
+                    var programmingLanguage = GetMultilingualText(db.GetAttribute("ProgrammingLanguage"));
+                    isSafety = programmingLanguage == "F_DB";
+
+                    if (isSafety)
+                    {
+                        _logger.Info($"Блок данных {db.Name} является Safety блоком (F_DB)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"Ошибка при определении Safety блока: {ex.Message}");
+                }
 
                 // Рекурсивно обрабатываем переменные блока данных
-                ProcessDbMembers(db.Interface, db.Name, "", plcData, isOptimized, isUDT, isSafety);
+                ProcessDbMembers(db.Interface, db.Name, "", plcData, isOptimized, isUDT, isSafety, ref tagCount);
             }
             catch (Exception ex)
             {
@@ -2005,94 +2070,45 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Проверка, является ли блок данных оптимизированным
-        /// </summary>
-        private bool IsOptimizedBlock(DataBlock db)
-        {
-            try
-            {
-                return db.MemoryLayout == MemoryLayout.Optimized;
-            }
-            catch
-            {
-                // Используем альтернативный способ определения через атрибуты
-                try
-                {
-                    var memoryLayoutObj = db.GetAttribute("MemoryLayout");
-                    if (memoryLayoutObj != null)
-                    {
-                        string memoryLayout = memoryLayoutObj.ToString();
-                        return memoryLayout.Contains("Optimized");
-                    }
-                }
-                catch { }
-
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Проверка, является ли блок данных UDT
-        /// </summary>
-        private bool IsUDTBlock(DataBlock db)
-        {
-            try
-            {
-                // Проверяем по имени типа данных
-                var dataTypeObj = db.GetAttribute("DataTypeName");
-                if (dataTypeObj != null)
-                {
-                    string dataType = GetMultilingualText(dataTypeObj);
-                    return dataType.StartsWith("UDT_") || dataType.Contains("type");
-                }
-            }
-            catch { }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Проверка, является ли блок данных Safety
-        /// </summary>
-        private bool IsSafetyBlock(DataBlock db)
-        {
-            try
-            {
-                // Проверяем по языку программирования
-                var programmingLanguage = GetMultilingualText(db.GetAttribute("ProgrammingLanguage"));
-                return programmingLanguage == "F_DB";
-            }
-            catch { }
-
-            // Альтернативный способ - по имени блока
-            return db.Name.Contains("_F_") || db.Name.EndsWith("_F");
-        }
-
-        /// <summary>
         /// Рекурсивная обработка членов блока данных
         /// </summary>
         private void ProcessDbMembers(IEngineeringObject memberContainer, string dbName, string parentPath,
-            PlcData plcData, bool isOptimized, bool isUDT, bool isSafety)
+            PlcData plcData, bool isOptimized, bool isUDT, bool isSafety, ref int tagCount)
         {
             try
             {
-                // Пытаемся получить члены различными способами в зависимости от версии API
-                var members = GetMembers(memberContainer);
+                if (memberContainer == null)
+                {
+                    _logger.Error("Ошибка: memberContainer не может быть null");
+                    return;
+                }
 
+                // Пытаемся получить члены из контейнера
+                var members = GetMembers(memberContainer);
                 if (members == null || !members.Any())
                 {
                     _logger.Debug($"Нет членов для контейнера {memberContainer.GetType().Name}");
                     return;
                 }
 
+                _logger.Debug($"Количество членов в контейнере: {members.Count()}");
+
                 // Обрабатываем каждый член
                 foreach (var member in members)
                 {
                     try
                     {
-                        string name = GetPropertyValue<string>(member, "Name") ?? "Unknown";
+                        if (member == null)
+                        {
+                            _logger.Debug("Пропускаем null-член");
+                            continue;
+                        }
 
-                        // Получаем тип данных через reflection
+                        // Получаем имя члена
+                        string name = GetPropertyValue<string>(member, "Name") ?? "Unknown";
+                        _logger.Debug($"Обработка члена: {name}");
+
+                        // Получаем тип данных
                         string dataTypeString = "Unknown";
                         try
                         {
@@ -2106,8 +2122,6 @@ namespace SiemensTrend.Communication.TIA
 
                         // Полный путь к переменной
                         string memberPath = string.IsNullOrEmpty(parentPath) ? name : $"{parentPath}.{name}";
-
-                        // Полное имя переменной с именем блока данных
                         string fullName = $"{dbName}.{memberPath}";
 
                         // Проверяем наличие вложенных элементов
@@ -2116,7 +2130,7 @@ namespace SiemensTrend.Communication.TIA
                         if (nestedMemberContainer != null)
                         {
                             // Рекурсивно обрабатываем вложенную структуру
-                            ProcessDbMembers(nestedMemberContainer, dbName, memberPath, plcData, isOptimized, isUDT, isSafety);
+                            ProcessDbMembers(nestedMemberContainer, dbName, memberPath, plcData, isOptimized, isUDT, isSafety, ref tagCount);
                         }
                         else
                         {
@@ -2127,9 +2141,9 @@ namespace SiemensTrend.Communication.TIA
                                 var commentObj = GetPropertyValue<object>(member, "Comment");
                                 comment = GetMultilingualText(commentObj);
                             }
-                            catch
+                            catch (Exception ex)
                             {
-                                _logger.Debug($"Не удалось получить комментарий для {name}");
+                                _logger.Debug($"Не удалось получить комментарий для {name}: {ex.Message}");
                             }
 
                             // Конвертируем тип данных
@@ -2156,6 +2170,7 @@ namespace SiemensTrend.Communication.TIA
                             };
 
                             plcData.DbTags.Add(dbTag);
+                            tagCount++;
                             _logger.Debug($"Добавлена переменная DB: {fullName} ({dataTypeString})");
                         }
                     }
@@ -2280,6 +2295,30 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
+        /// Получение строкового значения из объекта MultilingualText
+        /// </summary>
+        private string GetMultilingualText(object multilingualTextObj)
+        {
+            try
+            {
+                if (multilingualTextObj == null)
+                    return string.Empty;
+
+                // Если это уже string, просто возвращаем его
+                if (multilingualTextObj is string textString)
+                    return textString;
+
+                // Для других объектов используем ToString
+                return multilingualTextObj.ToString();
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug($"Ошибка при получении многоязычного текста: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// Получение адреса члена блока данных
         /// </summary>
         private string GetMemberAddress(object member, string dbName)
@@ -2291,7 +2330,7 @@ namespace SiemensTrend.Communication.TIA
                 if (offsetObj != null)
                 {
                     int offset = Convert.ToInt32(offsetObj);
-                    return $"{dbName}.DBX{offset}.0"; // Для bool
+                    return $"{dbName}.DBX{offset}.0"; // Для bool, остальные типы можно уточнить
                 }
             }
             catch (Exception ex)
