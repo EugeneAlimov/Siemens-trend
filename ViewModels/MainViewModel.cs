@@ -383,45 +383,33 @@ namespace SiemensTrend.ViewModels
         {
             try
             {
-                // Проверяем, есть ли подключение к TIA Portal
-                if (_tiaPortalService == null || !IsConnected)
+                if (_tiaPortalService == null)
                 {
-                    _logger.Error("GetPlcTagsAsync: Попытка получить теги без активного подключения к TIA Portal");
-                    StatusMessage = "Ошибка: отсутствует подключение к TIA Portal";
+                    _logger.Error("GetPlcTagsAsync: Сервис TIA Portal не инициализирован");
+                    StatusMessage = "Ошибка: сервис TIA Portal не инициализирован";
                     return;
                 }
 
                 IsLoading = true;
                 StatusMessage = "Получение тегов ПЛК...";
-                _logger.Info("GetPlcTagsAsync: Начало получения тегов ПЛК");
                 ProgressValue = 10;
 
-                // ВАЖНО: Мы не используем Task.Run для работы с TIA Portal API!
-                // Вместо этого, используем асинхронные методы из коммуникационного сервиса
                 var plcTags = await _tiaPortalService.GetPlcTagsAsync();
                 ProgressValue = 90;
 
-                // Заносим полученные теги в UI коллекцию
-                _logger.Info($"GetPlcTagsAsync: Получено {plcTags.Count} тегов ПЛК, обновляем UI");
                 PlcTags.Clear();
                 foreach (var tag in plcTags)
                 {
                     PlcTags.Add(tag);
                 }
 
-                _logger.Info($"GetPlcTagsAsync: Успешно добавлено {PlcTags.Count} тегов в UI коллекцию");
                 StatusMessage = $"Получено {plcTags.Count} тегов ПЛК";
                 ProgressValue = 100;
             }
             catch (Exception ex)
             {
-                _logger.Error($"GetPlcTagsAsync: Ошибка при получении тегов ПЛК: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    _logger.Error($"GetPlcTagsAsync: Внутренняя ошибка: {ex.InnerException.Message}");
-                }
+                _logger.Error($"GetPlcTagsAsync: Ошибка: {ex.Message}");
                 StatusMessage = "Ошибка получения тегов ПЛК";
-                ProgressValue = 0;
             }
             finally
             {
@@ -436,45 +424,33 @@ namespace SiemensTrend.ViewModels
         {
             try
             {
-                // Проверяем, есть ли подключение к TIA Portal
-                if (_tiaPortalService == null || !IsConnected)
+                if (_tiaPortalService == null)
                 {
-                    _logger.Error("GetDbTagsAsync: Попытка получить теги DB без активного подключения к TIA Portal");
-                    StatusMessage = "Ошибка: отсутствует подключение к TIA Portal";
+                    _logger.Error("GetDbTagsAsync: Сервис TIA Portal не инициализирован");
+                    StatusMessage = "Ошибка: сервис TIA Portal не инициализирован";
                     return;
                 }
 
                 IsLoading = true;
-                StatusMessage = "Получение тегов блоков данных...";
-                _logger.Info("GetDbTagsAsync: Начало получения тегов DB");
+                StatusMessage = "Получение тегов DB...";
                 ProgressValue = 10;
 
-                // ВАЖНО: Мы не используем Task.Run для работы с TIA Portal API!
-                // Вместо этого, используем асинхронные методы из коммуникационного сервиса
                 var dbTags = await _tiaPortalService.GetDbTagsAsync();
                 ProgressValue = 90;
 
-                // Заносим полученные теги в UI коллекцию
-                _logger.Info($"GetDbTagsAsync: Получено {dbTags.Count} тегов DB, обновляем UI");
                 DbTags.Clear();
                 foreach (var tag in dbTags)
                 {
                     DbTags.Add(tag);
                 }
 
-                _logger.Info($"GetDbTagsAsync: Успешно добавлено {DbTags.Count} тегов в UI коллекцию");
-                StatusMessage = $"Получено {dbTags.Count} тегов блоков данных";
+                StatusMessage = $"Получено {dbTags.Count} тегов DB";
                 ProgressValue = 100;
             }
             catch (Exception ex)
             {
-                _logger.Error($"GetDbTagsAsync: Ошибка при получении тегов блоков данных: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    _logger.Error($"GetDbTagsAsync: Внутренняя ошибка: {ex.InnerException.Message}");
-                }
-                StatusMessage = "Ошибка получения тегов блоков данных";
-                ProgressValue = 0;
+                _logger.Error($"GetDbTagsAsync: Ошибка: {ex.Message}");
+                StatusMessage = "Ошибка получения тегов DB";
             }
             finally
             {
@@ -493,6 +469,37 @@ namespace SiemensTrend.ViewModels
 
                 // Подписываемся на событие выбора тега
                 TagBrowserViewModel.TagSelected += OnTagSelected;
+            }
+        }
+
+        // Добавим метод для экспорта в XML
+        public async Task ExportTagsToXml()
+        {
+            try
+            {
+                if (_tiaPortalService == null || !IsConnected)
+                {
+                    StatusMessage = "Необходимо сначала подключиться к TIA Portal";
+                    return;
+                }
+
+                IsLoading = true;
+                StatusMessage = "Экспорт тегов в XML...";
+                ProgressValue = 10;
+
+                await _tiaPortalService.ExportTagsToXml();
+
+                ProgressValue = 100;
+                StatusMessage = "Экспорт тегов в XML завершен";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ExportTagsToXml: Ошибка: {ex.Message}");
+                StatusMessage = "Ошибка при экспорте тегов";
+            }
+            finally
+            {
+                IsLoading = false;
             }
         }
     }

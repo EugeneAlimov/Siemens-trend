@@ -1656,44 +1656,301 @@ namespace SiemensTrend.Communication.TIA
 
             try
             {
-                _logger.Info("Чтение тегов из проекта TIA Portal...");
+                _logger.Info("ReadAllTags: Чтение тегов из проекта TIA Portal...");
 
                 // Получаем программное обеспечение ПЛК
                 var plcSoftware = _tiaService.GetPlcSoftware();
                 if (plcSoftware == null)
                 {
-                    _logger.Error("Не удалось получить PlcSoftware из проекта");
+                    _logger.Error("ReadAllTags: Не удалось получить PlcSoftware из проекта");
                     return plcData;
                 }
 
-                _logger.Info($"PlcSoftware получен успешно: {plcSoftware.Name}");
+                _logger.Info($"ReadAllTags: PlcSoftware получен успешно: {plcSoftware.Name}");
 
-                // Читаем теги ПЛК
-                _logger.Info("Начало чтения тегов ПЛК...");
-                int plcTagCount = 0;
-                int tableCount = 0;
-                ReadPlcTags(plcSoftware, plcData, ref tableCount, ref plcTagCount);
-                _logger.Info($"Теги ПЛК прочитаны успешно, найдено {plcData.PlcTags.Count} тегов в {tableCount} таблицах");
+                // Сначала прочитаем только теги ПЛК в отдельной операции
+                try
+                {
+                    _logger.Info("ReadAllTags: Начало чтения тегов ПЛК...");
+                    int plcTagCount = 0;
+                    int tableCount = 0;
+                    ReadPlcTags(plcSoftware, plcData, ref tableCount, ref plcTagCount);
+                    _logger.Info($"ReadAllTags: Теги ПЛК прочитаны успешно, найдено {plcData.PlcTags.Count} тегов");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"ReadAllTags: Ошибка при чтении тегов ПЛК: {ex.Message}");
+                }
 
-                // Читаем теги блоков данных
-                _logger.Info("Начало чтения тегов DB...");
-                int dbCount = 0;
-                int dbTagCount = 0;
-                ReadDataBlocks(plcSoftware, plcData, ref dbCount, ref dbTagCount);
-                _logger.Info($"Теги DB прочитаны успешно, найдено {plcData.DbTags.Count} тегов в {dbCount} блоках данных");
+                // Теперь проверяем, что соединение еще активно
+                if (!_tiaService.IsConnected || _tiaService.CurrentProject == null)
+                {
+                    _logger.Error("ReadAllTags: Соединение с TIA Portal потеряно после чтения тегов ПЛК");
+                    return plcData; // Возвращаем только прочитанные теги PLC
+                }
 
-                _logger.Info($"Чтение тегов завершено: {plcData.PlcTags.Count} тегов ПЛК, {plcData.DbTags.Count} тегов DB");
+                // Получаем обновленный plcSoftware после проверки соединения
+                plcSoftware = _tiaService.GetPlcSoftware();
+                if (plcSoftware == null)
+                {
+                    _logger.Error("ReadAllTags: Не удалось получить PlcSoftware перед чтением DB");
+                    return plcData;
+                }
+
+                // Только если соединение активно, попробуем прочитать DB теги
+                try
+                {
+                    _logger.Info("ReadAllTags: Начало чтения тегов DB...");
+                    int dbCount = 0;
+                    int dbTagCount = 0;
+
+                    // Используем защищенное чтение блоков данных
+                    ReadDataBlocksSafe(plcSoftware, plcData, ref dbCount, ref dbTagCount);
+
+                    _logger.Info($"ReadAllTags: Теги DB прочитаны успешно, найдено {plcData.DbTags.Count} тегов");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"ReadAllTags: Ошибка при чтении тегов DB: {ex.Message}");
+                    // Продолжаем выполнение, возвращая хотя бы теги PLC
+                }
             }
             catch (Exception ex)
             {
-                _logger.Error($"Ошибка при чтении тегов: {ex.Message}");
+                _logger.Error($"ReadAllTags: Общая ошибка при чтении тегов: {ex.Message}");
                 if (ex.InnerException != null)
                 {
-                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                    _logger.Error($"ReadAllTags: Внутренняя ошибка: {ex.InnerException.Message}");
                 }
             }
 
             return plcData;
+        }
+
+        private void ReadDataBlocksSafe(PlcSoftware plcSoftware, PlcData plcData, ref int dbCount, ref int dbTagCount)
+        {
+            try
+            {
+                _logger.Info("Чтение блоков данных (безопасный режим)...");
+
+                // Получаем список всех блоков данных напрямую, без рекурсивной обработки групп
+                var allDataBlocks = new List<DataBlock>();
+
+                // Рекурсивно собираем только ссылки на блоки данных
+                CollectDataBlocks(plcSoftware.BlockGroup, allDataBlocks);
+
+                _logger.Info($"Найдено {allDataBlocks.Count} блоков данных для обработки");
+
+                // Обрабатываем каждый блок данных по отдельности
+                foreach (var db in allDataBlocks)
+                {
+                    try
+                    {
+                        _logger.Info($"Обработка блока данных: {db.Name}");
+
+                        // Запрос свойств каждого блока данных в отдельном try-catch
+                        bool isOptimized = false;
+                        bool isUDT = false;
+                        bool isSafety = false;
+
+                        try { isOptimized = db.MemoryLayout == MemoryLayout.Optimized; }
+                        catch (Exception ex) { _logger.Debug($"Ошибка при определении оптимизации: {ex.Message}"); }
+
+                        try { isUDT = db.Name.Contains("UDT") || db.Name.Contains("Type"); }
+                        catch (Exception ex) { _logger.Debug($"Ошибка при определении UDT: {ex.Message}"); }
+
+                        // Осторожно обрабатываем члены блока данных
+                        ProcessDbMembersSafe(db, plcData, isOptimized, isUDT, isSafety, ref dbTagCount);
+
+                        dbCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Ошибка при обработке блока данных {db.Name}: {ex.Message}");
+                        // Пропускаем проблемный блок и продолжаем с другими
+                    }
+
+                    // Проверяем соединение после каждого блока
+                    if (!_tiaService.IsConnected)
+                    {
+                        _logger.Error("Соединение с TIA Portal потеряно во время обработки блоков данных");
+                        break;
+                    }
+                }
+
+                _logger.Info($"Обработано {dbCount} блоков данных, найдено {dbTagCount} тегов DB");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при безопасном чтении блоков данных: {ex.Message}");
+            }
+        }
+
+        private void CollectDataBlocks(PlcBlockGroup group, List<DataBlock> dataBlocks)
+        {
+            try
+            {
+                // Собираем блоки данных из текущей группы
+                foreach (var block in group.Blocks)
+                {
+                    if (block is DataBlock db)
+                    {
+                        dataBlocks.Add(db);
+                    }
+                }
+
+                // Рекурсивно обрабатываем подгруппы
+                foreach (var subgroup in group.Groups)
+                {
+                    try
+                    {
+                        CollectDataBlocks(subgroup as PlcBlockGroup, dataBlocks);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug($"Пропуск подгруппы из-за ошибки: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug($"Ошибка при сборе блоков данных: {ex.Message}");
+            }
+        }
+
+        private void ProcessDbMembersSafe(DataBlock db, PlcData plcData, bool isOptimized, bool isUDT, bool isSafety, ref int tagCount)
+        {
+            // Безопасная обработка интерфейса блока данных
+            if (db.Interface == null)
+            {
+                _logger.Warn($"Блок данных {db.Name} не имеет интерфейса");
+                return;
+            }
+
+            try
+            {
+                // Ограничиваем глубину обработки для снижения вероятности ошибок
+                ExtractFlattenedDbTags(db, plcData, isOptimized, isUDT, isSafety, ref tagCount);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при обработке членов блока данных {db.Name}: {ex.Message}");
+            }
+        }
+
+        private void ExtractFlattenedDbTags(DataBlock db, PlcData plcData, bool isOptimized, bool isUDT, bool isSafety, ref int tagCount)
+        {
+            try
+            {
+                var members = db.Interface.Members;
+                if (members == null || !members.Any())
+                {
+                    return;
+                }
+
+                foreach (var member in members)
+                {
+                    try
+                    {
+                        if (member == null) continue;
+
+                        string name = member.Name;
+                        string dataTypeString = "Unknown";
+
+                        // Безопасное получение типа данных с использованием Reflection/GetAttribute
+                        try
+                        {
+                            // Пробуем получить тип через рефлексию
+                            var prop = member.GetType().GetProperty("DataTypeName");
+                            if (prop != null)
+                            {
+                                var value = prop.GetValue(member);
+                                dataTypeString = GetMultilingualText(value);
+                            }
+                            else
+                            {
+                                // Альтернативно используем GetAttribute метод если он существует
+                                var getAttributeMethod = member.GetType().GetMethod("GetAttribute");
+                                if (getAttributeMethod != null)
+                                {
+                                    var value = getAttributeMethod.Invoke(member, new object[] { "DataTypeName" });
+                                    dataTypeString = GetMultilingualText(value);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Debug($"Ошибка при получении типа данных для {name}: {ex.Message}");
+                        }
+
+                        // Формируем имя тега
+                        string fullName = $"{db.Name}.{name}";
+
+                        // Определяем тип тега
+                        TagDataType dataType = ConvertToTagDataType(dataTypeString);
+
+                        // Проверяем, поддерживается ли тип данных
+                        if (!IsSupportedTagType(dataType))
+                        {
+                            _logger.Debug($"Пропущен тег DB {fullName} с неподдерживаемым типом данных {dataTypeString}");
+                            continue;
+                        }
+
+                        // Добавляем тег в список DB тегов
+                        plcData.DbTags.Add(new TagDefinition
+                        {
+                            Name = fullName,
+                            Address = isOptimized ? "Optimized" : "Standard",
+                            DataType = dataType,
+                            Comment = GetMemberComment(member),
+                            GroupName = db.Name,
+                            IsOptimized = isOptimized,
+                            IsUDT = isUDT,
+                            IsSafety = isSafety
+                        });
+
+                        tagCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug($"Ошибка при обработке члена: {ex.Message}");
+                        // Продолжаем с другими членами
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при извлечении тегов DB: {ex.Message}");
+            }
+        }
+
+        // Вспомогательный метод для получения комментария
+        private string GetMemberComment(object member)
+        {
+            try
+            {
+                // Пробуем получить комментарий через рефлексию
+                var prop = member.GetType().GetProperty("Comment");
+                if (prop != null)
+                {
+                    var value = prop.GetValue(member);
+                    return GetMultilingualText(value);
+                }
+
+                // Альтернативно используем GetAttribute
+                var getAttributeMethod = member.GetType().GetMethod("GetAttribute");
+                if (getAttributeMethod != null)
+                {
+                    var value = getAttributeMethod.Invoke(member, new object[] { "Comment" });
+                    return GetMultilingualText(value);
+                }
+            }
+            catch
+            {
+                // Игнорируем ошибки при получении комментария
+            }
+
+            return string.Empty;
         }
 
         /// <summary>
