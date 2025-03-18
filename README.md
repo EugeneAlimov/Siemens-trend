@@ -1,87 +1,110 @@
-# SiemensTrend
+# SiemensTrend: Industrial PLC Monitoring Tool
 
-Приложение для мониторинга данных ПЛК Siemens S7-1200/1500 с визуализацией в реальном времени и возможностью экспорта данных для анализа.
+![Project Logo](path/to/your/logo.png)
 
-## Возможности
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/release/YourUsername/SiemensTrend.svg)](https://github.com/YourUsername/SiemensTrend/releases)
+[![.NET Framework](https://img.shields.io/badge/.NET-Framework%204.8-green.svg)](https://dotnet.microsoft.com/download/dotnet-framework)
 
-- Подключение к ПЛК Siemens S7-1200/1500 по различным протоколам (S7, OPC UA, TIA Portal Openness)
-- Чтение и визуализация данных с тегов ПЛК в реальном времени
-- Поддержка оптимизированных блоков данных
-- Возможность создания и настройки графиков для мониторинга тегов
-- Уведомления при выходе значений за заданные пределы
-- Экспорт данных в CSV для последующего анализа
-- Сохранение и загрузка проектов с различными конфигурациями
+## 🔍 Project Overview
 
-## Требования
+SiemensTrend is a comprehensive Windows application for monitoring and analyzing Siemens S7 PLCs, providing real-time data visualization and advanced tag management.
 
-- Windows 7/10/11
-- .NET Framework 4.8
-- TIA Portal (для функций Openness)
-- Соединение с ПЛК Siemens S7-1200/1500
+## ✨ Features
 
-## Установка
+- **PLC Connectivity**
+  - S7 Protocol support
+  - TIA Portal Openness integration
+  - Multiple PLC model compatibility
 
-1. Скачайте последнюю версию из раздела [Releases](https://github.com/EugeneAlimov/SiemensTrend/releases)
-2. Распакуйте архив в любую директорию
-3. Запустите файл `SiemensTrend.exe`
+- **Tag Management**
+  - Hierarchical tag browser
+  - Real-time tag monitoring
+  - Flexible tag selection
 
-## Использование
+- **Data Visualization**
+  - Interactive time-series charts
+  - Customizable dashboard
+  - Export capabilities
 
-### Подключение к ПЛК
+## 🖥️ System Requirements
 
-1. Запустите приложение
-2. Создайте новый проект или откройте существующий
-3. Укажите параметры подключения к ПЛК (IP-адрес, тип CPU, rack, slot)
-4. Нажмите "Подключиться"
+- **Operating System**: Windows 10/11 (64-bit)
+- **Runtime**: .NET Framework 4.8
+- **Hardware**: 
+  - 4GB RAM minimum
+  - 1 GHz processor
+- **Software**:
+  - Siemens TIA Portal (V16+)
+  - Compatible Siemens PLC with Ethernet
 
-### Выбор тегов для мониторинга
+## 🚀 Installation
 
-1. После успешного подключения загрузите структуру тегов из ПЛК
-2. Выберите теги для мониторинга из древовидной структуры
-3. Настройте параметры мониторинга (интервал опроса, уведомления)
+### Prerequisites
+1. Install [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)
+2. Install Siemens TIA Portal
 
-### Визуализация данных
+### Installation Steps
+1. Download the [latest release](https://github.com/YourUsername/SiemensTrend/releases)
+2. Extract the ZIP archive
+3. Run `SiemensTrend.exe`
 
-1. Создайте новый график, добавив выбранные теги
-2. Настройте параметры отображения (цвета, масштаб, временной диапазон)
-3. Используйте панель управления для управления графиком (пауза, масштабирование, маркеры)
+## 🛠️ Quick Start Guide
 
-### Экспорт данных
+1. Launch the application
+2. Configure PLC connection
+   - Select connection type (S7/TIA Portal)
+   - Enter PLC IP and parameters
+3. Browse and select tags
+4. Start real-time monitoring
 
-1. Выберите "Экспорт" в меню
-2. Укажите период данных для экспорта
-3. Выберите формат и место сохранения файла
-4. Нажмите "Экспортировать"
+## 📸 Screenshots
 
-## Разработка
+<!-- Add your application screenshots here -->
+![Main Interface](screenshots/main-interface.png)
+![Tag Browser](screenshots/tag-browser.png)
+![Chart View](screenshots/chart-view.png)
 
-### Требования для разработки
+## 🤝 Contributing
 
-- Visual Studio 2019/2022
-- .NET Framework 4.8 SDK
+Contributions are welcome! Please follow these steps:
 
-### Настройка окружения разработки
+1. Fork the repository
+2. Create a new branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-1. Клонируйте репозиторий:
-   ```
-   git clone https://github.com/yourusername/SiemensTrend.git
-   ```
+## 🐛 Issues
 
-2. Откройте решение в Visual Studio:
-   ```
-   SiemensTrend.sln
-   ```
+Found a bug? [Open an issue](https://github.com/YourUsername/SiemensTrend/issues) with:
+- Detailed description
+- Steps to reproduce
+- Expected vs. actual behavior
+- Screenshots (if applicable)
 
-3. Установите необходимые NuGet пакеты (при необходимости):
-   ```
-   S7NetPlus
-   LiveChartsCore.SkiaSharpView.WPF
-   ```
+## 📋 Roadmap
 
-## Лицензия
+- [ ] OPC UA Support
+- [ ] Enhanced data analysis tools
+- [ ] Cloud synchronization
+- [ ] Multi-language support
 
-MIT License
+## 📄 License
 
-## Авторы
+Distributed under the MIT License. See `LICENSE` for more information.
 
-- EugeneAlimov
+## 🏆 Acknowledgments
+
+- [Siemens](https://new.siemens.com/) for TIA Portal and Openness API
+- Open-source community
+
+## 📞 Contact
+
+Your Name - [your.email@example.com](mailto:your.email@example.com)
+
+Project Link: [https://github.com/YourUsername/SiemensTrend](https://github.com/YourUsername/SiemensTrend)
+
+---
+
+⭐ If you find this project helpful, please consider starring the repository!
