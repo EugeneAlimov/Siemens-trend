@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Logging;
@@ -60,18 +61,48 @@ namespace SiemensTrend.Views
                 if (openFileDialog.ShowDialog() == true)
                 {
                     string projectPath = openFileDialog.FileName;
+                    string projectName = Path.GetFileNameWithoutExtension(projectPath);
                     _logger.Info($"Выбран проект для открытия: {projectPath}");
 
-                    // Запускаем процесс открытия проекта
-                    _viewModel.StatusMessage = $"Открытие проекта: {Path.GetFileNameWithoutExtension(projectPath)}...";
-                    bool result = _viewModel.OpenTiaProject(projectPath);
+                    // Проверяем наличие кэшированных данных
+                    bool hasCachedData = _viewModel.CheckCachedProjectData(projectName);
+
+                    if (hasCachedData)
+                    {
+                        // Спрашиваем пользователя, хочет ли он использовать кэш
+                        var dialogResult = MessageBox.Show(
+                            $"Найдены кэшированные данные для проекта {projectName}. Хотите использовать их вместо открытия проекта?",
+                            "Кэшированные данные",
+                            MessageBoxButton.YesNoCancel,
+                            MessageBoxImage.Question);
+
+                        if (dialogResult == MessageBoxResult.Yes)
+                        {
+                            // Загружаем данные из кэша
+                            _logger.Info($"Использование кэшированных данных для проекта {projectName}");
+                            _viewModel.LoadCachedProjectDataAsync(projectName);
+                            UpdateConnectionState();
+                            return;
+                        }
+                        else if (dialogResult == MessageBoxResult.Cancel)
+                        {
+                            // Отменяем операцию
+                            _logger.Info("Операция отменена пользователем");
+                            return;
+                        }
+                        // Для MessageBoxResult.No - продолжаем открытие проекта
+                    }
+
+                    // Запускаем процесс открытия проекта и подключения к нему
+                    _viewModel.StatusMessage = $"Открытие проекта: {projectName}...";
+                    bool openResult = _viewModel.OpenTiaProject(projectPath);
 
                     // После открытия, обновляем состояние интерфейса
                     UpdateConnectionState();
 
                     // Если проект открыт успешно, но подключения нет,
                     // попробуем явно подключиться ещё раз
-                    if (result && !_viewModel.IsConnected)
+                    if (openResult && !_viewModel.IsConnected)
                     {
                         _logger.Info("Проект открыт, но подключение не установлено. Попытка подключения...");
                         _viewModel.ConnectToTiaPortal();
@@ -86,6 +117,48 @@ namespace SiemensTrend.Views
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        /// <summary>
+        /// Новая функция для сохранения тегов текущего проекта
+        /// </summary>
+        private async void SaveTagsToCache()
+        {
+            if (!_viewModel.IsConnected)
+            {
+                MessageBox.Show("Необходимо сначала подключиться к проекту TIA Portal",
+                    "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                _logger.Info("Сохранение тегов в кэш...");
+                _viewModel.StatusMessage = "Сохранение тегов в кэш...";
+                _viewModel.IsLoading = true;
+                _viewModel.ProgressValue = 20;
+
+                // Экспортируем теги в XML
+                await _viewModel.ExportTagsToXml();
+
+                _viewModel.ProgressValue = 100;
+                _viewModel.StatusMessage = "Теги успешно сохранены в кэш";
+                _logger.Info("Теги успешно сохранены в кэш");
+
+                MessageBox.Show("Теги успешно сохранены в кэш и будут доступны при следующем открытии проекта",
+                    "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при сохранении тегов в кэш: {ex.Message}");
+                MessageBox.Show($"Ошибка при сохранении тегов в кэш: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _viewModel.IsLoading = false;
+            }
+        }
+
 
         /// <summary>
         /// Обновление состояния подключения в интерфейсе
@@ -144,26 +217,26 @@ namespace SiemensTrend.Views
                 // Временно отключаем кнопку, чтобы избежать повторных нажатий
                 btnConnect.IsEnabled = false;
 
-                // Пытаемся подключиться к TIA Portal синхронно
+                // Получаем список проектов TIA Portal
                 bool connected = _viewModel.ConnectToTiaPortal();
+
+                // ConnectToTiaPortal всегда вернет false, чтобы показать диалог выбора
+                // В список TiaProjects будут загружены найденные проекты (если есть)
+                var projects = _viewModel.TiaProjects;
+
+                if (projects != null && projects.Count > 0)
+                {
+                    // Есть открытые проекты, показываем диалог выбора
+                    ShowProjectChoiceDialog(projects);
+                }
+                else
+                {
+                    // Нет открытых проектов, предлагаем открыть файл проекта
+                    ShowOpenProjectDialog();
+                }
 
                 // Обновляем состояние интерфейса
                 UpdateConnectionState();
-
-                if (!connected)
-                {
-                    // Проверяем, есть ли список проектов для выбора
-                    if (_viewModel.TiaProjects != null && _viewModel.TiaProjects.Count > 0)
-                    {
-                        // Есть несколько открытых проектов, показываем диалог выбора
-                        ShowProjectSelectionDialog(_viewModel.TiaProjects);
-                    }
-                    else
-                    {
-                        // Нет открытых проектов, предлагаем открыть файл проекта
-                        ShowOpenProjectDialog();
-                    }
-                }
             }
             catch (Exception ex)
             {
@@ -244,6 +317,14 @@ namespace SiemensTrend.Views
                 MessageBox.Show($"Ошибка при отключении: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        /// <summary>
+        /// Обработчик для кнопки "Сохранить в кэш"
+        /// </summary>
+        private void BtnSaveToCache_Click(object sender, RoutedEventArgs e)
+        {
+            SaveTagsToCache();
         }
 
         /// <summary>
@@ -548,6 +629,273 @@ namespace SiemensTrend.Views
             {
                 _logger.Error($"Ошибка при очистке лога: {ex.Message}");
                 MessageBox.Show($"Ошибка при очистке лога: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Обработчик кнопки "Очистить кэш"
+        /// </summary>
+        private void BtnClearCache_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Если подключено - очищаем текущий проект
+                if (_viewModel.IsConnected)
+                {
+                    ClearCurrentCache();
+                }
+                else
+                {
+                    // Если не подключено - всегда показываем диалог выбора проекта из кэша
+                    ShowClearCacheDialog();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnClearCache_Click: Ошибка: {ex.Message}");
+                MessageBox.Show($"Ошибка при очистке кэша: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Диалог для выбора проекта из кэша для очистки
+        /// </summary>
+        private void ShowClearCacheDialog()
+        {
+            try
+            {
+                // Получаем список проектов в кэше
+                var cachedProjects = _viewModel.GetCachedProjects();
+
+                if (cachedProjects.Count == 0)
+                {
+                    MessageBox.Show("В кэше нет сохраненных проектов",
+                        "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // Создаем диалог выбора проекта
+                var dialog = new Window
+                {
+                    Title = "Выбор проекта для очистки кэша",
+                    Width = 400,
+                    Height = 300,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    ResizeMode = ResizeMode.NoResize
+                };
+
+                // Создаем панель с элементами управления
+                var grid = new Grid();
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                // Добавляем заголовок
+                var label = new TextBlock
+                {
+                    Text = "Выберите проект для очистки кэша:",
+                    Margin = new Thickness(10),
+                    TextWrapping = TextWrapping.Wrap
+                };
+                Grid.SetRow(label, 0);
+                grid.Children.Add(label);
+
+                // Добавляем список проектов
+                var listBox = new ListBox
+                {
+                    Margin = new Thickness(10),
+                    ItemsSource = cachedProjects,
+                    SelectedIndex = cachedProjects.Count > 0 ? 0 : -1
+                };
+                Grid.SetRow(listBox, 1);
+                grid.Children.Add(listBox);
+
+                // Добавляем кнопки
+                var buttonPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(10)
+                };
+                Grid.SetRow(buttonPanel, 2);
+
+                var cancelButton = new Button
+                {
+                    Content = "Отмена",
+                    Width = 80,
+                    Margin = new Thickness(0, 0, 10, 0)
+                };
+                cancelButton.Click += (s, e) => dialog.DialogResult = false;
+                buttonPanel.Children.Add(cancelButton);
+
+                var okButton = new Button
+                {
+                    Content = "Очистить",
+                    Width = 80
+                };
+                okButton.Click += (s, e) =>
+                {
+                    if (listBox.SelectedItem != null)
+                    {
+                        string selectedProject = listBox.SelectedItem as string;
+
+                        // Спрашиваем подтверждение
+                        var result = MessageBox.Show($"Вы действительно хотите удалить кэш проекта {selectedProject}?",
+                            "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            dialog.DialogResult = true;
+                        }
+                        else
+                        {
+                            dialog.DialogResult = false;
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Выберите проект из списка",
+                            "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                };
+                buttonPanel.Children.Add(okButton);
+
+                grid.Children.Add(buttonPanel);
+
+                // Устанавливаем контент и показываем диалог
+                dialog.Content = grid;
+                bool? result = dialog.ShowDialog();
+
+                // Обрабатываем результат
+                if (result == true && listBox.SelectedItem != null)
+                {
+                    string selectedProject = listBox.SelectedItem as string;
+                    bool success = _viewModel.ClearProjectCache(selectedProject);
+
+                    if (success)
+                    {
+                        MessageBox.Show($"Кэш проекта {selectedProject} успешно очищен",
+                            "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Не удалось очистить кэш проекта {selectedProject}",
+                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ShowClearCacheDialog: Ошибка: {ex.Message}");
+                MessageBox.Show($"Ошибка при работе с диалогом очистки кэша: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Показ диалога выбора проекта TIA Portal
+        /// </summary>
+        private void ShowProjectChoiceDialog(List<TiaProjectInfo> projects)
+        {
+            try
+            {
+                // Создаем экземпляр нового диалога выбора проекта
+                var dialog = new TiaProjectChoiceDialog(projects);
+
+                // Настраиваем владельца диалога, чтобы он был модальным
+                dialog.Owner = this;
+
+                // Показываем диалог
+                bool? result = dialog.ShowDialog();
+
+                if (result == true)
+                {
+                    if (dialog.OpenNewProject)
+                    {
+                        // Пользователь выбрал открытие нового проекта
+                        _logger.Info("Пользователь выбрал открытие нового проекта");
+                        ShowOpenProjectDialog();
+                    }
+                    else if (dialog.SelectedProject != null)
+                    {
+                        // Пользователь выбрал проект, подключаемся к нему
+                        _viewModel.StatusMessage = $"Подключение к выбранному проекту: {dialog.SelectedProject.Name}...";
+
+                        // Выполняем подключение (не используем Task.Run!)
+                        bool success = _viewModel.ConnectToSpecificTiaProject(dialog.SelectedProject);
+
+                        // Обновляем интерфейс
+                        UpdateConnectionState();
+
+                        if (success)
+                        {
+                            _logger.Info($"Успешное подключение к проекту: {dialog.SelectedProject.Name}");
+                        }
+                        else
+                        {
+                            _logger.Error($"Не удалось подключиться к проекту: {dialog.SelectedProject.Name}");
+                            MessageBox.Show($"Не удалось подключиться к проекту: {dialog.SelectedProject.Name}",
+                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.Info("Пользователь отменил выбор проекта");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при выборе проекта: {ex.Message}");
+                MessageBox.Show($"Ошибка при выборе проекта: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Очистка кэша текущего проекта
+        /// </summary>
+        private void ClearCurrentCache()
+        {
+            try
+            {
+                string projectName = _viewModel.CurrentProjectName;
+
+                if (string.IsNullOrEmpty(projectName) || projectName == "Нет проекта")
+                {
+                    MessageBox.Show("Нет активного проекта для очистки кэша",
+                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Спрашиваем подтверждение
+                var result = MessageBox.Show($"Вы действительно хотите удалить кэш проекта {projectName}?",
+                    "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result != MessageBoxResult.Yes)
+                    return;
+
+                // Очищаем кэш
+                bool success = _viewModel.ClearCurrentProjectCache();
+
+                if (success)
+                {
+                    MessageBox.Show($"Кэш проекта {projectName} успешно очищен",
+                        "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"Не удалось очистить кэш проекта {projectName}",
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ClearCurrentCache: Ошибка: {ex.Message}");
+                MessageBox.Show($"Ошибка при очистке кэша: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

@@ -7,6 +7,7 @@ using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using System.Linq;
 using SiemensTrend.Helpers;
+using System.IO;
 //using Siemens.Collaboration.Net.Logging;
 
 namespace SiemensTrend.Communication.TIA
@@ -155,10 +156,42 @@ namespace SiemensTrend.Communication.TIA
                 _tiaPortal = projectInfo.TiaPortalInstance;
                 _project = projectInfo.Project;
 
-                // Логируем информацию о проекте
-                _logger.Info($"ConnectToProject: Успешное подключение к TIA Portal. Проект: {_project.Name}, Путь: {_project.Path}");
+                // Немедленно проверяем, что _project не null
+                if (_project == null)
+                {
+                    _logger.Error("ConnectToProject: После присвоения _project оказался null");
+                    return false;
+                }
 
-                // Создаем читатель тегов после успешного подключения
+                // Устанавливаем текущий проект для XML-менеджера
+                SetCurrentProjectInXmlManager();
+
+                // Логируем информацию о проекте
+                try
+                {
+                    _logger.Info($"ConnectToProject: Проект: {_project.Name}, Путь: {_project.Path}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"ConnectToProject: Не удалось получить информацию о проекте: {ex.Message}");
+                    // Не прерываем выполнение, так как это не критично
+                }
+
+                // Проверяем доступность проекта, пытаясь обратиться к его свойствам
+                try
+                {
+                    // Пытаемся обратиться к свойствам проекта для проверки
+                    var devices = _project.Devices.Count;
+                    _logger.Info($"ConnectToProject: Количество устройств в проекте: {devices}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"ConnectToProject: Ошибка при проверке свойств проекта: {ex.Message}");
+                    Disconnect(); // Отключаемся при ошибке
+                    return false;
+                }
+
+                // Создаем читатель тегов только после успешной проверки проекта
                 try
                 {
                     _tagReader = new TiaPortalTagReader(_logger, this);
@@ -167,12 +200,16 @@ namespace SiemensTrend.Communication.TIA
                 catch (Exception ex)
                 {
                     _logger.Error($"ConnectToProject: Ошибка при создании TiaPortalTagReader: {ex.Message}");
+                    Disconnect(); // Отключаемся при ошибке
                     return false;
                 }
 
                 // Устанавливаем флаг подключения
                 _isConnected = true;
                 _logger.Info($"ConnectToProject: Успешное подключение к проекту: {_project.Name}");
+
+                // Даем немного времени для завершения операций в UI
+                System.Windows.Forms.Application.DoEvents();
 
                 return true;
             }
@@ -372,6 +409,10 @@ namespace SiemensTrend.Communication.TIA
                     if (_project != null)
                     {
                         _logger.Info($"OpenProjectSync: Проект успешно открыт: {_project.Name}");
+
+                        // Устанавливаем текущий проект для XML-менеджера
+                        SetCurrentProjectInXmlManager();
+
                         openResult = true;
                     }
                     else
@@ -417,9 +458,8 @@ namespace SiemensTrend.Communication.TIA
                         return false;
                     }
 
-                    // ВАЖНО: явно устанавливаем статус подключения
                     _isConnected = true;
-                    _logger.Info($"OpenProjectSync: Проект успешно открыт и подключен: {_project.Name}");
+                    _logger.Info($"OpenProjectSync: Проект успешно открыт: {_project.Name}");
                     return true;
                 }
                 else
@@ -452,6 +492,29 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         private TiaPortalXmlManager _xmlManager;
 
+        /// <summary>
+        /// Установка текущего проекта для работы с XML
+        /// </summary>
+        private void SetCurrentProjectInXmlManager()
+        {
+            if (_project != null)
+            {
+                try
+                {
+                    string projectName = _project.Name;
+                    _xmlManager.SetCurrentProject(projectName);
+                    _logger.Info($"SetCurrentProjectInXmlManager: Установлен проект {projectName} для работы с XML");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"SetCurrentProjectInXmlManager: Ошибка при установке текущего проекта: {ex.Message}");
+                }
+            }
+            else
+            {
+                _logger.Warn("SetCurrentProjectInXmlManager: Нет активного проекта");
+            }
+        }
 
         /// <summary>
         /// "Экспортируем теги в xml"
@@ -477,6 +540,12 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
+                // Убедимся, что текущий проект установлен в XML менеджере
+                if (_project != null && !string.IsNullOrEmpty(_project.Name))
+                {
+                    SetCurrentProjectInXmlManager();
+                }
+
                 // Проверка наличия XML-файлов
                 var tagsFromXml = _xmlManager.LoadPlcTagsFromXml();
                 if (tagsFromXml.Count > 0)
@@ -485,7 +554,7 @@ namespace SiemensTrend.Communication.TIA
                     return tagsFromXml;
                 }
 
-                // Если XML нет, экспортируем и затем загружаем
+                // Если XML нет или они пустые, экспортируем и затем загружаем
                 if (IsConnected && _project != null)
                 {
                     await ExportTagsToXml();
@@ -551,6 +620,12 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
+                // Убедимся, что текущий проект установлен в XML менеджере
+                if (_project != null && !string.IsNullOrEmpty(_project.Name))
+                {
+                    SetCurrentProjectInXmlManager();
+                }
+
                 // Проверка наличия XML-файлов
                 var dbsFromXml = _xmlManager.LoadDbTagsFromXml();
                 if (dbsFromXml.Count > 0)
@@ -559,7 +634,7 @@ namespace SiemensTrend.Communication.TIA
                     return dbsFromXml;
                 }
 
-                // Если XML нет, экспортируем и затем загружаем
+                // Если XML нет или они пустые, экспортируем и затем загружаем
                 if (IsConnected && _project != null)
                 {
                     await ExportTagsToXml();
@@ -575,6 +650,27 @@ namespace SiemensTrend.Communication.TIA
             {
                 _logger.Error($"GetDbTagsAsync: Ошибка: {ex.Message}");
                 return new List<TagDefinition>();
+            }
+        }
+
+        /// <summary>
+        /// Добавьте это свойство в класс TiaPortalCommunicationService для публичного доступа к XmlManager
+        /// </summary>
+        public Helpers.TiaPortalXmlManager XmlManager
+        {
+            get { return _xmlManager; }
+        }
+
+        /// <summary>
+        /// Задание текущего проекта для XML-менеджера
+        /// </summary>
+        /// <param name="projectName">Имя проекта</param>
+        public void SetXmlManagerProject(string projectName)
+        {
+            if (_xmlManager != null && !string.IsNullOrEmpty(projectName))
+            {
+                _xmlManager.SetCurrentProject(projectName);
+                _logger.Info($"SetXmlManagerProject: Установлен проект {projectName}");
             }
         }
     }

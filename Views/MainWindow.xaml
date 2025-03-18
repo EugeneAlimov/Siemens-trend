@@ -31,6 +31,7 @@
                 <Button x:Name="btnGetPlcTags" Content="Получить теги ПЛК" Margin="3" Padding="5,3" Click="BtnGetPlcTags_Click"/>
                 <Button x:Name="btnGetDbs" Content="Получить DB" Margin="3" Padding="5,3" Click="BtnGetDbs_Click"/>
                 <Button x:Name="btnGetDbTags" Content="Получить теги DB" Margin="3" Padding="5,3" Click="BtnGetDbTags_Click"/>
+                <Button x:Name="btnClearCache" Content="Очистить кэш" Margin="3" Padding="5,3" Click="BtnClearCache_Click"/>
                 <Separator/>
                 <Button x:Name="btnStartMonitoring" Content="Запустить мониторинг" Margin="3" Padding="5,3" Click="BtnStartMonitoring_Click"/>
                 <Button x:Name="btnStopMonitoring" Content="Остановить мониторинг" Margin="3" Padding="5,3" Click="BtnStopMonitoring_Click"/>

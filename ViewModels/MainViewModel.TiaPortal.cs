@@ -47,86 +47,47 @@ namespace SiemensTrend.ViewModels
                 // Получаем список открытых проектов
                 StatusMessage = "Получение списка открытых проектов...";
                 _logger.Info("Запрос списка открытых проектов");
+
                 // ВАЖНО: используем синхронные вызовы для TIA Portal API
                 List<Communication.TIA.TiaProjectInfo> openProjects = _tiaPortalService.GetOpenProjects();
                 _logger.Info($"Получено {openProjects.Count} открытых проектов");
                 ProgressValue = 50;
 
-                // Проверяем количество открытых проектов
-                if (openProjects.Count == 0)
-                {
-                    // Нет открытых проектов, предлагаем выбрать файл проекта
-                    StatusMessage = "Открытые проекты не найдены. Выберите файл проекта...";
-                    _logger.Info("Открытые проекты не найдены. Потребуется выбрать файл.");
-                    ProgressValue = 60;
+                // Сохраняем список проектов для последующего выбора
+                TiaProjects = openProjects;
 
-                    // Возвращаем false чтобы в MainWindow вызвать диалог выбора проекта
+                // Для MainWindow - возвращаем false, чтобы показать диалог выбора проекта
+                // Даже если есть только один проект, мы всё равно покажем диалог
+                if (openProjects.Count > 0)
+                {
+                    StatusMessage = $"Найдено {openProjects.Count} открытых проектов TIA Portal";
+                    _logger.Info($"Найдено {openProjects.Count} открытых проектов. Возвращаем список для выбора.");
+                    ProgressValue = 60;
                     IsLoading = false;
                     return false;
                 }
-                else if (openProjects.Count == 1)
-                {
-                    // Один проект - подключаемся к нему
-                    StatusMessage = $"Подключение к проекту: {openProjects[0].Name}...";
-                    _logger.Info($"Найден один открытый проект: {openProjects[0].Name}. Выполняем подключение.");
-                    ProgressValue = 70;
-
-                    // ВАЖНО: Выполняем ConnectToProject синхронно напрямую в текущем потоке STA
-                    bool result = _tiaPortalService.ConnectToProject(openProjects[0]);
-
-                    if (result)
-                    {
-                        // Успешное подключение
-                        StatusMessage = $"Подключено к проекту: {openProjects[0].Name}";
-                        _logger.Info($"Успешное подключение к проекту: {openProjects[0].Name}");
-                        ProgressValue = 100;
-                        IsConnected = true;
-
-                        // Инициализируем обозреватель тегов после успешного подключения
-                        InitializeTagBrowser();
-
-                        return true;
-                    }
-                    else
-                    {
-                        // Ошибка подключения
-                        StatusMessage = "Ошибка при подключении к TIA Portal";
-                        _logger.Error("Ошибка при подключении к TIA Portal");
-                        ProgressValue = 0;
-                        IsConnected = false;
-                        return false;
-                    }
-                }
                 else
                 {
-                    // Несколько проектов - возвращаем список для выбора
-                    StatusMessage = "Найдено несколько открытых проектов. Выберите один...";
-                    _logger.Info($"Найдено несколько открытых проектов ({openProjects.Count}). Требуется выбор пользователя.");
+                    // Нет открытых проектов
+                    StatusMessage = "Открытые проекты не найдены. Выберите файл проекта...";
+                    _logger.Info("Открытые проекты не найдены. Потребуется выбрать файл.");
                     ProgressValue = 60;
-
-                    // Сохраняем список проектов для последующего выбора
-                    TiaProjects = openProjects;
-
-                    // Возвращаем false чтобы в MainWindow показать диалог выбора
                     IsLoading = false;
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error($"Ошибка при подключении к TIA Portal: {ex.Message}");
+                _logger.Error($"Ошибка при поиске проектов TIA Portal: {ex.Message}");
                 if (ex.InnerException != null)
                 {
                     _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
                 }
-                StatusMessage = "Ошибка при подключении к TIA Portal";
+                StatusMessage = "Ошибка при поиске проектов TIA Portal";
                 ProgressValue = 0;
                 IsConnected = false;
-                return false;
-            }
-            finally
-            {
                 IsLoading = false;
+                return false;
             }
         }
 
@@ -284,6 +245,105 @@ namespace SiemensTrend.ViewModels
             finally
             {
                 IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Получение списка проектов в кэше
+        /// </summary>
+        public List<string> GetCachedProjects()
+        {
+            try
+            {
+                // Получаем XmlManager
+                var xmlManager = GetXmlManager();
+                if (xmlManager == null)
+                {
+                    _logger.Error("GetCachedProjects: Не удалось получить доступ к XmlManager");
+                    return new List<string>();
+                }
+
+                // Получаем список проектов
+                return xmlManager.GetCachedProjects();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"GetCachedProjects: Ошибка: {ex.Message}");
+                return new List<string>();
+            }
+        }
+
+        /// <summary>
+        /// Очистка кэша для указанного проекта
+        /// </summary>
+        public bool ClearProjectCache(string projectName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(projectName))
+                {
+                    _logger.Warn("ClearProjectCache: Имя проекта не может быть пустым");
+                    return false;
+                }
+
+                // Получаем XmlManager
+                var xmlManager = GetXmlManager();
+                if (xmlManager == null)
+                {
+                    _logger.Error("ClearProjectCache: Не удалось получить доступ к XmlManager");
+                    return false;
+                }
+
+                // Очищаем кэш проекта
+                bool result = xmlManager.ClearProjectCache(projectName);
+
+                if (result)
+                {
+                    _logger.Info($"ClearProjectCache: Кэш проекта {projectName} успешно очищен");
+                }
+                else
+                {
+                    _logger.Warn($"ClearProjectCache: Не удалось очистить кэш проекта {projectName}");
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ClearProjectCache: Ошибка: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Очистка кэша текущего проекта
+        /// </summary>
+        public bool ClearCurrentProjectCache()
+        {
+            try
+            {
+                // Проверяем, есть ли подключение к проекту
+                if (!IsConnected || _tiaPortalService == null || _tiaPortalService.CurrentProject == null)
+                {
+                    _logger.Warn("ClearCurrentProjectCache: Нет подключения к проекту");
+                    return false;
+                }
+
+                // Получаем имя текущего проекта
+                string projectName = _tiaPortalService.CurrentProject.Name;
+                if (string.IsNullOrEmpty(projectName))
+                {
+                    _logger.Warn("ClearCurrentProjectCache: Не удалось получить имя текущего проекта");
+                    return false;
+                }
+
+                // Очищаем кэш проекта
+                return ClearProjectCache(projectName);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ClearCurrentProjectCache: Ошибка: {ex.Message}");
+                return false;
             }
         }
     }

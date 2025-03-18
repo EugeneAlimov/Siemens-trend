@@ -267,6 +267,190 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
+        /// Добавьте этот метод в класс MainViewModel для проверки кэшированных данных
+        /// </summary>
+        public bool CheckCachedProjectData(string projectName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(projectName))
+                {
+                    _logger.Warn("CheckCachedProjectData: Имя проекта не может быть пустым");
+                    return false;
+                }
+
+                // Проверяем, инициализирован ли TIA сервис
+                if (_tiaPortalService == null)
+                {
+                    _logger.Info("CheckCachedProjectData: Создаем новый экземпляр TiaPortalCommunicationService");
+                    _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
+                }
+
+                // Получаем доступ к XML Manager через отражение или с помощью нового метода
+                var xmlManager = GetXmlManager();
+                if (xmlManager == null)
+                {
+                    _logger.Error("CheckCachedProjectData: Не удалось получить доступ к XmlManager");
+                    return false;
+                }
+
+                // Проверяем наличие кэшированных данных
+                var hasData = xmlManager.HasExportedDataForProject(projectName);
+                _logger.Info($"CheckCachedProjectData: Проект {projectName} {(hasData ? "имеет" : "не имеет")} кэшированные данные");
+
+                return hasData;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"CheckCachedProjectData: Ошибка: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Получение экземпляра XmlManager из TiaPortalCommunicationService
+        /// </summary>
+        private Helpers.TiaPortalXmlManager GetXmlManager()
+        {
+            try
+            {
+                // Если есть доступ через TiaPortalCommunicationService
+                if (_tiaPortalService != null)
+                {
+                    // Пробуем получить через публичное свойство, если оно есть
+                    var xmlManagerProperty = _tiaPortalService.GetType().GetProperty("XmlManager");
+                    if (xmlManagerProperty != null)
+                    {
+                        var xmlManager = xmlManagerProperty.GetValue(_tiaPortalService) as Helpers.TiaPortalXmlManager;
+                        if (xmlManager != null)
+                        {
+                            return xmlManager;
+                        }
+                    }
+
+                    // Или через приватное поле с помощью рефлексии
+                    var field = _tiaPortalService.GetType().GetField("_xmlManager",
+                                      System.Reflection.BindingFlags.NonPublic |
+                                      System.Reflection.BindingFlags.Instance);
+
+                    if (field != null)
+                    {
+                        var xmlManager = field.GetValue(_tiaPortalService) as Helpers.TiaPortalXmlManager;
+                        if (xmlManager != null)
+                        {
+                            return xmlManager;
+                        }
+                    }
+
+                    // Если не смогли получить через TiaPortalCommunicationService, создаем новый
+                    _logger.Warn("GetXmlManager: Не удалось получить XmlManager через TiaPortalCommunicationService, создаем новый");
+                }
+
+                // Создаем новый XmlManager если:
+                // 1. _tiaPortalService == null
+                // 2. Не смогли получить через свойство или рефлексию
+                // 3. Полученный xmlManager == null
+
+                _logger.Info("GetXmlManager: Создание нового экземпляра TiaPortalXmlManager");
+                return new Helpers.TiaPortalXmlManager(_logger);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"GetXmlManager: Ошибка: {ex.Message}");
+
+                // Даже в случае ошибки, попробуем создать новый экземпляр
+                try
+                {
+                    return new Helpers.TiaPortalXmlManager(_logger);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+        /// <summary>
+        /// Загрузка кэшированных данных проекта
+        /// </summary>
+        public async Task<bool> LoadCachedProjectDataAsync(string projectName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(projectName))
+                {
+                    _logger.Warn("LoadCachedProjectDataAsync: Имя проекта не может быть пустым");
+                    return false;
+                }
+
+                IsLoading = true;
+                StatusMessage = $"Загрузка кэшированных данных проекта {projectName}...";
+                ProgressValue = 10;
+
+                // Проверяем, инициализирован ли TIA сервис
+                if (_tiaPortalService == null)
+                {
+                    _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
+                }
+
+                // Устанавливаем имя текущего проекта в XML Manager
+                var xmlManager = GetXmlManager();
+                if (xmlManager != null)
+                {
+                    xmlManager.SetCurrentProject(projectName);
+                    _logger.Info($"LoadCachedProjectDataAsync: Установлен текущий проект {projectName} в XmlManager");
+                }
+                else
+                {
+                    _logger.Error("LoadCachedProjectDataAsync: Не удалось получить доступ к XmlManager");
+                    IsLoading = false;
+                    return false;
+                }
+
+                // Загружаем теги ПЛК из кэша
+                ProgressValue = 30;
+                StatusMessage = "Загрузка тегов ПЛК из кэша...";
+
+                var plcTags = await _tiaPortalService.GetPlcTagsAsync();
+                PlcTags.Clear();
+                foreach (var tag in plcTags)
+                {
+                    PlcTags.Add(tag);
+                }
+                _logger.Info($"LoadCachedProjectDataAsync: Загружено {plcTags.Count} тегов ПЛК");
+
+                // Загружаем теги DB из кэша
+                ProgressValue = 60;
+                StatusMessage = "Загрузка блоков данных из кэша...";
+
+                var dbTags = await _tiaPortalService.GetDbTagsAsync();
+                DbTags.Clear();
+                foreach (var tag in dbTags)
+                {
+                    DbTags.Add(tag);
+                }
+                _logger.Info($"LoadCachedProjectDataAsync: Загружено {dbTags.Count} блоков данных");
+
+                ProgressValue = 100;
+                StatusMessage = $"Загрузка кэшированных данных проекта {projectName} завершена";
+
+                // Устанавливаем статус подключения, хотя реального подключения к TIA Portal нет
+                IsConnected = true;
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"LoadCachedProjectDataAsync: Ошибка: {ex.Message}");
+                StatusMessage = "Ошибка при загрузке кэшированных данных";
+                return false;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        /// <summary>
         /// Загрузка тегов
         /// </summary>
         private async Task LoadTagsAsync()
