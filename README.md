@@ -2,109 +2,110 @@
 
 ![Project Logo](path/to/your/logo.png)
 
+## 🚧 Project Status: Under Active Development 🚧
+
+**⚠️ WARNING: This project is currently in ALPHA stage**
+
+- **Many features are incomplete or non-functional**
+- Expect significant changes and potential instability
+- Not recommended for production use
+- Contributions and feedback are highly welcome!
+
+[![Development Status](https://img.shields.io/badge/Status-Alpha-red.svg)](https://github.com/YourUsername/SiemensTrend)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release](https://img.shields.io/github/release/YourUsername/SiemensTrend.svg)](https://github.com/YourUsername/SiemensTrend/releases)
-[![.NET Framework](https://img.shields.io/badge/.NET-Framework%204.8-green.svg)](https://dotnet.microsoft.com/download/dotnet-framework)
 
-## 🔍 Project Overview
+## 🔍 Current Limitations
 
-SiemensTrend is a comprehensive Windows application for monitoring and analyzing Siemens S7 PLCs, providing real-time data visualization and advanced tag management.
+### Partially Implemented Features
+- ✅ Basic PLC Connection
+- ✅ Tag Browser
+- ✅ TIA Portal Integration
+- ❌ Full Monitoring Functionality
+- ❌ Complete Data Visualization
+- ❌ Advanced Export Options
 
-## ✨ Features
+### Known Issues
+- Unstable connection handling
+- Limited tag types support
+- Potential memory leaks
+- Incomplete error handling
 
-- **PLC Connectivity**
-  - S7 Protocol support
-  - TIA Portal Openness integration
-  - Multiple PLC model compatibility
+## 🛠️ Planned Development Roadmap
 
-- **Tag Management**
-  - Hierarchical tag browser
-  - Real-time tag monitoring
-  - Flexible tag selection
+### Short-Term Goals
+- [ ] Stabilize core connectivity
+- [ ] Improve tag reading reliability
+- [ ] Enhance error reporting
+- [ ] Implement basic charting
 
-- **Data Visualization**
-  - Interactive time-series charts
-  - Customizable dashboard
-  - Export capabilities
+### Mid-Term Goals
+- [ ] Full tag type support
+- [ ] Advanced monitoring features
+- [ ] Comprehensive data export
+- [ ] Performance optimizations
 
-## 🖥️ System Requirements
+### Long-Term Vision
+- OPC UA support
+- Cloud synchronization
+- Machine learning insights
+- Multi-language interface
 
-- **Operating System**: Windows 10/11 (64-bit)
-- **Runtime**: .NET Framework 4.8
-- **Hardware**: 
-  - 4GB RAM minimum
-  - 1 GHz processor
-- **Software**:
-  - Siemens TIA Portal (V16+)
-  - Compatible Siemens PLC with Ethernet
+## 🤝 How You Can Help
 
-## 🚀 Installation
+1. **Report Bugs**: Detailed bug reports are crucial
+2. **Suggest Features**: Open issues with feature requests
+3. **Contribute Code**: 
+   - Fix existing issues
+   - Improve documentation
+   - Implement new features
 
-### Prerequisites
-1. Install [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)
-2. Install Siemens TIA Portal
+### Contribution Guidelines
+- Read `CONTRIBUTING.md` before submitting PRs
+- Follow coding standards
+- Write unit tests
+- Document your changes
 
-### Installation Steps
-1. Download the [latest release](https://github.com/YourUsername/SiemensTrend/releases)
-2. Extract the ZIP archive
-3. Run `SiemensTrend.exe`
+## 🚀 Current Capabilities
 
-## 🛠️ Quick Start Guide
+Despite being in early development, the project already supports:
+- Connection to Siemens S7 PLCs
+- Basic tag browsing
+- TIA Portal project parsing
+- Rudimentary data reading
 
-1. Launch the application
-2. Configure PLC connection
-   - Select connection type (S7/TIA Portal)
-   - Enter PLC IP and parameters
-3. Browse and select tags
-4. Start real-time monitoring
+## ⚙️ Technical Details
 
-## 📸 Screenshots
+- **Framework**: .NET Framework 4.8
+- **Primary Technologies**:
+  - WPF
+  - TIA Portal Openness API
+  - S7.Net library
 
-<!-- Add your application screenshots here -->
-![Main Interface](screenshots/main-interface.png)
-![Tag Browser](screenshots/tag-browser.png)
-![Chart View](screenshots/chart-view.png)
+## 📋 Installation (Experimental)
 
-## 🤝 Contributing
+**Use at your own risk!**
 
-Contributions are welcome! Please follow these steps:
+1. Download latest release
+2. Ensure .NET Framework 4.8 is installed
+3. Have Siemens TIA Portal available
+4. Run the application
+5. Expect and report any issues
 
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+## 🐛 Reporting Issues
 
-## 🐛 Issues
-
-Found a bug? [Open an issue](https://github.com/YourUsername/SiemensTrend/issues) with:
+When reporting issues, please include:
 - Detailed description
 - Steps to reproduce
-- Expected vs. actual behavior
-- Screenshots (if applicable)
-
-## 📋 Roadmap
-
-- [ ] OPC UA Support
-- [ ] Enhanced data analysis tools
-- [ ] Cloud synchronization
-- [ ] Multi-language support
+- Application version
+- System configuration
+- TIA Portal version
+- PLC model
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
-
-## 🏆 Acknowledgments
-
-- [Siemens](https://new.siemens.com/) for TIA Portal and Openness API
-- Open-source community
-
-## 📞 Contact
-
-Your Name - [your.email@example.com](mailto:your.email@example.com)
-
-Project Link: [https://github.com/YourUsername/SiemensTrend](https://github.com/YourUsername/SiemensTrend)
+MIT License - Experimental use permitted
 
 ---
 
-⭐ If you find this project helpful, please consider starring the repository!
+⚠️ **ALPHA SOFTWARE** - Expect Frequent Changes! ⚠️
