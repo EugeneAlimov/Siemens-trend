@@ -43,6 +43,7 @@ namespace SiemensTrend.Views
         /// <summary>
         /// Показ диалога открытия проекта TIA Portal
         /// </summary>
+        // В MainWindow.xaml.cs, метод ShowOpenProjectDialog()
         private void ShowOpenProjectDialog()
         {
             try
@@ -61,9 +62,21 @@ namespace SiemensTrend.Views
                     string projectPath = openFileDialog.FileName;
                     _logger.Info($"Выбран проект для открытия: {projectPath}");
 
-                    // Запускаем процесс открытия проекта и подключения к нему
+                    // Запускаем процесс открытия проекта
                     _viewModel.StatusMessage = $"Открытие проекта: {Path.GetFileNameWithoutExtension(projectPath)}...";
-                    _ = _viewModel.OpenTiaProject(projectPath);
+                    bool result = _viewModel.OpenTiaProject(projectPath);
+
+                    // После открытия, обновляем состояние интерфейса
+                    UpdateConnectionState();
+
+                    // Если проект открыт успешно, но подключения нет,
+                    // попробуем явно подключиться ещё раз
+                    if (result && !_viewModel.IsConnected)
+                    {
+                        _logger.Info("Проект открыт, но подключение не установлено. Попытка подключения...");
+                        _viewModel.ConnectToTiaPortal();
+                        UpdateConnectionState();
+                    }
                 }
             }
             catch (Exception ex)

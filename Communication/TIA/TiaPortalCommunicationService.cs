@@ -417,8 +417,9 @@ namespace SiemensTrend.Communication.TIA
                         return false;
                     }
 
+                    // ВАЖНО: явно устанавливаем статус подключения
                     _isConnected = true;
-                    _logger.Info($"OpenProjectSync: Проект успешно открыт: {_project.Name}");
+                    _logger.Info($"OpenProjectSync: Проект успешно открыт и подключен: {_project.Name}");
                     return true;
                 }
                 else

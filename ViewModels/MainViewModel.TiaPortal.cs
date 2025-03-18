@@ -248,11 +248,12 @@ namespace SiemensTrend.ViewModels
                 System.Windows.Application.Current.Dispatcher.Invoke(() => {
                     if (result)
                     {
+                        // Успешное открытие
                         string projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath);
                         StatusMessage = $"Проект TIA Portal открыт успешно: {projectName}";
                         _logger.Info($"OpenTiaProject: Проект успешно открыт: {projectName}");
                         ProgressValue = 100;
-                        IsConnected = true;
+                        IsConnected = true;  // Важно: явно устанавливаем этот флаг!
 
                         // Инициализируем обозреватель тегов после успешного подключения
                         InitializeTagBrowser();
