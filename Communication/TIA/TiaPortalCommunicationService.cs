@@ -33,6 +33,13 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         public Project CurrentProject => _project;
 
+        public enum ExportTagType
+        {
+            All,
+            PlcTags,
+            DbTags
+        }
+
         /// <summary>
         /// Конструктор
         /// </summary>
@@ -495,7 +502,7 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Установка текущего проекта для работы с XML
         /// </summary>
-        private void SetCurrentProjectInXmlManager()
+        public void SetCurrentProjectInXmlManager()
         {
             if (_project != null)
             {
@@ -519,7 +526,7 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// "Экспортируем теги в xml"
         /// </summary>
-        public async Task ExportTagsToXml()
+        public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
         {
             if (!IsConnected || _project == null)
             {
@@ -530,8 +537,35 @@ namespace SiemensTrend.Communication.TIA
             var plcSoftware = GetPlcSoftware();
             if (plcSoftware == null) return;
 
-            await _xmlManager.ExportTagsToXml(plcSoftware);
+            // Экспортируем в зависимости от типа
+            try
+            {
+                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов начат");
+
+                if (tagType == ExportTagType.All)
+                {
+                    // Используем существующий метод для экспорта всех тегов
+                    await _xmlManager.ExportTagsToXml(plcSoftware);
+                }
+                else if (tagType == ExportTagType.PlcTags)
+                {
+                    // Для тегов ПЛК используем новый метод
+                    _xmlManager.ExportTagTablesToXml(plcSoftware.TagTableGroup);
+                }
+                else if (tagType == ExportTagType.DbTags)
+                {
+                    // Для тегов DB используем новый метод
+                    _xmlManager.ExportDataBlocksToXml(plcSoftware.BlockGroup);
+                }
+
+                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов завершен");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ExportTagsToXml: Ошибка при экспорте {tagType} тегов: {ex.Message}");
+            }
         }
+
 
         /// <summary>
         /// Получение только тегов ПЛК из проекта
@@ -557,7 +591,7 @@ namespace SiemensTrend.Communication.TIA
                 // Если XML нет или они пустые, экспортируем и затем загружаем
                 if (IsConnected && _project != null)
                 {
-                    await ExportTagsToXml();
+                    await ExportTagsToXml(ExportTagType.PlcTags); // Только теги ПЛК
                     tagsFromXml = _xmlManager.LoadPlcTagsFromXml();
                     _logger.Info($"GetPlcTagsAsync: Экспортировано и загружено {tagsFromXml.Count} тегов");
                     return tagsFromXml;
@@ -637,7 +671,7 @@ namespace SiemensTrend.Communication.TIA
                 // Если XML нет или они пустые, экспортируем и затем загружаем
                 if (IsConnected && _project != null)
                 {
-                    await ExportTagsToXml();
+                    await ExportTagsToXml(ExportTagType.DbTags); // Только теги DB
                     dbsFromXml = _xmlManager.LoadDbTagsFromXml();
                     _logger.Info($"GetDbTagsAsync: Экспортировано и загружено {dbsFromXml.Count} блоков данных");
                     return dbsFromXml;

@@ -323,6 +323,8 @@ using Siemens.Engineering.SW;
 using SiemensTrend.Core.Models;
 using SiemensTrend.Core.Logging;
 using System;
+using Siemens.Engineering;
+using static SiemensTrend.Communication.TIA.TiaPortalCommunicationService;
 
 namespace SiemensTrend.Helpers
 {
@@ -334,7 +336,10 @@ namespace SiemensTrend.Helpers
         private string _currentProjectPath => Path.Combine(_baseExportPath, _currentProjectName);
         private string _plcTagsPath => Path.Combine(_currentProjectPath, "TagTables");
         private string _dbExportsPath => Path.Combine(_currentProjectPath, "DB");
+        private bool IsConnected { get; set; }
+        private object _project { get; set; }
 
+        private readonly TiaPortalXmlManager _xmlManager;
         /// <summary>
         /// Улучшенный конструктор с возможностью указать текущий проект
         /// </summary>
@@ -344,6 +349,12 @@ namespace SiemensTrend.Helpers
             _baseExportPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TiaExports");
             Directory.CreateDirectory(_baseExportPath);
             _logger.Info($"TiaPortalXmlManager: Базовая директория для экспорта создана: {_baseExportPath}");
+
+                // Initialize the _xmlManager field
+            _xmlManager = this;
+
+            IsConnected = false; // or true, depending on your logic
+            _project = null; // or assign the actual project object
 
             // Если указано имя проекта, устанавливаем его
             if (!string.IsNullOrEmpty(currentProjectName))
@@ -377,39 +388,61 @@ namespace SiemensTrend.Helpers
             _logger.Info($"TiaPortalXmlManager: Пути экспорта: {_plcTagsPath}, {_dbExportsPath}");
         }
 
-        public async Task ExportTagsToXml(PlcSoftware plcSoftware)
+        /// <summary>
+        /// Экспорт тегов в XML с возможностью выбора типа тегов
+        /// </summary>
+        public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
         {
-            if (string.IsNullOrEmpty(_currentProjectName))
+            if (!IsConnected || _project == null)
             {
-                _logger.Error("ExportTagsToXml: Не установлен текущий проект");
+                _logger.Error("ExportTagsToXml: Нет подключения к TIA Portal");
                 return;
             }
 
-            _logger.Info("ExportTagsToXml: Начало экспорта тегов в XML");
+            var plcSoftware = GetPlcSoftware();
+            if (plcSoftware == null) return;
 
+            // Сначала проверяем, настроен ли XML-менеджер для текущего проекта
+            if (_project is Project project && !string.IsNullOrEmpty(project.Name))
+            {
+                SetCurrentProjectInXmlManager();
+            }
+
+            // Экспортируем в зависимости от типа
             try
             {
-                // Экспорт таблиц тегов
-                await ExportTagTables(plcSoftware.TagTableGroup, _plcTagsPath);
+                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов начат");
 
-                // Экспорт блоков данных
-                await ExportDataBlocks(plcSoftware.BlockGroup);
+                if (tagType == ExportTagType.All)
+                {
+                    // Используем существующий метод для экспорта всех тегов
+                    await _xmlManager.ExportTagsToXml(plcSoftware);
+                }
+                else if (tagType == ExportTagType.PlcTags)
+                {
+                    // Для тегов ПЛК используем новый метод
+                    _xmlManager.ExportTagTablesToXml(plcSoftware.TagTableGroup);
+                }
+                else if (tagType == ExportTagType.DbTags)
+                {
+                    // Для тегов DB используем новый метод
+                    _xmlManager.ExportDataBlocksToXml(plcSoftware.BlockGroup);
+                }
 
-                _logger.Info("ExportTagsToXml: Экспорт завершен успешно");
+                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов завершен");
             }
             catch (Exception ex)
             {
-                _logger.Error($"ExportTagsToXml: Ошибка при экспорте: {ex.Message}");
+                _logger.Error($"ExportTagsToXml: Ошибка при экспорте {tagType} тегов: {ex.Message}");
             }
         }
-
-        private async Task ExportTagTables(PlcTagTableGroup tagGroup, string exportFolder)
+        public async Task ExportTagTables(PlcTagTableGroup tagGroup, string exportFolder)
         {
             if (tagGroup == null) return;
 
             foreach (PlcTagTable tagTable in tagGroup.TagTables)
             {
-                await ExportTagTable(tagTable, exportFolder);
+                await ExportTagTables(tagGroup, _plcTagsPath);
             }
 
             foreach (PlcTagTableUserGroup subgroup in tagGroup.Groups)
@@ -465,7 +498,7 @@ namespace SiemensTrend.Helpers
             }
         }
 
-        private async Task ExportDataBlocks(PlcBlockGroup blockGroup)
+        public async Task ExportDataBlocks(PlcBlockGroup blockGroup)
         {
             try
             {
@@ -791,9 +824,41 @@ namespace SiemensTrend.Helpers
 
             return projects;
         }
+
+        /// <summary>
+        /// Экспорт только таблиц тегов ПЛК
+        /// </summary>
+        public void ExportTagTablesToXml(PlcTagTableGroup tagTableGroup)
+        {
+            try
+            {
+                _logger.Info("ExportTagTablesToXml: Начало экспорта таблиц тегов");
+                ExportTagTables(tagTableGroup, _plcTagsPath).Wait();
+                _logger.Info("ExportTagTablesToXml: Экспорт таблиц тегов завершен");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ExportTagTablesToXml: Ошибка: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Экспорт только блоков данных
+        /// </summary>
+        public void ExportDataBlocksToXml(PlcBlockGroup blockGroup)
+        {
+            try
+            {
+                _logger.Info("ExportDataBlocksToXml: Начало экспорта блоков данных");
+                ExportDataBlocks(blockGroup).Wait();
+                _logger.Info("ExportDataBlocksToXml: Экспорт блоков данных завершен");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ExportDataBlocksToXml: Ошибка: {ex.Message}");
+            }
+        }
     }
 }
-//        }
-//    }
-//}
+
 
