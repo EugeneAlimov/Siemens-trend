@@ -536,12 +536,13 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Получение только тегов ПЛК из проекта
         /// </summary>
+
         public async Task<List<TagDefinition>> GetPlcTagsAsync()
         {
             try
             {
                 // Убедимся, что текущий проект установлен в XML менеджере
-                if (_project != null && !string.IsNullOrEmpty(_project.Name))
+                if (CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.Name))
                 {
                     SetCurrentProjectInXmlManager();
                 }
@@ -554,13 +555,25 @@ namespace SiemensTrend.Communication.TIA
                     return tagsFromXml;
                 }
 
-                // Если XML нет или они пустые, экспортируем и затем загружаем
-                if (IsConnected && _project != null)
+                // Если XML нет или они пустые, получаем данные напрямую из TIA Portal
+                if (IsConnected && CurrentProject != null)
                 {
-                    await ExportTagsToXml();
-                    tagsFromXml = _xmlManager.LoadPlcTagsFromXml();
-                    _logger.Info($"GetPlcTagsAsync: Экспортировано и загружено {tagsFromXml.Count} тегов");
-                    return tagsFromXml;
+                    // Проверяем наличие читателя тегов
+                    if (_tagReader == null)
+                    {
+                        _logger.Warn("GetPlcTagsAsync: TiaPortalTagReader не инициализирован, создаем новый экземпляр");
+                        _tagReader = new TiaPortalTagReader(_logger, this);
+                    }
+
+                    // Получаем все теги и фильтруем только PLC
+                    PlcData plcData;
+                    await Task.Run(() => {
+                        plcData = _tagReader.ReadAllTags();
+                    });
+
+                    // Возвращаем только теги ПЛК
+                    _logger.Info($"GetPlcTagsAsync: Загружено {plcData.PlcTags.Count} тегов ПЛК");
+                    return plcData.PlcTags;
                 }
 
                 _logger.Error("GetPlcTagsAsync: Нет подключения к TIA Portal и отсутствуют XML");
@@ -572,13 +585,15 @@ namespace SiemensTrend.Communication.TIA
                 return new List<TagDefinition>();
             }
         }
-
+        /// <summary>
+        /// Загрузка и возврат всех тегов проекта
+        /// </summary>
         /// <summary>
         /// Загрузка и возврат всех тегов проекта
         /// </summary>
         public async Task<PlcData> GetAllProjectTagsAsync()
         {
-            if (!IsConnected || _project == null)
+            if (!IsConnected || CurrentProject == null)
             {
                 _logger.Error("GetAllProjectTagsAsync: Попытка получения тегов без подключения к TIA Portal");
                 return new PlcData();
@@ -595,11 +610,18 @@ namespace SiemensTrend.Communication.TIA
                     _tagReader = new TiaPortalTagReader(_logger, this);
                 }
 
-                // ВАЖНО: Не используем Task.Run для Openness API!
-                // Вместо этого используем Task.FromResult для асинхронной обертки синхронного метода
-                var plcData = await Task.FromResult(_tagReader.ReadAllTags());
+                // ВАЖНО: Используем синхронный метод ReadAllTags вместо асинхронного для Openness API
+                // Но оборачиваем в Task для сохранения асинхронного интерфейса
+                PlcData plcData;
+                await Task.Run(() => {
+                    // Вызываем синхронно ReadAllTags, который использует улучшенный
+                    // метод ReadDataBlocksSafe вместо ProcessBlockGroup 
+                    plcData = _tagReader.ReadAllTags();
+                });
 
+                // Проверяем результаты
                 _logger.Info($"GetAllProjectTagsAsync: Загружено {plcData.PlcTags.Count} тегов ПЛК и {plcData.DbTags.Count} тегов DB");
+
                 return plcData;
             }
             catch (Exception ex)
@@ -612,7 +634,6 @@ namespace SiemensTrend.Communication.TIA
                 return new PlcData();
             }
         }
-
         /// <summary>
         /// Получение только тегов блоков данных из проекта
         /// </summary>
@@ -621,7 +642,7 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Убедимся, что текущий проект установлен в XML менеджере
-                if (_project != null && !string.IsNullOrEmpty(_project.Name))
+                if (CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.Name))
                 {
                     SetCurrentProjectInXmlManager();
                 }
@@ -634,13 +655,25 @@ namespace SiemensTrend.Communication.TIA
                     return dbsFromXml;
                 }
 
-                // Если XML нет или они пустые, экспортируем и затем загружаем
-                if (IsConnected && _project != null)
+                // Если XML нет или они пустые, получаем данные напрямую из TIA Portal
+                if (IsConnected && CurrentProject != null)
                 {
-                    await ExportTagsToXml();
-                    dbsFromXml = _xmlManager.LoadDbTagsFromXml();
-                    _logger.Info($"GetDbTagsAsync: Экспортировано и загружено {dbsFromXml.Count} блоков данных");
-                    return dbsFromXml;
+                    // Проверяем наличие читателя тегов
+                    if (_tagReader == null)
+                    {
+                        _logger.Warn("GetDbTagsAsync: TiaPortalTagReader не инициализирован, создаем новый экземпляр");
+                        _tagReader = new TiaPortalTagReader(_logger, this);
+                    }
+
+                    // Получаем все теги и фильтруем только DB
+                    PlcData plcData;
+                    await Task.Run(() => {
+                        plcData = _tagReader.ReadAllTags();
+                    });
+
+                    // Возвращаем только теги DB
+                    _logger.Info($"GetDbTagsAsync: Загружено {plcData.DbTags.Count} тегов DB");
+                    return plcData.DbTags;
                 }
 
                 _logger.Error("GetDbTagsAsync: Нет подключения к TIA Portal и отсутствуют XML");
@@ -652,7 +685,6 @@ namespace SiemensTrend.Communication.TIA
                 return new List<TagDefinition>();
             }
         }
-
         /// <summary>
         /// Добавьте это свойство в класс TiaPortalCommunicationService для публичного доступа к XmlManager
         /// </summary>
