@@ -324,6 +324,7 @@ using SiemensTrend.Core.Models;
 using SiemensTrend.Core.Logging;
 using System;
 using Siemens.Engineering;
+using SiemensTrend.Communication.TIA;
 using static SiemensTrend.Communication.TIA.TiaPortalCommunicationService;
 
 namespace SiemensTrend.Helpers
@@ -362,6 +363,13 @@ namespace SiemensTrend.Helpers
                 SetCurrentProject(currentProjectName);
             }
         }
+        private void SetCurrentProjectInXmlManager()
+        {
+            if (!string.IsNullOrEmpty(_currentProjectName))
+            {
+                SetCurrentProject(_currentProjectName);
+            }
+        }
 
         /// <summary>
         /// Установка текущего проекта для работы с XML
@@ -387,6 +395,8 @@ namespace SiemensTrend.Helpers
             _logger.Info($"TiaPortalXmlManager: Установлен текущий проект: {projectName}");
             _logger.Info($"TiaPortalXmlManager: Пути экспорта: {_plcTagsPath}, {_dbExportsPath}");
         }
+
+
 
         /// <summary>
         /// Экспорт тегов в XML с возможностью выбора типа тегов

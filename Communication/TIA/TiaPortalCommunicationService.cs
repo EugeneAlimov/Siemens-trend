@@ -537,6 +537,12 @@ namespace SiemensTrend.Communication.TIA
             var plcSoftware = GetPlcSoftware();
             if (plcSoftware == null) return;
 
+            // Сначала проверяем, настроен ли XML-менеджер для текущего проекта
+            if (_project != null && !string.IsNullOrEmpty(_project.Name))
+            {
+                SetCurrentProjectInXmlManager();
+            }
+
             // Экспортируем в зависимости от типа
             try
             {
@@ -545,7 +551,7 @@ namespace SiemensTrend.Communication.TIA
                 if (tagType == ExportTagType.All)
                 {
                     // Используем существующий метод для экспорта всех тегов
-                    await _xmlManager.ExportTagsToXml(plcSoftware);
+                    await _xmlManager.ExportTagsToXml(ExportTagType.All);
                 }
                 else if (tagType == ExportTagType.PlcTags)
                 {
@@ -565,7 +571,6 @@ namespace SiemensTrend.Communication.TIA
                 _logger.Error($"ExportTagsToXml: Ошибка при экспорте {tagType} тегов: {ex.Message}");
             }
         }
-
 
         /// <summary>
         /// Получение только тегов ПЛК из проекта
@@ -606,6 +611,7 @@ namespace SiemensTrend.Communication.TIA
                 return new List<TagDefinition>();
             }
         }
+
 
         /// <summary>
         /// Загрузка и возврат всех тегов проекта
@@ -707,5 +713,7 @@ namespace SiemensTrend.Communication.TIA
                 _logger.Info($"SetXmlManagerProject: Установлен проект {projectName}");
             }
         }
+
+
     }
 }
