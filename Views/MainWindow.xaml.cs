@@ -237,6 +237,19 @@ namespace SiemensTrend.Views
 
                 // Обновляем состояние интерфейса
                 UpdateConnectionState();
+
+                // ВАЖНО: НЕ запускаем автоматическую загрузку тегов!
+                // _viewModel.GetPlcTagsAsync();  // Раньше здесь могло быть такое
+                // _viewModel.GetDbTagsAsync();   // Или такое
+
+                // Инициализируем модель после подключения (без загрузки тегов)
+                if (_viewModel.IsConnected)
+                {
+                    _viewModel.InitializeAfterConnection();
+
+                    // Сообщаем пользователю, что он может загрузить теги вручную
+                    _viewModel.StatusMessage = "Подключено успешно. Используйте кнопки 'Получить теги ПЛК' и 'Получить DB' для загрузки тегов.";
+                }
             }
             catch (Exception ex)
             {
@@ -281,6 +294,13 @@ namespace SiemensTrend.Views
                     if (success)
                     {
                         _logger.Info($"Успешное подключение к проекту: {dialog.SelectedProject.Name}");
+
+                        // Инициализируем модель после подключения (без загрузки тегов)
+                        _viewModel.InitializeAfterConnection();
+
+                        // ВАЖНО: НЕ запускаем автоматическую загрузку тегов!
+                        // Вместо этого сообщаем пользователю, что он может загрузить теги вручную
+                        _viewModel.StatusMessage = "Подключено успешно. Используйте кнопки 'Получить теги ПЛК' и 'Получить DB' для загрузки тегов.";
                     }
                     else
                     {
