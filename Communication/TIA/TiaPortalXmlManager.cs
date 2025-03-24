@@ -320,63 +320,26 @@ namespace SiemensTrend.Helpers
             {
                 _logger.Info("ExportDataBlocksToXml: Начало экспорта блоков данных");
 
-                // Создаем директорию для экспорта, если она не существует
-                Directory.CreateDirectory(_dbExportsPath);
+                // Здесь важно не использовать Task.Run или другие методы асинхронного выполнения
+                // Все операции с TIA Portal API должны выполняться в том же STA-потоке
 
-                // Получаем список всех блоков данных для постепенной обработки
+                // Собираем блоки данных
                 var allDataBlocks = new List<DataBlock>();
                 CollectDataBlocks(blockGroup, allDataBlocks);
 
                 _logger.Info($"ExportDataBlocksToXml: Найдено {allDataBlocks.Count} блоков данных");
 
-                // Обрабатываем каждый блок данных по отдельности с таймаутом
-                int processedCount = 0;
-                int successCount = 0;
-
+                // Обрабатываем каждый блок данных последовательно в текущем потоке
                 foreach (var db in allDataBlocks)
                 {
-                    try
-                    {
-                        processedCount++;
-                        string dbName = db.Name;
-
-                        _logger.Info($"ExportDataBlocksToXml: Обработка DB {dbName} ({processedCount}/{allDataBlocks.Count})");
-
-                        // Создаем задачу с таймаутом в 10 секунд для каждого блока
-                        var cts = new CancellationTokenSource(10000); // 10 секунд
-                        var task = Task.Run(() => ExportSingleDataBlockToXml(db), cts.Token);
-
-                        try
-                        {
-                            // Ожидаем завершения задачи или таймаута
-                            task.Wait(cts.Token);
-                            successCount++;
-                            _logger.Info($"ExportDataBlocksToXml: DB {dbName} успешно экспортирован");
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            _logger.Warn($"ExportDataBlocksToXml: Превышен таймаут обработки DB {dbName}, пропускаем");
-                        }
-                        catch (AggregateException ex)
-                        {
-                            _logger.Error($"ExportDataBlocksToXml: Ошибка при экспорте DB {dbName}: {ex.InnerException?.Message}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error($"ExportDataBlocksToXml: Ошибка при обработке блока данных: {ex.Message}");
-                        // Продолжаем с другими блоками
-                    }
+                    ExportSingleDataBlockToXml(db);
                 }
-
-                _logger.Info($"ExportDataBlocksToXml: Экспорт блоков данных завершен. Успешно: {successCount}/{allDataBlocks.Count}");
             }
             catch (Exception ex)
             {
-                _logger.Error($"ExportDataBlocksToXml: Общая ошибка: {ex.Message}");
+                _logger.Error($"ExportDataBlocksToXml: Ошибка: {ex.Message}");
             }
         }
-
         /// <summary>
         /// Рекурсивный сбор блоков данных из группы
         /// </summary>
@@ -437,7 +400,7 @@ namespace SiemensTrend.Helpers
 
                 // Безопасное извлечение переменных из блока данных
                 var variables = new List<XElement>();
-                int variableCount = 0;
+                //int variableCount = 0;
 
                 if (db.Interface != null && db.Interface.Members != null)
                 {
@@ -445,11 +408,11 @@ namespace SiemensTrend.Helpers
                     {
                         foreach (var member in db.Interface.Members)
                         {
-                            if (variableCount >= 1000) // Ограничиваем количество переменных
-                            {
-                                _logger.Warn($"ExportSingleDataBlockToXml: Достигнут лимит переменных (1000) для DB {dbName}");
-                                break;
-                            }
+                            //if (variableCount >= 1000) // Ограничиваем количество переменных
+                            //{
+                                //_logger.Warn($"ExportSingleDataBlockToXml: Достигнут лимит переменных (1000) для DB {dbName}");
+                                //break;
+                            //}
 
                             string varName = member.Name;
                             string dataType = "Unknown";
@@ -468,7 +431,7 @@ namespace SiemensTrend.Helpers
                                 new XAttribute("DataType", dataType)
                             ));
 
-                            variableCount++;
+                            //variableCount++;
                         }
                     }
                     catch (Exception ex)
