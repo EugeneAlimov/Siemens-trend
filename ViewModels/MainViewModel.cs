@@ -111,6 +111,7 @@ namespace SiemensTrend.ViewModels
         public MainViewModel(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _logger.Info("Инициализация MainViewModel");
 
             // Инициализируем коллекции
             AvailableTags = new ObservableCollection<TagDefinition>();
@@ -124,30 +125,39 @@ namespace SiemensTrend.ViewModels
             StatusMessage = "Готово к работе";
             ProgressValue = 0;
 
-            // Создаем тестовый сервис коммуникации
-            var s7Parameters = new S7ConnectionParameters
-            {
-                IpAddress = "192.168.0.1",
-                CpuType = S7CpuType.S71500,
-                Rack = 0,
-                Slot = 1
-            };
+            // Важно: не вызываем методы получения тегов в конструкторе!
 
-            _communicationService = new S7CommunicationService(logger, s7Parameters);
+            _logger.Info("MainViewModel инициализирован успешно");
+        }
 
-            // Подписываемся на события
-            _communicationService.ConnectionStateChanged += (sender, isConnected) =>
+        /// <summary>
+        /// Инициализация после подключения к TIA Portal
+        /// </summary>
+        public void InitializeAfterConnection()
+        {
+            if (!IsConnected)
             {
-                IsConnected = isConnected;
-                StatusMessage = isConnected ? "Подключено к ПЛК" : "Отключено от ПЛК";
-            };
+                _logger.Warn("InitializeAfterConnection: Вызов без активного подключения");
+                return;
+            }
 
-            _communicationService.DataReceived += (sender, args) =>
+            _logger.Info("InitializeAfterConnection: Инициализация после подключения");
+
+            try
             {
-                // Обрабатываем полученные данные
-                // (в реальном приложении здесь будет логика обновления графиков)
-                _logger.Debug($"Получено {args.DataPoints.Count} точек данных");
-            };
+                // Инициализируем обозреватель тегов
+                InitializeTagBrowser();
+
+                // ВАЖНО: НЕ запускаем автоматическую загрузку тегов!
+                // Это будет делаться по явному запросу пользователя через UI
+
+                StatusMessage = "Подключено к TIA Portal. Используйте кнопки для загрузки тегов.";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"InitializeAfterConnection: Ошибка: {ex.Message}");
+                StatusMessage = "Ошибка при инициализации после подключения";
+            }
         }
 
         /// <summary>

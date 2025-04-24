@@ -1,4 +1,12 @@
-﻿using System;
+﻿//using System;
+//using System.Collections.Generic;
+//using System.Threading.Tasks;
+//using Siemens.Engineering;
+//using Siemens.Engineering.SW;
+//using SiemensTrend.Core.Logging;
+//using SiemensTrend.Core.Models;
+//using System.Linq;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Siemens.Engineering;
@@ -8,20 +16,24 @@ using SiemensTrend.Core.Models;
 using System.Linq;
 using SiemensTrend.Helpers;
 using System.IO;
-//using Siemens.Collaboration.Net.Logging;
+using Siemens.Engineering.HW;
+using Siemens.Engineering.HW.Features;
+using System.Diagnostics;
 
 namespace SiemensTrend.Communication.TIA
 {
     /// <summary>
-    /// Сервис для коммуникации с TIA Portal (исправленная версия)
+    /// Сервис для коммуникации с TIA Portal
     /// </summary>
-    public partial class TiaPortalCommunicationService
+    public class TiaPortalCommunicationService
     {
         private readonly Logger _logger;
         private TiaPortal _tiaPortal;
         private Project _project;
         private bool _isConnected;
         private TiaPortalTagReader _tagReader;
+        private readonly TiaPortalXmlManager _xmlManager;
+        private readonly object _tiaPortalLock = new object();
 
         /// <summary>
         /// Флаг подключения к TIA Portal
@@ -41,11 +53,16 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
+        /// XML-менеджер для работы с кэшем
+        /// </summary>
+        public TiaPortalXmlManager XmlManager => _xmlManager;
+
+        /// <summary>
         /// Конструктор
         /// </summary>
         public TiaPortalCommunicationService(Logger logger)
         {
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _logger.Info("Создание экземпляра TiaPortalCommunicationService");
             _xmlManager = new TiaPortalXmlManager(_logger);
             _logger.Info("Экземпляр TiaPortalCommunicationService создан успешно");
@@ -316,7 +333,7 @@ namespace SiemensTrend.Communication.TIA
                                 _logger.Info($"GetPlcSoftware: Проверка элемента устройства {deviceItem.Name}");
 
                                 // Получаем SoftwareContainer
-                                var softwareContainer = deviceItem.GetService<Siemens.Engineering.HW.Features.SoftwareContainer>();
+                                var softwareContainer = deviceItem.GetService<SoftwareContainer>();
                                 if (softwareContainer == null)
                                 {
                                     _logger.Info($"GetPlcSoftware: Элемент {deviceItem.Name} не содержит SoftwareContainer");
@@ -365,6 +382,8 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Открытие проекта TIA Portal (синхронный метод)
         /// </summary>
+        /// <param name="projectPath">Путь к файлу проекта TIA Portal</param>
+        /// <returns>True если проект успешно открыт</returns>
         public bool OpenProjectSync(string projectPath)
         {
             try
@@ -397,14 +416,14 @@ namespace SiemensTrend.Communication.TIA
                     _logger.Info($"OpenProjectSync: Попытка открыть проект {projectPath}");
 
                     // Проверяем существование файла проекта
-                    if (!System.IO.File.Exists(projectPath))
+                    if (!File.Exists(projectPath))
                     {
                         _logger.Error($"OpenProjectSync: Файл проекта не существует: {projectPath}");
                         return false;
                     }
 
                     // Создаем FileInfo для проекта
-                    var projectFile = new System.IO.FileInfo(projectPath);
+                    var projectFile = new FileInfo(projectPath);
 
                     // Открываем проект напрямую (синхронно)
                     _project = _tiaPortal.Projects.Open(projectFile);
@@ -446,7 +465,10 @@ namespace SiemensTrend.Communication.TIA
                             _tiaPortal = null;
                         }
                     }
-                    catch { }
+                    catch (Exception disposeEx)
+                    {
+                        _logger.Error($"OpenProjectSync: Ошибка при освобождении ресурсов TIA Portal: {disposeEx.Message}");
+                    }
 
                     return false;
                 }
@@ -462,11 +484,31 @@ namespace SiemensTrend.Communication.TIA
                     catch (Exception ex)
                     {
                         _logger.Error($"OpenProjectSync: Ошибка при создании TiaPortalTagReader: {ex.Message}");
-                        return false;
+
+                        // Несмотря на ошибку создания tagReader, проект уже открыт,
+                        // поэтому мы не закрываем его, но логируем ошибку
+                        _logger.Warn("OpenProjectSync: Проект открыт, но TiaPortalTagReader не создан");
                     }
 
                     _isConnected = true;
                     _logger.Info($"OpenProjectSync: Проект успешно открыт: {_project.Name}");
+
+                    // Проверяем, нужно ли создать кэш проекта
+                    try
+                    {
+                        if (_xmlManager != null && !_xmlManager.HasExportedDataForProject(_project.Name))
+                        {
+                            _logger.Info($"OpenProjectSync: Для проекта {_project.Name} отсутствует XML-кэш, будет создан");
+
+                            // Запускаем асинхронный экспорт, но не ждем его завершения
+                            ExportCurrentProject();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"OpenProjectSync: Ошибка при проверке/создании XML-кэша: {ex.Message}");
+                    }
+
                     return true;
                 }
                 else
@@ -479,7 +521,7 @@ namespace SiemensTrend.Communication.TIA
             }
             catch (Exception ex)
             {
-                _logger.Error($"OpenProjectSync: Ошибка при открытии проекта TIA Portal: {ex.Message}");
+                _logger.Error($"OpenProjectSync: Общая ошибка при открытии проекта TIA Portal: {ex.Message}");
                 if (ex.InnerException != null)
                 {
                     _logger.Error($"OpenProjectSync: Внутренняя ошибка: {ex.InnerException.Message}");
@@ -492,12 +534,6 @@ namespace SiemensTrend.Communication.TIA
                 return false;
             }
         }
-
-
-        /// <summary>
-        /// Открытие Созlадем xml manager
-        /// </summary>
-        private TiaPortalXmlManager _xmlManager;
 
         /// <summary>
         /// Установка текущего проекта для работы с XML
@@ -524,7 +560,7 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// "Экспортируем теги в xml"
+        /// Экспорт тегов в XML
         /// </summary>
         public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
         {
@@ -534,8 +570,14 @@ namespace SiemensTrend.Communication.TIA
                 return;
             }
 
-            var plcSoftware = GetPlcSoftware();
-            if (plcSoftware == null) return;
+            try
+            {
+                var plcSoftware = GetPlcSoftware();
+                if (plcSoftware == null)
+                {
+                    _logger.Error("ExportTagsToXml: Не удалось получить PlcSoftware");
+                    return;
+                }
 
             // Сначала проверяем, настроен ли XML-менеджер для текущего проекта
             if (_project != null && !string.IsNullOrEmpty(_project.Name))
@@ -577,37 +619,256 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         public async Task<List<TagDefinition>> GetPlcTagsAsync()
         {
+            _logger.Info($"Вызван метод {nameof(GetPlcTagsAsync)} из {new StackTrace().GetFrame(1).GetMethod().Name}");
             try
             {
-                // Убедимся, что текущий проект установлен в XML менеджере
-                if (_project != null && !string.IsNullOrEmpty(_project.Name))
+                // Проверяем состояние подключения
+                if (!IsConnected || CurrentProject == null)
                 {
-                    SetCurrentProjectInXmlManager();
+                    _logger.Warn("GetPlcTagsAsync: Нет активного подключения к TIA Portal");
+                    
+                    // Попробуем использовать XML-кэш, если он есть
+                    if (CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.Name))
+                    {
+                        _xmlManager.SetCurrentProject(CurrentProject.Name);
+                        _logger.Info($"GetPlcTagsAsync: Попытка загрузки из XML для проекта: {CurrentProject.Name}");
+                    }
+                    
+                    var tagsFromXml = _xmlManager.LoadPlcTagsFromXml();
+                    if (tagsFromXml.Count > 0)
+                    {
+                        _logger.Info($"GetPlcTagsAsync: Загружено {tagsFromXml.Count} тегов из XML");
+                        return tagsFromXml;
+                    }
+                    
+                    _logger.Error("GetPlcTagsAsync: Нет подключения к TIA Portal и отсутствуют данные в XML");
+                    return new List<TagDefinition>();
                 }
 
-                // Проверка наличия XML-файлов
-                var tagsFromXml = _xmlManager.LoadPlcTagsFromXml();
-                if (tagsFromXml.Count > 0)
+                // Сначала проверяем наличие XML-кэша
+                if (CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.Name))
                 {
-                    _logger.Info($"GetPlcTagsAsync: Загружено {tagsFromXml.Count} тегов из XML");
-                    return tagsFromXml;
+                    _xmlManager.SetCurrentProject(CurrentProject.Name);
+                    _logger.Info($"GetPlcTagsAsync: Установлен текущий проект для XML: {CurrentProject.Name}");
+                    
+                    var tagsFromXml = _xmlManager.LoadPlcTagsFromXml();
+                    if (tagsFromXml.Count > 0)
+                    {
+                        _logger.Info($"GetPlcTagsAsync: Загружено {tagsFromXml.Count} тегов из XML");
+                        return tagsFromXml;
+                    }
+                    else
+                    {
+                        _logger.Warn($"GetPlcTagsAsync: XML-кэш для проекта {CurrentProject.Name} пуст или поврежден");
+                    }
                 }
 
-                // Если XML нет или они пустые, экспортируем и затем загружаем
-                if (IsConnected && _project != null)
+                // Проверяем, жив ли еще TIA Portal
+                if (!IsTiaPortalAlive())
                 {
+
                     await ExportTagsToXml(ExportTagType.PlcTags); // Только теги ПЛК
                     tagsFromXml = _xmlManager.LoadPlcTagsFromXml();
                     _logger.Info($"GetPlcTagsAsync: Экспортировано и загружено {tagsFromXml.Count} тегов");
                     return tagsFromXml;
                 }
 
-                _logger.Error("GetPlcTagsAsync: Нет подключения к TIA Portal и отсутствуют XML");
-                return new List<TagDefinition>();
+                // Теперь пробуем получить теги напрямую из TIA Portal
+                if (_tagReader == null)
+                {
+                    _logger.Info("GetPlcTagsAsync: Инициализация TiaPortalTagReader");
+                    
+                    try
+                    {
+                        _tagReader = new TiaPortalTagReader(_logger, this);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"GetPlcTagsAsync: Не удалось создать TiaPortalTagReader: {ex.Message}");
+                        return new List<TagDefinition>();
+                    }
+                }
+
+                // Используем синхронный вызов для TIA Portal Openness API
+                _logger.Info("GetPlcTagsAsync: Чтение тегов ПЛК из TIA Portal");
+                
+                try
+                {
+                    // Используем блокировку для синхронизации доступа к TIA Portal
+                    lock (_tiaPortalLock)
+                    {
+                        PlcData plcData = _tagReader.ReadAllTags();
+                        
+                        if (plcData != null)
+                        {
+                            _logger.Info($"GetPlcTagsAsync: Успешно получено {plcData.PlcTags.Count} тегов ПЛК");
+                            
+                            // Экспортируем полученные данные в XML для будущего использования
+                            if (plcData.PlcTags.Count > 0 && CurrentProject != null)
+                            {
+                                ExportCurrentProject();
+                            }
+                            
+                            return plcData.PlcTags;
+                        }
+                        else
+                        {
+                            _logger.Error("GetPlcTagsAsync: ReadAllTags вернул null");
+                            return new List<TagDefinition>();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"GetPlcTagsAsync: Ошибка при чтении тегов: {ex.Message}");
+                    if (ex.InnerException != null)
+                    {
+                        _logger.Error($"GetPlcTagsAsync: Внутренняя ошибка: {ex.InnerException.Message}");
+                    }
+                    
+                    // Анализируем ошибку для выявления проблем с COM-объектами
+                    if (ex.Message.Contains("COM") || ex.Message.Contains("RCW") || 
+                        ex.Message.Contains("0x8") || ex.Message.Contains("thread") ||
+                        ex.Message.Contains("STA"))
+                    {
+                        _logger.Error("GetPlcTagsAsync: Обнаружена ошибка COM или потоков. Переподключение может быть необходимо.");
+                        _isConnected = false;
+                    }
+                    
+                    return new List<TagDefinition>();
+                }
             }
             catch (Exception ex)
             {
-                _logger.Error($"GetPlcTagsAsync: Ошибка: {ex.Message}");
+                _logger.Error($"GetPlcTagsAsync: Непредвиденная ошибка: {ex.Message}");
+                return new List<TagDefinition>();
+            }
+        }
+
+        /// <summary>
+        /// Получение только тегов блоков данных из проекта
+        /// </summary>
+        public async Task<List<TagDefinition>> GetDbTagsAsync()
+        {
+            _logger.Info($"Вызван метод {nameof(GetDbTagsAsync)} из {new StackTrace().GetFrame(1).GetMethod().Name}");
+            try
+            {
+                // Проверяем состояние подключения
+                if (!IsConnected || CurrentProject == null)
+                {
+                    _logger.Warn("GetDbTagsAsync: Нет активного подключения к TIA Portal");
+                    
+                    // Попробуем использовать XML-кэш, если он есть
+                    if (CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.Name))
+                    {
+                        _xmlManager.SetCurrentProject(CurrentProject.Name);
+                        _logger.Info($"GetDbTagsAsync: Попытка загрузки из XML для проекта: {CurrentProject.Name}");
+                    }
+                    
+                    var dbsFromXml = _xmlManager.LoadDbTagsFromXml();
+                    if (dbsFromXml.Count > 0)
+                    {
+                        _logger.Info($"GetDbTagsAsync: Загружено {dbsFromXml.Count} блоков данных из XML");
+                        return dbsFromXml;
+                    }
+                    
+                    _logger.Error("GetDbTagsAsync: Нет подключения к TIA Portal и отсутствуют данные в XML");
+                    return new List<TagDefinition>();
+                }
+
+                // Сначала проверяем наличие XML-кэша
+                if (CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.Name))
+                {
+                    _xmlManager.SetCurrentProject(CurrentProject.Name);
+                    _logger.Info($"GetDbTagsAsync: Установлен текущий проект для XML: {CurrentProject.Name}");
+                    
+                    var dbsFromXml = _xmlManager.LoadDbTagsFromXml();
+                    if (dbsFromXml.Count > 0)
+                    {
+                        _logger.Info($"GetDbTagsAsync: Загружено {dbsFromXml.Count} блоков данных из XML");
+                        return dbsFromXml;
+                    }
+                    else
+                    {
+                        _logger.Warn($"GetDbTagsAsync: XML-кэш для блоков данных проекта {CurrentProject.Name} пуст или поврежден");
+                    }
+                }
+
+                // Проверяем, жив ли еще TIA Portal
+                if (!IsTiaPortalAlive())
+                {
+                    _logger.Error("GetDbTagsAsync: TIA Portal не отвечает или закрыт");
+                    return new List<TagDefinition>();
+                }
+
+                // Теперь пробуем получить теги напрямую из TIA Portal
+                if (_tagReader == null)
+                {
+                    _logger.Info("GetDbTagsAsync: Инициализация TiaPortalTagReader");
+                    
+                    try
+                    {
+                        _tagReader = new TiaPortalTagReader(_logger, this);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"GetDbTagsAsync: Не удалось создать TiaPortalTagReader: {ex.Message}");
+                        return new List<TagDefinition>();
+                    }
+                }
+
+                // Используем синхронный вызов для TIA Portal Openness API
+                _logger.Info("GetDbTagsAsync: Чтение тегов DB из TIA Portal");
+                
+                try
+                {
+                    // Используем блокировку для синхронизации доступа к TIA Portal
+                    lock (_tiaPortalLock)
+                    {
+                        PlcData plcData = _tagReader.ReadAllTags();
+                        
+                        if (plcData != null)
+                        {
+                            _logger.Info($"GetDbTagsAsync: Успешно получено {plcData.DbTags.Count} тегов DB");
+                            
+                            // Экспортируем полученные данные в XML для будущего использования
+                            if (plcData.DbTags.Count > 0 && CurrentProject != null)
+                            {
+                                ExportCurrentProject();
+                            }
+                            
+                            return plcData.DbTags;
+                        }
+                        else
+                        {
+                            _logger.Error("GetDbTagsAsync: ReadAllTags вернул null");
+                            return new List<TagDefinition>();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"GetDbTagsAsync: Ошибка при чтении тегов DB: {ex.Message}");
+                    if (ex.InnerException != null)
+                    {
+                        _logger.Error($"GetDbTagsAsync: Внутренняя ошибка: {ex.InnerException.Message}");
+                    }
+                    
+                    // Анализируем ошибку для выявления проблем с COM-объектами
+                    if (ex.Message.Contains("COM") || ex.Message.Contains("RCW") || 
+                        ex.Message.Contains("0x8") || ex.Message.Contains("thread") ||
+                        ex.Message.Contains("STA"))
+                    {
+                        _logger.Error("GetDbTagsAsync: Обнаружена ошибка COM или потоков. Переподключение может быть необходимо.");
+                        _isConnected = false;
+                    }
+                    
+                    return new List<TagDefinition>();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"GetDbTagsAsync: Непредвиденная ошибка: {ex.Message}");
                 return new List<TagDefinition>();
             }
         }
@@ -618,7 +879,7 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         public async Task<PlcData> GetAllProjectTagsAsync()
         {
-            if (!IsConnected || _project == null)
+            if (!IsConnected || CurrentProject == null)
             {
                 _logger.Error("GetAllProjectTagsAsync: Попытка получения тегов без подключения к TIA Portal");
                 return new PlcData();
@@ -632,19 +893,55 @@ namespace SiemensTrend.Communication.TIA
                 if (_tagReader == null)
                 {
                     _logger.Warn("GetAllProjectTagsAsync: TiaPortalTagReader не инициализирован, создаем новый экземпляр");
-                    _tagReader = new TiaPortalTagReader(_logger, this);
+                    
+                    try
+                    {
+                        _tagReader = new TiaPortalTagReader(_logger, this);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"GetAllProjectTagsAsync: Ошибка при создании TiaPortalTagReader: {ex.Message}");
+                        return new PlcData();
+                    }
                 }
 
-                // ВАЖНО: Не используем Task.Run для Openness API!
-                // Вместо этого используем Task.FromResult для асинхронной обертки синхронного метода
-                var plcData = await Task.FromResult(_tagReader.ReadAllTags());
+                // Используем синхронный метод ReadAllTags для TIA Portal Openness API
+                _logger.Info("GetAllProjectTagsAsync: Синхронное чтение тегов");
+                PlcData plcData = new PlcData();
+                
+                try
+                {
+                    // Используем блокировку для синхронизации доступа к TIA Portal
+                    lock (_tiaPortalLock)
+                    {
+                        // Вызываем метод синхронно в текущем STA-потоке
+                        plcData = _tagReader.ReadAllTags();
+                        _logger.Info("GetAllProjectTagsAsync: Метод ReadAllTags() выполнен успешно");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"GetAllProjectTagsAsync: Ошибка при вызове ReadAllTags(): {ex.Message}");
+                    if (ex.InnerException != null)
+                    {
+                        _logger.Error($"GetAllProjectTagsAsync: Внутренняя ошибка: {ex.InnerException.Message}");
+                    }
+                    return new PlcData();
+                }
 
+                // Проверяем результаты и экспортируем при необходимости
+                if (plcData.PlcTags.Count > 0 || plcData.DbTags.Count > 0)
+                {
+                    // Сохраняем результаты в XML для будущего использования
+                    ExportCurrentProject();
+                }
+                
                 _logger.Info($"GetAllProjectTagsAsync: Загружено {plcData.PlcTags.Count} тегов ПЛК и {plcData.DbTags.Count} тегов DB");
                 return plcData;
             }
             catch (Exception ex)
             {
-                _logger.Error($"GetAllProjectTagsAsync: Ошибка при получении всех тегов проекта: {ex.Message}");
+                _logger.Error($"GetAllProjectTagsAsync: Общая ошибка при получении всех тегов проекта: {ex.Message}");
                 if (ex.InnerException != null)
                 {
                     _logger.Error($"GetAllProjectTagsAsync: Внутренняя ошибка: {ex.InnerException.Message}");
@@ -654,11 +951,11 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Получение только тегов блоков данных из проекта
+        /// Проверка состояния TIA Portal
         /// </summary>
-        public async Task<List<TagDefinition>> GetDbTagsAsync()
+        private bool IsTiaPortalAlive()
         {
-            try
+            if (_tiaPortal == null || _project == null)
             {
                 // Убедимся, что текущий проект установлен в XML менеджере
                 if (_project != null && !string.IsNullOrEmpty(_project.Name))
@@ -683,22 +980,51 @@ namespace SiemensTrend.Communication.TIA
                     return dbsFromXml;
                 }
 
-                _logger.Error("GetDbTagsAsync: Нет подключения к TIA Portal и отсутствуют XML");
-                return new List<TagDefinition>();
+            try
+            {
+                // Проверяем доступность проекта, пытаясь обратиться к его свойствам
+                string projectName = _project.Name;
+                _logger.Debug($"IsTiaPortalAlive: Успешная проверка проекта {projectName}");
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.Error($"GetDbTagsAsync: Ошибка: {ex.Message}");
-                return new List<TagDefinition>();
+                _logger.Error($"IsTiaPortalAlive: TIA Portal недоступен: {ex.Message}");
+                // Сбрасываем флаг подключения
+                _isConnected = false;
+                return false;
             }
         }
 
         /// <summary>
-        /// Добавьте это свойство в класс TiaPortalCommunicationService для публичного доступа к XmlManager
+        /// Экспорт текущего проекта в XML
         /// </summary>
-        public Helpers.TiaPortalXmlManager XmlManager
+        private void ExportCurrentProject()
         {
-            get { return _xmlManager; }
+            if (CurrentProject == null || !IsConnected)
+            {
+                _logger.Warn("ExportCurrentProject: Нет активного проекта или подключения");
+                return;
+            }
+
+            try
+            {
+                // Перед экспортом, проверим, можем ли получить PlcSoftware
+                var plcSoftware = GetPlcSoftware();
+                if (plcSoftware == null)
+                {
+                    _logger.Error("ExportCurrentProject: Не удалось получить PlcSoftware");
+                    return;
+                }
+
+                // Выполняем экспорт асинхронно, но не ждем завершения
+                _logger.Info("ExportCurrentProject: Начало экспорта проекта в XML");
+                _xmlManager.ExportTagsToXml(plcSoftware).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ExportCurrentProject: Ошибка при экспорте проекта: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -713,7 +1039,5 @@ namespace SiemensTrend.Communication.TIA
                 _logger.Info($"SetXmlManagerProject: Установлен проект {projectName}");
             }
         }
-
-
     }
 }

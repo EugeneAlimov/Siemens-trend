@@ -1,87 +1,111 @@
-# SiemensTrend
+# SiemensTrend: Industrial PLC Monitoring Tool
 
-Приложение для мониторинга данных ПЛК Siemens S7-1200/1500 с визуализацией в реальном времени и возможностью экспорта данных для анализа.
+![Project Logo](path/to/your/logo.png)
 
-## Возможности
+## 🚧 Project Status: Under Active Development 🚧
 
-- Подключение к ПЛК Siemens S7-1200/1500 по различным протоколам (S7, OPC UA, TIA Portal Openness)
-- Чтение и визуализация данных с тегов ПЛК в реальном времени
-- Поддержка оптимизированных блоков данных
-- Возможность создания и настройки графиков для мониторинга тегов
-- Уведомления при выходе значений за заданные пределы
-- Экспорт данных в CSV для последующего анализа
-- Сохранение и загрузка проектов с различными конфигурациями
+**⚠️ WARNING: This project is currently in ALPHA stage**
 
-## Требования
+- **Many features are incomplete or non-functional**
+- Expect significant changes and potential instability
+- Not recommended for production use
+- Contributions and feedback are highly welcome!
 
-- Windows 7/10/11
-- .NET Framework 4.8
-- TIA Portal (для функций Openness)
-- Соединение с ПЛК Siemens S7-1200/1500
+[![Development Status](https://img.shields.io/badge/Status-Alpha-red.svg)](https://github.com/YourUsername/SiemensTrend)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/release/YourUsername/SiemensTrend.svg)](https://github.com/YourUsername/SiemensTrend/releases)
 
-## Установка
+## 🔍 Current Limitations
 
-1. Скачайте последнюю версию из раздела [Releases](https://github.com/EugeneAlimov/SiemensTrend/releases)
-2. Распакуйте архив в любую директорию
-3. Запустите файл `SiemensTrend.exe`
+### Partially Implemented Features
+- ✅ Basic PLC Connection
+- ✅ Tag Browser
+- ✅ TIA Portal Integration
+- ❌ Full Monitoring Functionality
+- ❌ Complete Data Visualization
+- ❌ Advanced Export Options
 
-## Использование
+### Known Issues
+- Unstable connection handling
+- Limited tag types support
+- Potential memory leaks
+- Incomplete error handling
 
-### Подключение к ПЛК
+## 🛠️ Planned Development Roadmap
 
-1. Запустите приложение
-2. Создайте новый проект или откройте существующий
-3. Укажите параметры подключения к ПЛК (IP-адрес, тип CPU, rack, slot)
-4. Нажмите "Подключиться"
+### Short-Term Goals
+- [ ] Stabilize core connectivity
+- [ ] Improve tag reading reliability
+- [ ] Enhance error reporting
+- [ ] Implement basic charting
 
-### Выбор тегов для мониторинга
+### Mid-Term Goals
+- [ ] Full tag type support
+- [ ] Advanced monitoring features
+- [ ] Comprehensive data export
+- [ ] Performance optimizations
 
-1. После успешного подключения загрузите структуру тегов из ПЛК
-2. Выберите теги для мониторинга из древовидной структуры
-3. Настройте параметры мониторинга (интервал опроса, уведомления)
+### Long-Term Vision
+- OPC UA support
+- Cloud synchronization
+- Machine learning insights
+- Multi-language interface
 
-### Визуализация данных
+## 🤝 How You Can Help
 
-1. Создайте новый график, добавив выбранные теги
-2. Настройте параметры отображения (цвета, масштаб, временной диапазон)
-3. Используйте панель управления для управления графиком (пауза, масштабирование, маркеры)
+1. **Report Bugs**: Detailed bug reports are crucial
+2. **Suggest Features**: Open issues with feature requests
+3. **Contribute Code**: 
+   - Fix existing issues
+   - Improve documentation
+   - Implement new features
 
-### Экспорт данных
+### Contribution Guidelines
+- Read `CONTRIBUTING.md` before submitting PRs
+- Follow coding standards
+- Write unit tests
+- Document your changes
 
-1. Выберите "Экспорт" в меню
-2. Укажите период данных для экспорта
-3. Выберите формат и место сохранения файла
-4. Нажмите "Экспортировать"
+## 🚀 Current Capabilities
 
-## Разработка
+Despite being in early development, the project already supports:
+- Connection to Siemens S7 PLCs
+- Basic tag browsing
+- TIA Portal project parsing
+- Rudimentary data reading
 
-### Требования для разработки
+## ⚙️ Technical Details
 
-- Visual Studio 2019/2022
-- .NET Framework 4.8 SDK
+- **Framework**: .NET Framework 4.8
+- **Primary Technologies**:
+  - WPF
+  - TIA Portal Openness API
+  - S7.Net library
 
-### Настройка окружения разработки
+## 📋 Installation (Experimental)
 
-1. Клонируйте репозиторий:
-   ```
-   git clone https://github.com/yourusername/SiemensTrend.git
-   ```
+**Use at your own risk!**
 
-2. Откройте решение в Visual Studio:
-   ```
-   SiemensTrend.sln
-   ```
+1. Download latest release
+2. Ensure .NET Framework 4.8 is installed
+3. Have Siemens TIA Portal available
+4. Run the application
+5. Expect and report any issues
 
-3. Установите необходимые NuGet пакеты (при необходимости):
-   ```
-   S7NetPlus
-   LiveChartsCore.SkiaSharpView.WPF
-   ```
+## 🐛 Reporting Issues
 
-## Лицензия
+When reporting issues, please include:
+- Detailed description
+- Steps to reproduce
+- Application version
+- System configuration
+- TIA Portal version
+- PLC model
 
-MIT License
+## 📄 License
 
-## Авторы
+MIT License - Experimental use permitted
 
-- EugeneAlimov
+---
+
+⚠️ **ALPHA SOFTWARE** - Expect Frequent Changes! ⚠️
