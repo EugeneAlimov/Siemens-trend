@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Windows;
 using Siemens.Collaboration.Net;
 using SiemensTrend.Core.Logging;
