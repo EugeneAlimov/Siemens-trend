@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 using Siemens.Engineering.SW;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
@@ -7,35 +6,75 @@ using SiemensTrend.Core.Models;
 namespace SiemensTrend.Communication.TIA
 {
     /// <summary>
-    /// Комбинированный класс для чтения всех типов тегов из проекта TIA Portal
-    /// Использует отдельные специализированные классы для чтения разных типов тегов
+    /// Базовый абстрактный класс для всех читателей тегов TIA Portal
     /// </summary>
-    public class TiaPortalTagReader : ITiaPortalTagReader
+    public abstract class TiaPortalTagReaderBase : ITiaPortalTagReader
     {
-        private readonly Logger _logger;
-        private readonly TiaPortalCommunicationService _tiaService;
-        private readonly TiaPortalPlcTagReader _plcTagReader;
-        private readonly TiaPortalDbTagReader _dbTagReader;
+        /// <summary>
+        /// Логгер для записи событий
+        /// </summary>
+        protected readonly Logger _logger;
 
         /// <summary>
-        /// Конструктор
+        /// Сервис коммуникации с TIA Portal
+        /// </summary>
+        protected readonly TiaPortalCommunicationService _tiaService;
+
+        /// <summary>
+        /// Конструктор базового класса
         /// </summary>
         /// <param name="logger">Логгер</param>
         /// <param name="tiaService">Сервис коммуникации с TIA Portal</param>
-        public TiaPortalTagReader(Logger logger, TiaPortalCommunicationService tiaService)
+        protected TiaPortalTagReaderBase(Logger logger, TiaPortalCommunicationService tiaService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _tiaService = tiaService ?? throw new ArgumentNullException(nameof(tiaService));
-
-            // Создаем специализированные читатели
-            _plcTagReader = new TiaPortalPlcTagReader(logger, tiaService);
-            _dbTagReader = new TiaPortalDbTagReader(logger, tiaService);
         }
 
         /// <summary>
-        /// Чтение всех тегов из проекта
+        /// Получение программного обеспечения ПЛК
         /// </summary>
-        public PlcData ReadAllTags()
+        /// <returns>Объект PlcSoftware или null</returns>
+        protected PlcSoftware GetPlcSoftware()
+        {
+            try
+            {
+                var plcSoftware = _tiaService.GetPlcSoftware();
+
+                if (plcSoftware == null)
+                {
+                    _logger.Error("Не удалось получить PlcSoftware из проекта");
+                    return null;
+                }
+
+                _logger.Info($"PlcSoftware получен успешно: {plcSoftware.Name}");
+                return plcSoftware;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении PlcSoftware: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Проверка соединения с TIA Portal
+        /// </summary>
+        /// <returns>True, если соединение активно</returns>
+        protected bool CheckConnection()
+        {
+            if (!_tiaService.IsConnected || _tiaService.CurrentProject == null)
+            {
+                _logger.Error("Соединение с TIA Portal потеряно");
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Реализация метода чтения всех тегов
+        /// </summary>
+        public virtual PlcData ReadAllTags()
         {
             var plcData = new PlcData();
 
@@ -100,63 +139,13 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Чтение тегов ПЛК
+        /// Абстрактный метод чтения тегов ПЛК
         /// </summary>
-        public int ReadPlcTags(PlcData plcData)
-        {
-            if (plcData == null)
-                throw new ArgumentNullException(nameof(plcData));
-
-            return _plcTagReader.ReadPlcTags(plcData);
-        }
+        public abstract int ReadPlcTags(PlcData plcData);
 
         /// <summary>
-        /// Чтение блоков данных
+        /// Абстрактный метод чтения блоков данных
         /// </summary>
-        public int ReadDataBlocks(PlcData plcData)
-        {
-            if (plcData == null)
-                throw new ArgumentNullException(nameof(plcData));
-
-            return _dbTagReader.ReadDataBlocks(plcData);
-        }
-
-        /// <summary>
-        /// Получение программного обеспечения ПЛК
-        /// </summary>
-        private PlcSoftware GetPlcSoftware()
-        {
-            try
-            {
-                var plcSoftware = _tiaService.GetPlcSoftware();
-
-                if (plcSoftware == null)
-                {
-                    _logger.Error("Не удалось получить PlcSoftware из проекта");
-                    return null;
-                }
-
-                _logger.Info($"PlcSoftware получен успешно: {plcSoftware.Name}");
-                return plcSoftware;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении PlcSoftware: {ex.Message}");
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Проверка соединения с TIA Portal
-        /// </summary>
-        private bool CheckConnection()
-        {
-            if (!_tiaService.IsConnected || _tiaService.CurrentProject == null)
-            {
-                _logger.Error("Соединение с TIA Portal потеряно");
-                return false;
-            }
-            return true;
-        }
+        public abstract int ReadDataBlocks(PlcData plcData);
     }
 }

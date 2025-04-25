@@ -150,16 +150,12 @@ namespace SiemensTrend.Communication.TIA
             {
                 _logger.Info("GetAllProjectTagsAsync: Запуск чтения всех тегов проекта");
 
-                // Проверяем наличие читателя тегов
-                if (_tagReader == null)
-                {
-                    _logger.Warn("GetAllProjectTagsAsync: TiaPortalTagReader не инициализирован, создаем новый экземпляр");
-                    _tagReader = new TiaPortalTagReader(_logger, this);
-                }
+                // Создаем читатель тегов с помощью фабрики
+                var tagReader = TiaPortalTagReaderFactory.CreateTagReader(_logger, this);
 
                 // ВАЖНО: Не используем Task.Run для Openness API!
                 // Вместо этого используем Task.FromResult для асинхронной обертки синхронного метода
-                var plcData = await Task.FromResult(_tagReader.ReadAllTags());
+                var plcData = await Task.FromResult(tagReader.ReadAllTags());
 
                 _logger.Info($"GetAllProjectTagsAsync: Загружено {plcData.PlcTags.Count} тегов ПЛК и {plcData.DbTags.Count} тегов DB");
                 return plcData;
@@ -174,7 +170,6 @@ namespace SiemensTrend.Communication.TIA
                 return new PlcData();
             }
         }
-
         /// <summary>
         /// Получение только тегов блоков данных из проекта
         /// </summary>
