@@ -822,6 +822,12 @@ namespace SiemensTrend.Views
         {
             try
             {
+                if (projects == null || projects.Count == 0)
+                {
+                    _logger.Warn("ShowProjectChoiceDialog: Список проектов пуст или равен null");
+                    return;
+                }
+
                 // Создаем экземпляр нового диалога выбора проекта
                 var dialog = new TiaProjectChoiceDialog(projects);
 
@@ -874,7 +880,6 @@ namespace SiemensTrend.Views
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
         /// <summary>
         /// Очистка кэша текущего проекта
         /// </summary>
