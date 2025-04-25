@@ -669,9 +669,5 @@ namespace SiemensTrend.Communication.TIA
             else
                 return TagDataType.Other;
         }
-
-        // ВАЖНО: Удалить все старые методы, которые больше не должны использоваться
-        // Метод ReadDataBlocks больше НЕ НУЖЕН - он заменен на ReadDataBlocksSafe
-        // Метод ProcessBlockGroup больше НЕ НУЖЕН - он заменен на CollectDataBlocks и ProcessDbMembersSafe
     }
 }

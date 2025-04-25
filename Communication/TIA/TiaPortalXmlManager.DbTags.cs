@@ -331,7 +331,7 @@ namespace SiemensTrend.Helpers
                         dbTags.Add(dbTag);
 
                         // Если нужно также добавлять переменные блоков данных:
-                        /*
+                        
                         foreach (var varElement in doc.Descendants("Variable"))
                         {
                             try
@@ -359,7 +359,7 @@ namespace SiemensTrend.Helpers
                                 // Продолжаем с другими переменными
                             }
                         }
-                        */
+                        
 
                         _logger.Info($"LoadDbTagsFromXml: Загружен DB {dbName}");
                     }
