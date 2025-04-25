@@ -12,18 +12,22 @@
 
   <ItemGroup>
     <Compile Remove="Alerts\**" />
+    <Compile Remove="Communication\OpcUa\**" />
     <Compile Remove="Core\Extensions\**" />
     <Compile Remove="Core\Interfaces\**" />
     <Compile Remove="TagManagement\**" />
     <EmbeddedResource Remove="Alerts\**" />
+    <EmbeddedResource Remove="Communication\OpcUa\**" />
     <EmbeddedResource Remove="Core\Extensions\**" />
     <EmbeddedResource Remove="Core\Interfaces\**" />
     <EmbeddedResource Remove="TagManagement\**" />
     <None Remove="Alerts\**" />
+    <None Remove="Communication\OpcUa\**" />
     <None Remove="Core\Extensions\**" />
     <None Remove="Core\Interfaces\**" />
     <None Remove="TagManagement\**" />
     <Page Remove="Alerts\**" />
+    <Page Remove="Communication\OpcUa\**" />
     <Page Remove="Core\Extensions\**" />
     <Page Remove="Core\Interfaces\**" />
     <Page Remove="TagManagement\**" />
@@ -51,7 +55,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Communication\OpcUa\" />
     <Folder Include="Visualization\Controls\" />
   </ItemGroup>
 
