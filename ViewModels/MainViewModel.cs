@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.ObjectModel;
-using System.Linq; // Добавлено для методов Any(), Where() и т.д.
-using System.Threading.Tasks;
+using System.Linq;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.S7;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
+using SiemensTrend.Helpers;
 
 namespace SiemensTrend.ViewModels
 {
@@ -14,8 +14,15 @@ namespace SiemensTrend.ViewModels
     /// </summary>
     public partial class MainViewModel : ViewModelBase
     {
-        private readonly Logger _logger;
-        private ICommunicationService _communicationService;
+        /// <summary>
+        /// Логгер для записи событий
+        /// </summary>
+        protected readonly Logger _logger;
+
+        /// <summary>
+        /// Сервис для коммуникации с ПЛК
+        /// </summary>
+        protected ICommunicationService _communicationService;
 
         private bool _isConnected;
         private bool _isLoading;
@@ -107,7 +114,7 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Конструктор
         /// </summary>
-        /// <param name="logger">Логер</param>
+        /// <param name="logger">Логгер</param>
         public MainViewModel(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -161,45 +168,6 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Подключение к ПЛК
-        /// </summary>
-        public async Task ConnectAsync()
-        {
-            if (IsLoading || IsConnected)
-                return;
-
-            try
-            {
-                IsLoading = true;
-                StatusMessage = "Подключение к ПЛК...";
-                ProgressValue = 0;
-
-                bool result = await _communicationService.ConnectAsync();
-
-                if (!result)
-                {
-                    StatusMessage = "Ошибка подключения";
-                    _logger.Error("Не удалось подключиться к ПЛК");
-                }
-                else
-                {
-                    // Подключились успешно, загружаем список тегов
-                    await LoadTagsAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при подключении: {ex.Message}");
-                StatusMessage = "Ошибка подключения";
-            }
-            finally
-            {
-                IsLoading = false;
-                ProgressValue = 100;
-            }
-        }
-
-        /// <summary>
         /// Название текущего проекта
         /// </summary>
         public string CurrentProjectName
@@ -218,109 +186,9 @@ namespace SiemensTrend.ViewModels
         public int MaxMonitoredTags => 10;
 
         /// <summary>
-        /// Обработчик выбора тега для мониторинга
-        /// </summary>
-        public void OnTagSelected(object sender, TagDefinition tag)
-        {
-            if (tag == null) return;
-
-            // Проверяем, не выбран ли уже этот тег
-            if (MonitoredTags.Any(t => t.Name == tag.Name))
-            {
-                _logger.Warn($"Тег {tag.Name} уже добавлен в мониторинг");
-                return;
-            }
-
-            // Проверяем лимит тегов
-            if (MonitoredTags.Count >= MaxMonitoredTags)
-            {
-                _logger.Warn($"Достигнут лимит тегов для мониторинга ({MaxMonitoredTags})");
-                // Здесь можно показать диалог с предупреждением
-                return;
-            }
-
-            // Добавляем тег в мониторинг
-            MonitoredTags.Add(tag);
-            _logger.Info($"Тег {tag.Name} добавлен в мониторинг");
-        }
-
-        /// <summary>
-        /// Отключение от ПЛК
-        /// </summary>
-        public void Disconnect()
-        {
-            if (IsLoading || !IsConnected)
-                return;
-
-            try
-            {
-                _communicationService.Disconnect();
-
-                // Если есть TIA Portal сервис, отключаем и его
-                _tiaPortalService?.Disconnect();
-
-                StatusMessage = "Отключено от ПЛК";
-
-                // Очищаем списки тегов
-                AvailableTags.Clear();
-                MonitoredTags.Clear();
-                PlcTags.Clear();
-                DbTags.Clear();
-
-                IsConnected = false;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при отключении: {ex.Message}");
-                StatusMessage = "Ошибка при отключении";
-            }
-        }
-
-        /// <summary>
-        /// Добавьте этот метод в класс MainViewModel для проверки кэшированных данных
-        /// </summary>
-        public bool CheckCachedProjectData(string projectName)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(projectName))
-                {
-                    _logger.Warn("CheckCachedProjectData: Имя проекта не может быть пустым");
-                    return false;
-                }
-
-                // Проверяем, инициализирован ли TIA сервис
-                if (_tiaPortalService == null)
-                {
-                    _logger.Info("CheckCachedProjectData: Создаем новый экземпляр TiaPortalCommunicationService");
-                    _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
-                }
-
-                // Получаем доступ к XML Manager через отражение или с помощью нового метода
-                var xmlManager = GetXmlManager();
-                if (xmlManager == null)
-                {
-                    _logger.Error("CheckCachedProjectData: Не удалось получить доступ к XmlManager");
-                    return false;
-                }
-
-                // Проверяем наличие кэшированных данных
-                var hasData = xmlManager.HasExportedDataForProject(projectName);
-                _logger.Info($"CheckCachedProjectData: Проект {projectName} {(hasData ? "имеет" : "не имеет")} кэшированные данные");
-
-                return hasData;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"CheckCachedProjectData: Ошибка: {ex.Message}");
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Получение экземпляра XmlManager из TiaPortalCommunicationService
         /// </summary>
-        private Helpers.TiaPortalXmlManager GetXmlManager()
+        protected TiaPortalXmlManager GetXmlManager()
         {
             try
             {
@@ -331,7 +199,7 @@ namespace SiemensTrend.ViewModels
                     var xmlManagerProperty = _tiaPortalService.GetType().GetProperty("XmlManager");
                     if (xmlManagerProperty != null)
                     {
-                        var xmlManager = xmlManagerProperty.GetValue(_tiaPortalService) as Helpers.TiaPortalXmlManager;
+                        var xmlManager = xmlManagerProperty.GetValue(_tiaPortalService) as TiaPortalXmlManager;
                         if (xmlManager != null)
                         {
                             return xmlManager;
@@ -345,7 +213,7 @@ namespace SiemensTrend.ViewModels
 
                     if (field != null)
                     {
-                        var xmlManager = field.GetValue(_tiaPortalService) as Helpers.TiaPortalXmlManager;
+                        var xmlManager = field.GetValue(_tiaPortalService) as TiaPortalXmlManager;
                         if (xmlManager != null)
                         {
                             return xmlManager;
@@ -362,7 +230,7 @@ namespace SiemensTrend.ViewModels
                 // 3. Полученный xmlManager == null
 
                 _logger.Info("GetXmlManager: Создание нового экземпляра TiaPortalXmlManager");
-                return new Helpers.TiaPortalXmlManager(_logger);
+                return new TiaPortalXmlManager(_logger);
             }
             catch (Exception ex)
             {
@@ -371,284 +239,12 @@ namespace SiemensTrend.ViewModels
                 // Даже в случае ошибки, попробуем создать новый экземпляр
                 try
                 {
-                    return new Helpers.TiaPortalXmlManager(_logger);
+                    return new TiaPortalXmlManager(_logger);
                 }
                 catch
                 {
                     return null;
                 }
-            }
-        }
-        /// <summary>
-        /// Загрузка кэшированных данных проекта
-        /// </summary>
-        public async Task<bool> LoadCachedProjectDataAsync(string projectName)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(projectName))
-                {
-                    _logger.Warn("LoadCachedProjectDataAsync: Имя проекта не может быть пустым");
-                    return false;
-                }
-
-                IsLoading = true;
-                StatusMessage = $"Загрузка кэшированных данных проекта {projectName}...";
-                ProgressValue = 10;
-
-                // Проверяем, инициализирован ли TIA сервис
-                if (_tiaPortalService == null)
-                {
-                    _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
-                }
-
-                // Устанавливаем имя текущего проекта в XML Manager
-                var xmlManager = GetXmlManager();
-                if (xmlManager != null)
-                {
-                    xmlManager.SetCurrentProject(projectName);
-                    _logger.Info($"LoadCachedProjectDataAsync: Установлен текущий проект {projectName} в XmlManager");
-                }
-                else
-                {
-                    _logger.Error("LoadCachedProjectDataAsync: Не удалось получить доступ к XmlManager");
-                    IsLoading = false;
-                    return false;
-                }
-
-                // Загружаем теги ПЛК из кэша
-                ProgressValue = 30;
-                StatusMessage = "Загрузка тегов ПЛК из кэша...";
-
-                var plcTags = await _tiaPortalService.GetPlcTagsAsync();
-                PlcTags.Clear();
-                foreach (var tag in plcTags)
-                {
-                    PlcTags.Add(tag);
-                }
-                _logger.Info($"LoadCachedProjectDataAsync: Загружено {plcTags.Count} тегов ПЛК");
-
-                // Загружаем теги DB из кэша
-                ProgressValue = 60;
-                StatusMessage = "Загрузка блоков данных из кэша...";
-
-                var dbTags = await _tiaPortalService.GetDbTagsAsync();
-                DbTags.Clear();
-                foreach (var tag in dbTags)
-                {
-                    DbTags.Add(tag);
-                }
-                _logger.Info($"LoadCachedProjectDataAsync: Загружено {dbTags.Count} блоков данных");
-
-                ProgressValue = 100;
-                StatusMessage = $"Загрузка кэшированных данных проекта {projectName} завершена";
-
-                // Устанавливаем статус подключения, хотя реального подключения к TIA Portal нет
-                IsConnected = true;
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"LoadCachedProjectDataAsync: Ошибка: {ex.Message}");
-                StatusMessage = "Ошибка при загрузке кэшированных данных";
-                return false;
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        /// <summary>
-        /// Загрузка тегов
-        /// </summary>
-        private async Task LoadTagsAsync()
-        {
-            if (!IsConnected)
-                return;
-
-            try
-            {
-                IsLoading = true;
-                StatusMessage = "Загрузка тегов...";
-                ProgressValue = 0;
-
-                // Для демонстрации просто добавляем тестовые теги
-                AvailableTags.Clear();
-
-                // Эмулируем задержку загрузки тегов
-                await Task.Delay(1000);
-
-                // Добавляем тестовые теги
-                AvailableTags.Add(new TagDefinition { Name = "Motor1_Speed", Address = "DB1.DBD0", DataType = TagDataType.Real, GroupName = "Motors" });
-                AvailableTags.Add(new TagDefinition { Name = "Motor1_Running", Address = "DB1.DBX4.0", DataType = TagDataType.Bool, GroupName = "Motors" });
-                AvailableTags.Add(new TagDefinition { Name = "Motor2_Speed", Address = "DB1.DBD8", DataType = TagDataType.Real, GroupName = "Motors" });
-                AvailableTags.Add(new TagDefinition { Name = "Motor2_Running", Address = "DB1.DBX12.0", DataType = TagDataType.Bool, GroupName = "Motors" });
-                AvailableTags.Add(new TagDefinition { Name = "Temperature", Address = "DB2.DBD0", DataType = TagDataType.Real, GroupName = "Sensors" });
-                AvailableTags.Add(new TagDefinition { Name = "Pressure", Address = "DB2.DBD4", DataType = TagDataType.Real, GroupName = "Sensors" });
-                AvailableTags.Add(new TagDefinition { Name = "Level", Address = "DB2.DBD8", DataType = TagDataType.Real, GroupName = "Sensors" });
-                AvailableTags.Add(new TagDefinition { Name = "Alarm", Address = "DB3.DBX0.0", DataType = TagDataType.Bool, GroupName = "System" });
-
-                StatusMessage = $"Загружено {AvailableTags.Count} тегов";
-                ProgressValue = 100;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при загрузке тегов: {ex.Message}");
-                StatusMessage = "Ошибка при загрузке тегов";
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        /// <summary>
-        /// Добавление тега в мониторинг
-        /// </summary>
-        public void AddTagToMonitoring(TagDefinition tag)
-        {
-            if (tag == null || MonitoredTags.Contains(tag))
-                return;
-
-            MonitoredTags.Add(tag);
-            _logger.Info($"Тег {tag.Name} добавлен в мониторинг");
-        }
-
-        /// <summary>
-        /// Удаление тега из мониторинга
-        /// </summary>
-        public void RemoveTagFromMonitoring(TagDefinition tag)
-        {
-            if (tag == null || !MonitoredTags.Contains(tag))
-                return;
-
-            MonitoredTags.Remove(tag);
-            _logger.Info($"Тег {tag.Name} удален из мониторинга");
-        }
-
-        /// <summary>
-        /// Начало мониторинга выбранных тегов
-        /// </summary>
-        public async Task StartMonitoringAsync()
-        {
-            if (!IsConnected || MonitoredTags.Count == 0)
-                return;
-
-            try
-            {
-                StatusMessage = "Запуск мониторинга...";
-                await _communicationService.StartMonitoringAsync(MonitoredTags);
-                StatusMessage = $"Мониторинг запущен для {MonitoredTags.Count} тегов";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при запуске мониторинга: {ex.Message}");
-                StatusMessage = "Ошибка при запуске мониторинга";
-            }
-        }
-
-        /// <summary>
-        /// Остановка мониторинга
-        /// </summary>
-        public async Task StopMonitoringAsync()
-        {
-            if (!IsConnected)
-                return;
-
-            try
-            {
-                StatusMessage = "Остановка мониторинга...";
-                await _communicationService.StopMonitoringAsync();
-                StatusMessage = "Мониторинг остановлен";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при остановке мониторинга: {ex.Message}");
-                StatusMessage = "Ошибка при остановке мониторинга";
-            }
-        }
-
-        /// <summary>
-        /// Получение тегов ПЛК из проекта
-        /// </summary>
-        public async Task GetPlcTagsAsync()
-        {
-            try
-            {
-                if (_tiaPortalService == null)
-                {
-                    _logger.Error("GetPlcTagsAsync: Сервис TIA Portal не инициализирован");
-                    StatusMessage = "Ошибка: сервис TIA Portal не инициализирован";
-                    return;
-                }
-
-                IsLoading = true;
-                StatusMessage = "Получение тегов ПЛК...";
-                ProgressValue = 10;
-
-                var plcTags = await _tiaPortalService.GetPlcTagsAsync();
-                ProgressValue = 90;
-
-                PlcTags.Clear();
-                foreach (var tag in plcTags)
-                {
-                    PlcTags.Add(tag);
-                }
-
-                StatusMessage = $"Получено {plcTags.Count} тегов ПЛК";
-                ProgressValue = 100;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"GetPlcTagsAsync: Ошибка: {ex.Message}");
-                StatusMessage = "Ошибка получения тегов ПЛК";
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        /// <summary>
-        /// Получение тегов блоков данных из проекта
-        /// </summary>
-        public async Task GetDbTagsAsync()
-        {
-            try
-            {
-                if (_tiaPortalService == null)
-                {
-                    _logger.Error("GetDbTagsAsync: Сервис TIA Portal не инициализирован");
-                    StatusMessage = "Ошибка: сервис TIA Portal не инициализирован";
-                    return;
-                }
-
-                IsLoading = true;
-                StatusMessage = "Получение тегов DB...";
-                ProgressValue = 10;
-
-                var dbTags = await _tiaPortalService.GetDbTagsAsync();
-                ProgressValue = 90;
-
-                DbTags.Clear();
-                foreach (var tag in dbTags)
-                {
-                    DbTags.Add(tag);
-                }
-
-                StatusMessage = $"Получено {dbTags.Count} тегов DB";
-                ProgressValue = 100;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"GetDbTagsAsync: Ошибка: {ex.Message}");
-                StatusMessage = "Ошибка получения тегов DB";
-            }
-            finally
-            {
-                IsLoading = false;
             }
         }
 
@@ -663,37 +259,6 @@ namespace SiemensTrend.ViewModels
 
                 // Подписываемся на событие выбора тега
                 TagBrowserViewModel.TagSelected += OnTagSelected;
-            }
-        }
-
-        // Добавим метод для экспорта в XML
-        public async Task ExportTagsToXml()
-        {
-            try
-            {
-                if (_tiaPortalService == null || !IsConnected)
-                {
-                    StatusMessage = "Необходимо сначала подключиться к TIA Portal";
-                    return;
-                }
-
-                IsLoading = true;
-                StatusMessage = "Экспорт тегов в XML...";
-                ProgressValue = 10;
-
-                await _tiaPortalService.ExportTagsToXml();
-
-                ProgressValue = 100;
-                StatusMessage = "Экспорт тегов в XML завершен";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"ExportTagsToXml: Ошибка: {ex.Message}");
-                StatusMessage = "Ошибка при экспорте тегов";
-            }
-            finally
-            {
-                IsLoading = false;
             }
         }
     }
