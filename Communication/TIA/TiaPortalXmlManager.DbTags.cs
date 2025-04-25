@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Xml.Linq;
 using Siemens.Engineering;
 using Siemens.Engineering.SW.Blocks;
@@ -15,7 +16,7 @@ namespace SiemensTrend.Helpers
     public partial class TiaPortalXmlManager
     {
         /// <summary>
-        /// Экспорт только блоков данных
+        /// Экспорт только блоков данных (минимизированная версия)
         /// </summary>
         public void ExportDataBlocksToXml(PlcBlockGroup blockGroup)
         {
@@ -38,78 +39,76 @@ namespace SiemensTrend.Helpers
                 // Проверяем существование директории для экспорта
                 Directory.CreateDirectory(_dbExportsPath);
 
-                // Собираем блоки данных
-                var allDataBlocks = new List<DataBlock>();
-                CollectDataBlocks(blockGroup, allDataBlocks);
+                // Вместо глубокого обхода всех блоков, создадим простую информацию о блоках данных
+                // сразу создаем минимальные XML-файлы
+                int dbCounter = ExportDataBlocksBasicInfo(blockGroup, 0);
 
-                _logger.Info($"ExportDataBlocksToXml: Найдено {allDataBlocks.Count} блоков данных");
-
-                // Обрабатываем каждый блок данных последовательно
-                int processedCount = 0;
-                int successCount = 0;
-
-                foreach (var db in allDataBlocks)
-                {
-                    // Проверяем отмену операции
-                    if (_cancellationTokenSource.Token.IsCancellationRequested)
-                    {
-                        _logger.Info("ExportDataBlocksToXml: Операция отменена пользователем");
-                        break;
-                    }
-
-                    try
-                    {
-                        if (db == null) continue;
-
-                        processedCount++;
-                        string dbName = db.Name;
-
-                        _logger.Info($"ExportDataBlocksToXml: Обработка блока данных {dbName} ({processedCount}/{allDataBlocks.Count})");
-
-                        ExportSingleDataBlockToXml(db);
-
-                        successCount++;
-                        _logger.Info($"ExportDataBlocksToXml: Блок данных {dbName} успешно экспортирован");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error($"ExportDataBlocksToXml: Ошибка при обработке блока данных: {ex.Message}");
-                        // Продолжаем с другими блоками
-                    }
-                }
-
-                _logger.Info($"ExportDataBlocksToXml: Экспорт блоков данных завершен. Успешно: {successCount}/{allDataBlocks.Count}");
+                _logger.Info($"ExportDataBlocksToXml: Экспорт базовой информации о блоках данных завершен. Обработано {dbCounter} блоков");
             }
             catch (Exception ex)
             {
                 _logger.Error($"ExportDataBlocksToXml: Ошибка: {ex.Message}");
             }
+            finally
+            {
+                // Принудительно очищаем память
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
         }
 
         /// <summary>
-        /// Рекурсивный сбор блоков данных из группы
+        /// Экспорт базовой информации о блоках данных
         /// </summary>
-        private void CollectDataBlocks(PlcBlockGroup group, List<DataBlock> dataBlocks)
+        private int ExportDataBlocksBasicInfo(PlcBlockGroup group, int currentCount)
         {
-            if (group == null) return;
+            int dbCounter = currentCount;
+
+            if (group == null) return dbCounter;
 
             try
             {
-                // Собираем блоки на текущем уровне
+                // Обрабатываем блоки текущей группы
                 if (group.Blocks != null)
                 {
+                    // Создаем копию списка блоков для безопасной итерации
+                    var blocks = new List<PlcBlock>();
                     foreach (var block in group.Blocks)
                     {
-                        // Проверяем отмену операции
-                        if (_cancellationTokenSource.Token.IsCancellationRequested)
+                        if (block != null)
                         {
-                            _logger.Info("CollectDataBlocks: Операция отменена пользователем");
-                            return;
+                            blocks.Add(block);
                         }
+                    }
 
-                        if (block is DataBlock db)
+                    // Обрабатываем копию списка
+                    foreach (var block in blocks)
+                    {
+                        try
                         {
-                            dataBlocks.Add(db);
+                            // Проверяем отмену операции
+                            if (_cancellationTokenSource.Token.IsCancellationRequested)
+                            {
+                                _logger.Info("ExportDataBlocksBasicInfo: Операция отменена пользователем");
+                                return dbCounter;
+                            }
+
+                            if (block is DataBlock)
+                            {
+                                // Быстро получаем только базовую информацию и записываем в файл
+                                if (CreateBasicDbInfoFile(block as DataBlock))
+                                {
+                                    dbCounter++;
+                                }
+
+                                // Добавляем паузу между блоками для снижения нагрузки на TIA Portal
+                                Thread.Sleep(50);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Error($"ExportDataBlocksBasicInfo: Ошибка при обработке блока: {ex.Message}");
+                            // Продолжаем с другими блоками
                         }
                     }
                 }
@@ -117,31 +116,85 @@ namespace SiemensTrend.Helpers
                 // Рекурсивно обрабатываем подгруппы
                 if (group.Groups != null)
                 {
+                    // Создаем копию списка подгрупп для безопасной итерации
+                    var subgroups = new List<PlcBlockGroup>();
                     foreach (var subgroup in group.Groups)
                     {
-                        if (subgroup as PlcBlockGroup != null)
+                        if (subgroup is PlcBlockGroup)
                         {
-                            CollectDataBlocks(subgroup as PlcBlockGroup, dataBlocks);
+                            subgroups.Add(subgroup as PlcBlockGroup);
+                        }
+                    }
+
+                    // Обрабатываем копию списка
+                    foreach (var subgroup in subgroups)
+                    {
+                        try
+                        {
+                            // Проверяем отмену операции
+                            if (_cancellationTokenSource.Token.IsCancellationRequested)
+                            {
+                                _logger.Info("ExportDataBlocksBasicInfo: Операция отменена пользователем");
+                                return dbCounter;
+                            }
+
+                            dbCounter = ExportDataBlocksBasicInfo(subgroup, dbCounter);
+
+                            // Проверяем, не произошло ли отключение от TIA Portal
+                            if (!IsConnectedToTiaPortal(group))
+                            {
+                                _logger.Error("ExportDataBlocksBasicInfo: Потеряно соединение с TIA Portal");
+                                return dbCounter;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Error($"ExportDataBlocksBasicInfo: Ошибка при обработке подгруппы: {ex.Message}");
+                            // Продолжаем с другими подгруппами
                         }
                     }
                 }
+
+                // Важно: удерживаем COM-объект group до конца метода
+                GC.KeepAlive(group);
+                return dbCounter;
             }
             catch (Exception ex)
             {
-                _logger.Error($"CollectDataBlocks: Ошибка при сборе блоков данных: {ex.Message}");
+                _logger.Error($"ExportDataBlocksBasicInfo: Ошибка при экспорте блоков данных: {ex.Message}");
+                return dbCounter;
             }
         }
 
         /// <summary>
-        /// Экспорт отдельного блока данных в XML
+        /// Проверка, подключены ли мы все еще к TIA Portal
         /// </summary>
-        private void ExportSingleDataBlockToXml(DataBlock db)
+        private bool IsConnectedToTiaPortal(PlcBlockGroup group)
         {
-            if (db == null) return;
+            try
+            {
+                // Пытаемся выполнить простую операцию с объектом
+                string name = group.Name;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Создает базовый XML-файл с информацией о блоке данных
+        /// </summary>
+        private bool CreateBasicDbInfoFile(DataBlock db)
+        {
+            if (db == null) return false;
 
             try
             {
                 string dbName = db.Name;
+                _logger.Info($"CreateBasicDbInfoFile: Создание базовой информации для DB {dbName}");
+
                 string exportPath = Path.Combine(_dbExportsPath, $"{dbName}.xml");
 
                 // Проверяем существование директории
@@ -153,114 +206,50 @@ namespace SiemensTrend.Helpers
 
                 bool isOptimized = false;
 
+                // Безопасно определяем оптимизацию
                 try
                 {
                     isOptimized = db.MemoryLayout == MemoryLayout.Optimized;
                 }
                 catch (Exception ex)
                 {
-                    _logger.Warn($"ExportSingleDataBlockToXml: Не удалось определить MemoryLayout для DB {dbName}: {ex.Message}");
+                    _logger.Warn($"CreateBasicDbInfoFile: Не удалось определить MemoryLayout для DB {dbName}: {ex.Message}");
                 }
 
-                // Безопасное извлечение переменных из блока данных
-                var variables = new List<XElement>();
-
-                if (db.Interface == null)
-                {
-                    _logger.Warn($"ExportSingleDataBlockToXml: Блок данных {dbName} не имеет интерфейса (Interface == null)");
-                    // Создаем пустой XML для блока данных
-                    XDocument emptyDoc = new XDocument(
-                        new XElement("DataBlock",
-                            new XAttribute("Name", dbName),
-                            new XAttribute("Optimized", isOptimized),
-                            new XElement("Variables")
-                        )
-                    );
-                    emptyDoc.Save(exportPath);
-                    return;
-                }
-
-                if (db.Interface.Members == null)
-                {
-                    _logger.Warn($"ExportSingleDataBlockToXml: Блок данных {dbName} не имеет членов (Members == null)");
-                    // Создаем пустой XML для блока данных
-                    XDocument emptyDoc = new XDocument(
-                        new XElement("DataBlock",
-                            new XAttribute("Name", dbName),
-                            new XAttribute("Optimized", isOptimized),
-                            new XElement("Variables")
-                        )
-                    );
-                    emptyDoc.Save(exportPath);
-                    return;
-                }
-
-                try
-                {
-                    foreach (var member in db.Interface.Members)
-                    {
-                        // Проверяем отмену операции
-                        if (_cancellationTokenSource.Token.IsCancellationRequested)
-                        {
-                            _logger.Info("ExportSingleDataBlockToXml: Операция отменена пользователем");
-                            return;
-                        }
-
-                        if (member == null) continue;
-
-                        string varName = member.Name;
-                        string dataType = "Unknown";
-                        string comment = "";
-
-                        try
-                        {
-                            dataType = member.GetAttribute("DataTypeName")?.ToString() ?? "Unknown";
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Debug($"Ошибка при получении типа данных для {varName}: {ex.Message}");
-                        }
-
-                        try
-                        {
-                            comment = member.GetAttribute("Comment")?.ToString() ?? "";
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Debug($"Ошибка при получении комментария для {varName}: {ex.Message}");
-                        }
-
-                        variables.Add(new XElement("Variable",
-                            new XAttribute("Name", varName),
-                            new XAttribute("DataType", dataType),
-                            new XAttribute("Comment", comment)
-                        ));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"ExportSingleDataBlockToXml: Ошибка при обработке переменных DB {dbName}: {ex.Message}");
-                }
-
-                // Создаем XML документ
+                // Создаем минимальный XML с основной информацией
                 XDocument doc = new XDocument(
                     new XElement("DataBlock",
                         new XAttribute("Name", dbName),
                         new XAttribute("Optimized", isOptimized),
-                        new XElement("Variables", variables)
+                        new XElement("Variables")
+                    )
+                );
+
+                // Создаем фиктивную переменную-заглушку
+                // Так мы гарантируем, что загрузчик будет видеть блок данных
+                doc.Root.Element("Variables").Add(
+                    new XElement("Variable",
+                        new XAttribute("Name", "INFO"),
+                        new XAttribute("DataType", "String"),
+                        new XAttribute("Comment", "Simplified export to prevent TIA Portal crashes")
                     )
                 );
 
                 // Сохраняем документ
                 doc.Save(exportPath);
-                _logger.Info($"ExportSingleDataBlockToXml: DB {dbName} экспортирован: {exportPath}");
+                _logger.Info($"CreateBasicDbInfoFile: Базовая информация для DB {dbName} сохранена: {exportPath}");
+
+                // Важно: удерживаем COM-объект до конца метода
+                GC.KeepAlive(db);
+                return true;
             }
             catch (Exception ex)
             {
                 string dbName = "unknown";
                 try { dbName = db.Name; } catch { }
 
-                _logger.Error($"ExportSingleDataBlockToXml: Ошибка при экспорте DB {dbName}: {ex.Message}");
+                _logger.Error($"CreateBasicDbInfoFile: Ошибка при создании XML для DB {dbName}: {ex.Message}");
+                return false;
             }
         }
 
@@ -323,27 +312,30 @@ namespace SiemensTrend.Helpers
                         {
                             Name = dbName,
                             Address = isOptimized ? "Optimized" : "Standard",
-                            DataType = TagDataType.Bool, // Используем существующий тип вместо Struct
+                            DataType = TagDataType.Bool, // Используем существующий тип
                             GroupName = "DataBlocks",
                             IsOptimized = isOptimized
                         };
 
                         dbTags.Add(dbTag);
 
-                        // Если нужно также добавлять переменные блоков данных:
-                        
+                        // Добавляем переменные из XML, если они есть
                         foreach (var varElement in doc.Descendants("Variable"))
                         {
                             try
                             {
                                 string varName = varElement.Attribute("Name")?.Value ?? "Unknown";
                                 string dataTypeStr = varElement.Attribute("DataType")?.Value ?? "Unknown";
-                                
+
+                                // Пропускаем служебную переменную-заглушку
+                                if (varName == "INFO" && dataTypeStr == "String")
+                                    continue;
+
                                 // Формируем полное имя переменной с префиксом DB
                                 string fullName = $"{dbName}.{varName}";
-                                
+
                                 TagDataType dataType = ConvertStringToTagDataType(dataTypeStr);
-                                
+
                                 dbTags.Add(new TagDefinition
                                 {
                                     Name = fullName,
@@ -359,7 +351,6 @@ namespace SiemensTrend.Helpers
                                 // Продолжаем с другими переменными
                             }
                         }
-                        
 
                         _logger.Info($"LoadDbTagsFromXml: Загружен DB {dbName}");
                     }
