@@ -1,18 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Siemens.Engineering;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Blocks.Interface;
+using Siemens.Engineering.SW.ExternalSources;
+using Siemens.Engineering.SW.Tags;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 
 namespace SiemensTrend.Communication.TIA
 {
     /// <summary>
-    /// Класс для чтения блоков данных из проекта TIA Portal
+    /// Улучшенный класс для чтения блоков данных из проекта TIA Portal
+    /// с защитой от сбоев и частичной обработкой структуры блоков
     /// </summary>
     public class TiaPortalDbTagReader : TiaPortalTagReaderBase
     {
+        // Максимальное количество блоков данных для обработки
+        private readonly int _maxDbCount = 1000;
+        // Максимальное количество членов DB для обработки в одном блоке
+        private readonly int _maxMembersPerDb = 200;
+        // Максимальная глубина иерархии блоков данных
+        private readonly int _maxHierarchyDepth = 3;
+
         /// <summary>
         /// Конструктор
         /// </summary>
@@ -28,13 +40,12 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         public override int ReadPlcTags(PlcData plcData)
         {
-            // Этот метод не используется в данном классе, 
-            // он реализован в TiaPortalPlcTagReader
+            // Этот метод не используется в данном классе
             return 0;
         }
 
         /// <summary>
-        /// Чтение блоков данных из проекта
+        /// Чтение блоков данных из проекта с защитой от сбоев
         /// </summary>
         /// <param name="plcData">Объект для сохранения тегов</param>
         /// <returns>Количество прочитанных блоков данных</returns>
@@ -45,7 +56,7 @@ namespace SiemensTrend.Communication.TIA
 
             try
             {
-                _logger.Info("Чтение блоков данных (безопасный режим)...");
+                _logger.Info("ReadDataBlocks: Начало безопасного чтения блоков данных...");
 
                 // Получаем программное обеспечение ПЛК
                 var plcSoftware = GetPlcSoftware();
@@ -54,74 +65,160 @@ namespace SiemensTrend.Communication.TIA
                     return 0;
                 }
 
-                // Получаем список всех блоков данных напрямую, без рекурсивной обработки групп
+                // Получаем список всех блоков данных без рекурсивной обработки групп
                 var allDataBlocks = new List<DataBlock>();
 
-                // Рекурсивно собираем только ссылки на блоки данных
-                CollectDataBlocks(plcSoftware.BlockGroup, allDataBlocks);
+                // Ограничиваем количество собираемых блоков данных
+                _logger.Info($"ReadDataBlocks: Начало сбора блоков данных (лимит: {_maxDbCount})...");
+                CollectDataBlocks(plcSoftware.BlockGroup, allDataBlocks, _maxDbCount);
 
-                _logger.Info($"Найдено {allDataBlocks.Count} блоков данных для обработки");
+                _logger.Info($"ReadDataBlocks: Найдено {allDataBlocks.Count} блоков данных для обработки");
 
                 // Обрабатываем каждый блок данных по отдельности с восстановлением после ошибок
+                int processedCount = 0;
                 foreach (var db in allDataBlocks)
                 {
                     try
                     {
-                        _logger.Info($"Обработка блока данных: {db.Name}");
+                        if (db == null) continue;
 
-                        // Запрашиваем свойства каждого блока данных в отдельном try-catch
-                        bool isOptimized = false;
-                        bool isUDT = false;
-                        bool isSafety = false;
+                        processedCount++;
+                        _logger.Info($"ReadDataBlocks: Обработка блока данных: {db.Name} ({processedCount}/{allDataBlocks.Count})");
 
-                        try { isOptimized = db.MemoryLayout == MemoryLayout.Optimized; }
-                        catch (Exception ex) { _logger.Debug($"Ошибка при определении оптимизации: {ex.Message}"); }
+                        // Используем таймаут для предотвращения зависаний
+                        var propertiesTask = System.Threading.Tasks.Task.Run(() => GetDbProperties(db));
+                        bool timeoutOccurred = !propertiesTask.Wait(5000); // Ждем не более 5 секунд
 
-                        try { isUDT = db.Name.Contains("UDT") || db.Name.Contains("Type"); }
-                        catch (Exception ex) { _logger.Debug($"Ошибка при определении UDT: {ex.Message}"); }
-
-                        try
+                        if (timeoutOccurred)
                         {
-                            var programmingLanguage = db.GetAttribute("ProgrammingLanguage")?.ToString();
-                            isSafety = programmingLanguage == "F_DB";
+                            _logger.Warn($"ReadDataBlocks: Таймаут при получении свойств блока данных {db.Name}");
+                            continue;
                         }
-                        catch (Exception ex) { _logger.Debug($"Ошибка при определении Safety: {ex.Message}"); }
 
-                        // Осторожно обрабатываем члены блока данных
-                        ProcessDbMembersSafe(db, plcData, isOptimized, isUDT, isSafety, ref dbTagCount);
+                        var properties = propertiesTask.Result;
+                        bool isOptimized = properties.Item1;
+                        bool isUDT = properties.Item2;
+                        bool isSafety = properties.Item3;
+
+                        // Создаем запись для самого блока данных
+                        var dbDefinition = new TagDefinition
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = db.Name,
+                            Address = isOptimized ? "Optimized" : "Standard",
+                            DataType = TagDataType.UDT,
+                            Comment = "Data Block",
+                            GroupName = "DB",
+                            IsOptimized = isOptimized,
+                            IsUDT = isUDT,
+                            IsSafety = isSafety
+                        };
+
+                        plcData.DbTags.Add(dbDefinition);
+                        dbCount++;
+
+                        // Обрабатываем члены блока данных безопасным способом
+                        int membersProcessed = ProcessDbMembersSafe(db, plcData, isOptimized, isUDT, isSafety, ref dbTagCount);
+                        _logger.Info($"ReadDataBlocks: В блоке {db.Name} обработано {membersProcessed} членов");
 
                         // Важно: удерживаем COM-объект в памяти до завершения работы с ним
                         GC.KeepAlive(db);
-
-                        dbCount++;
                     }
                     catch (Exception ex)
                     {
-                        _logger.Error($"Ошибка при обработке блока данных {db.Name}: {ex.Message}");
+                        _logger.Error($"ReadDataBlocks: Ошибка при обработке блока данных {db?.Name}: {ex.Message}");
                         // Пропускаем проблемный блок и продолжаем с другими
                     }
 
                     // Проверяем соединение после каждого блока
                     if (!CheckConnection())
                     {
+                        _logger.Error("ReadDataBlocks: Потеряно соединение с TIA Portal");
                         break;
+                    }
+
+                    // Принудительно запускаем сборщик мусора каждые 10 блоков
+                    if (processedCount % 10 == 0)
+                    {
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
                     }
                 }
 
-                _logger.Info($"Обработано {dbCount} блоков данных, найдено {dbTagCount} тегов DB");
+                _logger.Info($"ReadDataBlocks: Обработано {dbCount} блоков данных, найдено {dbTagCount} тегов DB");
             }
             catch (Exception ex)
             {
-                _logger.Error($"Ошибка при безопасном чтении блоков данных: {ex.Message}");
+                _logger.Error($"ReadDataBlocks: Ошибка при безопасном чтении блоков данных: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"ReadDataBlocks: Внутренняя ошибка: {ex.InnerException.Message}");
+                }
+            }
+            finally
+            {
+                // Очищаем память после завершения
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
             }
 
             return dbCount;
         }
 
         /// <summary>
+        /// Получение свойств блока данных безопасным способом
+        /// </summary>
+        private Tuple<bool, bool, bool> GetDbProperties(DataBlock db)
+        {
+            bool isOptimized = false;
+            bool isUDT = false;
+            bool isSafety = false;
+
+            try
+            {
+                // Пытаемся определить оптимизацию
+                try
+                {
+                    isOptimized = db.MemoryLayout == MemoryLayout.Optimized;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"GetDbProperties: Ошибка при определении оптимизации: {ex.Message}");
+                }
+
+                // Определяем UDT по имени
+                try
+                {
+                    isUDT = db.Name.Contains("UDT") || db.Name.Contains("Type");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"GetDbProperties: Ошибка при определении UDT: {ex.Message}");
+                }
+
+                // Пытаемся определить Safety
+                try
+                {
+                    var programmingLanguage = db.GetAttribute("ProgrammingLanguage")?.ToString();
+                    isSafety = programmingLanguage == "F_DB";
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"GetDbProperties: Ошибка при определении Safety: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"GetDbProperties: Общая ошибка при получении свойств блока {db?.Name}: {ex.Message}");
+            }
+
+            return new Tuple<bool, bool, bool>(isOptimized, isUDT, isSafety);
+        }
+
+        /// <summary>
         /// Рекурсивный сбор блоков данных из группы
         /// </summary>
-        private void CollectDataBlocks(PlcBlockGroup group, List<DataBlock> dataBlocks)
+        private void CollectDataBlocks(PlcBlockGroup group, List<DataBlock> dataBlocks, int maxCount)
         {
             try
             {
@@ -132,195 +229,187 @@ namespace SiemensTrend.Communication.TIA
                     return;
                 }
 
-                // Логгируем группу
-                _logger.Debug($"CollectDataBlocks: Обработка группы блоков: {group.Name}");
+                // Если достигли максимального количества блоков, прекращаем сбор
+                if (dataBlocks.Count >= maxCount)
+                {
+                    _logger.Info($"CollectDataBlocks: Достигнут лимит количества блоков данных ({maxCount})");
+                    return;
+                }
 
-                // Собираем блоки данных из текущей группы
+                // Логгируем группу
+                string groupName = "Unknown";
+                try { groupName = group.Name; } catch { }
+                _logger.Debug($"CollectDataBlocks: Обработка группы блоков: {groupName}");
+
+                // Собираем блоки данных из текущей группы с защитой от сбоев
                 try
                 {
                     // Проверка наличия доступа к Blocks
-                    if (group.Blocks == null)
+                    if (group.Blocks != null)
                     {
-                        _logger.Warn($"CollectDataBlocks: Blocks равен null в группе {group.Name}");
-                        return;
-                    }
+                        int blockCount = 0;
+                        try { blockCount = group.Blocks.Count; } catch { }
+                        _logger.Debug($"CollectDataBlocks: Количество блоков в группе {groupName}: {blockCount}");
 
-                    _logger.Debug($"CollectDataBlocks: Количество блоков в группе {group.Name}: {group.Blocks.Count}");
-
-                    foreach (var block in group.Blocks)
-                    {
-                        try
+                        // Создаем защищенную копию списка блоков
+                        var blockList = new List<PlcBlock>();
+                        foreach (var block in group.Blocks)
                         {
-                            if (block is DataBlock db)
+                            if (block != null)
                             {
-                                dataBlocks.Add(db);
-                                _logger.Debug($"CollectDataBlocks: Добавлен DB: {db.Name}");
-
-                                // Важно: удерживаем COM-объект в памяти до завершения работы с ним
-                                GC.KeepAlive(db);
+                                blockList.Add(block);
+                                if (blockList.Count >= 1000) break; // Защита от слишком большого количества блоков
                             }
                         }
-                        catch (Exception ex)
+
+                        // Проходим по копии списка
+                        foreach (var block in blockList)
                         {
-                            _logger.Error($"CollectDataBlocks: Ошибка при обработке блока: {ex.Message}");
+                            try
+                            {
+                                if (block is DataBlock db)
+                                {
+                                    dataBlocks.Add(db);
+                                    _logger.Debug($"CollectDataBlocks: Добавлен DB: {db.Name}");
+
+                                    // Если достигли максимального количества блоков, прекращаем сбор
+                                    if (dataBlocks.Count >= maxCount)
+                                    {
+                                        _logger.Info($"CollectDataBlocks: Достигнут лимит количества блоков данных ({maxCount})");
+                                        return;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.Debug($"CollectDataBlocks: Ошибка при обработке блока: {ex.Message}");
+                                // Продолжаем с другими блоками
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error($"CollectDataBlocks: Ошибка при доступе к блокам группы {group.Name}: {ex.Message}");
+                    _logger.Error($"CollectDataBlocks: Ошибка при доступе к блокам группы {groupName}: {ex.Message}");
                 }
 
                 // Рекурсивно обрабатываем подгруппы
                 try
                 {
                     // Проверка наличия доступа к Groups
-                    if (group.Groups == null)
+                    if (group.Groups != null)
                     {
-                        _logger.Warn($"CollectDataBlocks: Groups равен null в группе {group.Name}");
-                        return;
-                    }
+                        int groupCount = 0;
+                        try { groupCount = group.Groups.Count; } catch { }
+                        _logger.Debug($"CollectDataBlocks: Количество подгрупп в группе {groupName}: {groupCount}");
 
-                    _logger.Debug($"CollectDataBlocks: Количество подгрупп в группе {group.Name}: {group.Groups.Count}");
-
-                    foreach (var subgroup in group.Groups)
-                    {
-                        try
+                        // Создаем защищенную копию списка подгрупп
+                        var subgroupList = new List<PlcBlockGroup>();
+                        foreach (var subgroup in group.Groups)
                         {
-                            CollectDataBlocks(subgroup as PlcBlockGroup, dataBlocks);
+                            if (subgroup is PlcBlockGroup pbg)
+                            {
+                                subgroupList.Add(pbg);
+                                if (subgroupList.Count >= 100) break; // Защита от слишком большого количества подгрупп
+                            }
                         }
-                        catch (Exception ex)
+
+                        // Проходим по копии списка
+                        foreach (var subgroup in subgroupList)
                         {
-                            _logger.Debug($"CollectDataBlocks: Пропуск подгруппы из-за ошибки: {ex.Message}");
+                            try
+                            {
+                                CollectDataBlocks(subgroup, dataBlocks, maxCount);
+
+                                // Если достигли максимального количества блоков, прекращаем сбор
+                                if (dataBlocks.Count >= maxCount)
+                                {
+                                    return;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.Debug($"CollectDataBlocks: Ошибка при обработке подгруппы: {ex.Message}");
+                                // Продолжаем с другими подгруппами
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error($"CollectDataBlocks: Ошибка при доступе к подгруппам группы {group.Name}: {ex.Message}");
+                    _logger.Error($"CollectDataBlocks: Ошибка при доступе к подгруппам группы {groupName}: {ex.Message}");
                 }
+
+                // Важно: удерживаем COM-объект в памяти до завершения работы с ним
+                GC.KeepAlive(group);
             }
             catch (Exception ex)
             {
-                _logger.Error($"CollectDataBlocks: Ошибка при сборе блоков данных: {ex.Message}");
+                _logger.Error($"CollectDataBlocks: Общая ошибка при сборе блоков данных: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Обработка членов блока данных
+        /// Обработка членов блока данных с ограничением по количеству и глубине
         /// </summary>
-        private void ProcessDbMembersSafe(DataBlock db, PlcData plcData, bool isOptimized, bool isUDT, bool isSafety, ref int tagCount)
+        private int ProcessDbMembersSafe(DataBlock db, PlcData plcData, bool isOptimized, bool isUDT, bool isSafety, ref int tagCount)
         {
+            int processedMembers = 0;
+
             try
             {
                 // Проверка аргументов
                 if (db == null)
                 {
                     _logger.Warn("ProcessDbMembersSafe: db не может быть null");
-                    return;
+                    return 0;
                 }
 
-                // Безопасная обработка интерфейса блока данных
+                string dbName = "Unknown";
+                try { dbName = db.Name; } catch { }
+
+                // Безопасно получаем интерфейс блока данных
                 if (db.Interface == null)
                 {
-                    _logger.Warn($"ProcessDbMembersSafe: Блок данных {db.Name} не имеет интерфейса");
-                    return;
+                    _logger.Warn($"ProcessDbMembersSafe: Блок данных {dbName} не имеет интерфейса");
+                    return 0;
                 }
 
-                // Ограничиваем глубину обработки для снижения вероятности ошибок
-                ExtractFlattenedDbTags(db, plcData, isOptimized, isUDT, isSafety, ref tagCount);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"ProcessDbMembersSafe: Ошибка при обработке членов блока данных {db?.Name}: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Извлечение тегов DB
-        /// </summary>
-        private void ExtractFlattenedDbTags(DataBlock db, PlcData plcData, bool isOptimized, bool isUDT, bool isSafety, ref int tagCount)
-        {
-            try
-            {
-                // Проверяем, что интерфейс и члены доступны
-                var members = db.Interface.Members;
-                if (members == null || members.Count == 0)
+                // Проверяем наличие членов
+                if (db.Interface.Members == null)
                 {
-                    _logger.Warn($"ExtractFlattenedDbTags: Интерфейс блока данных {db.Name} не содержит членов");
-                    return;
+                    _logger.Warn($"ProcessDbMembersSafe: Интерфейс блока данных {dbName} не имеет членов");
+                    return 0;
                 }
 
-                // Перебираем каждый член
-                foreach (var member in members)
+                int memberCount = 0;
+                try { memberCount = db.Interface.Members.Count; } catch { }
+                _logger.Info($"ProcessDbMembersSafe: В блоке {dbName} найдено {memberCount} членов");
+
+                // Ограничиваем количество обрабатываемых членов
+                var membersTasks = new List<System.Threading.Tasks.Task>();
+                var membersList = new List<Member>();
+
+                // Создаем защищенную копию списка членов
+                foreach (var member in db.Interface.Members)
+                {
+                    if (member != null)
+                    {
+                        membersList.Add(member);
+                        if (membersList.Count >= _maxMembersPerDb) break; // Защита от слишком большого количества членов
+                    }
+                }
+
+                // Обрабатываем каждый член параллельно
+                foreach (var member in membersList)
                 {
                     try
                     {
-                        if (member == null) continue;
-
-                        // Получаем имя члена
-                        string name = member.Name;
-
-                        // Определяем тип данных
-                        string dataTypeString = "Unknown";
-                        try
-                        {
-                            // Пробуем получить тип через свойство или аттрибут
-                            var dataTypeObj = member.GetAttribute("DataTypeName");
-                            dataTypeString = dataTypeObj?.ToString() ?? "Unknown";
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Debug($"ExtractFlattenedDbTags: Ошибка при получении типа данных для {name}: {ex.Message}");
-                        }
-
-                        // Формируем полное имя тега с префиксом блока данных
-                        string fullName = $"{db.Name}.{name}";
-
-                        // Конвертируем строковый тип данных в TagDataType
-                        TagDataType dataType = TiaTagTypeUtility.ConvertToTagDataType(dataTypeString);
-
-                        // Проверяем, поддерживается ли тип данных
-                        if (!TiaTagTypeUtility.IsSupportedTagType(dataType))
-                        {
-                            _logger.Debug($"ExtractFlattenedDbTags: Пропущен тег DB {fullName} с неподдерживаемым типом данных {dataTypeString}");
-                            continue;
-                        }
-
-                        // Получаем комментарий
-                        string comment = "";
-                        try
-                        {
-                            var commentObj = member.GetAttribute("Comment");
-                            comment = commentObj?.ToString() ?? "";
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Debug($"ExtractFlattenedDbTags: Ошибка при получении комментария для {name}: {ex.Message}");
-                        }
-
-                        // Создаем и добавляем тег в плакдату
-                        plcData.DbTags.Add(new TagDefinition
-                        {
-                            Name = fullName,
-                            Address = isOptimized ? "Optimized" : "Standard",
-                            DataType = dataType,
-                            Comment = comment,
-                            GroupName = db.Name,
-                            IsOptimized = isOptimized,
-                            IsUDT = isUDT,
-                            IsSafety = isSafety
-                        });
-
-                        tagCount++;
-                        _logger.Debug($"ExtractFlattenedDbTags: Добавлен тег DB: {fullName} ({dataTypeString})");
-
-                        // Важно: удерживаем COM-объект в памяти до завершения работы с ним
-                        GC.KeepAlive(member);
+                        ProcessDbMember(member, dbName, plcData, isOptimized, isUDT, isSafety, 0, ref processedMembers, ref tagCount);
                     }
                     catch (Exception ex)
                     {
-                        _logger.Debug($"ExtractFlattenedDbTags: Ошибка при обработке члена: {ex.Message}");
+                        _logger.Error($"ProcessDbMembersSafe: Ошибка при обработке члена блока данных: {ex.Message}");
                         // Продолжаем с другими членами
                     }
                 }
@@ -328,11 +417,127 @@ namespace SiemensTrend.Communication.TIA
                 // Важно: удерживаем COM-объект в памяти до завершения работы с ним
                 GC.KeepAlive(db);
                 GC.KeepAlive(db.Interface);
-                GC.KeepAlive(members);
+                GC.KeepAlive(db.Interface.Members);
             }
             catch (Exception ex)
             {
-                _logger.Error($"ExtractFlattenedDbTags: Ошибка при извлечении тегов DB: {ex.Message}");
+                _logger.Error($"ProcessDbMembersSafe: Общая ошибка при обработке членов блока данных: {ex.Message}");
+            }
+
+            return processedMembers;
+        }
+
+        /// <summary>
+        /// Обработка отдельного члена блока данных с ограничением глубины
+        /// </summary>
+        private void ProcessDbMember(Member member, string dbName, PlcData plcData, bool isOptimized,
+                                     bool isUDT, bool isSafety, int depth, ref int processedMembers, ref int tagCount)
+        {
+            try
+            {
+                if (member == null) return;
+                if (depth >= _maxHierarchyDepth) return; // Ограничение глубины иерархии
+
+                string memberName = "Unknown";
+                try { memberName = member.Name; } catch { }
+
+                // Получаем имя члена
+                _logger.Debug($"ProcessDbMember: Обработка члена {memberName} в блоке {dbName}");
+
+                // Определяем тип данных
+                string dataTypeString = "Unknown";
+                try
+                {
+                    // Пробуем получить тип через свойство или аттрибут
+                    var dataTypeObj = member.GetAttribute("DataTypeName");
+                    dataTypeString = dataTypeObj?.ToString() ?? "Unknown";
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"ProcessDbMember: Ошибка при получении типа данных для {memberName}: {ex.Message}");
+                }
+
+                // Формируем полное имя тега с префиксом блока данных
+                string fullName = $"{dbName}.{memberName}";
+
+                // Конвертируем строковый тип данных в TagDataType
+                TagDataType dataType = TiaTagTypeUtility.ConvertToTagDataType(dataTypeString);
+
+                // Получаем комментарий
+                string comment = "";
+                try
+                {
+                    var commentObj = member.GetAttribute("Comment");
+                    comment = commentObj?.ToString() ?? "";
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"ProcessDbMember: Ошибка при получении комментария для {memberName}: {ex.Message}");
+                }
+
+                // Проверяем, поддерживается ли тип данных
+                bool isSupported = TiaTagTypeUtility.IsSupportedTagType(dataType);
+
+                // Создаем и добавляем тег в коллекцию, если тип поддерживается или это структура
+                if (isSupported || dataType == TagDataType.UDT)
+                {
+                    var tagDefinition = new TagDefinition
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = fullName,
+                        Address = isOptimized ? "Optimized" : "Standard",
+                        DataType = dataType,
+                        Comment = comment,
+                        GroupName = dbName,
+                        IsOptimized = isOptimized,
+                        IsUDT = isUDT || dataType == TagDataType.UDT,
+                        IsSafety = isSafety
+                    };
+
+                    plcData.DbTags.Add(tagDefinition);
+                    tagCount++;
+                    processedMembers++;
+                    _logger.Debug($"ProcessDbMember: Добавлен тег DB: {fullName} ({dataTypeString})");
+                }
+
+                // Если член имеет подчлены и не превышен лимит глубины, обрабатываем их
+                try
+                {
+                    if (member.Members != null && member.Members.Count > 0 && depth < _maxHierarchyDepth)
+                    {
+                        _logger.Debug($"ProcessDbMember: Член {memberName} имеет {member.Members.Count} подчленов");
+
+                        // Создаем защищенную копию списка подчленов
+                        var submembersList = new List<Member>();
+                        foreach (var submember in member.Members)
+                        {
+                            if (submember != null)
+                            {
+                                submembersList.Add(submember);
+                                if (submembersList.Count >= 50) break; // Ограничение количества подчленов
+                            }
+                        }
+
+                        // Обрабатываем каждый подчлен
+                        foreach (var submember in submembersList)
+                        {
+                            // Рекурсивно обрабатываем подчлен с увеличением глубины
+                            ProcessDbMember(submember, dbName, plcData, isOptimized,
+                                           isUDT, isSafety, depth + 1, ref processedMembers, ref tagCount);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"ProcessDbMember: Ошибка при обработке подчленов {memberName}: {ex.Message}");
+                }
+
+                // Важно: удерживаем COM-объект в памяти до завершения работы с ним
+                GC.KeepAlive(member);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ProcessDbMember: Ошибка при обработке члена {member?.Name}: {ex.Message}");
             }
         }
     }
