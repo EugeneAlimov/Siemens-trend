@@ -181,7 +181,6 @@ namespace SiemensTrend.Communication.TIA
                 _logger.Error($"ExportTagsToXmlEnhanced: Ошибка при экспорте {tagType} тегов: {ex.Message}");
             }
         }
-
         /// <summary>
         /// Экспорт всех типов тегов из PlcSoftware с улучшенным подходом
         /// </summary>
@@ -211,7 +210,6 @@ namespace SiemensTrend.Communication.TIA
                 throw; // Пробрасываем исключение для обработки в вызывающем методе
             }
         }
-        
         /// <summary>
         /// Проверка наличия кэшированных данных для проекта
         /// </summary>
@@ -260,6 +258,59 @@ namespace SiemensTrend.Communication.TIA
             {
                 _logger.Error($"ClearDbTagsCache: Ошибка при очистке кэша: {ex.Message}");
                 return false;
+            }
+        }
+
+        public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
+        {
+            if (!IsConnected || _project == null)
+            {
+                _logger.Error("ExportTagsToXml: Нет подключения к TIA Portal");
+                return;
+            }
+
+            var plcSoftware = GetPlcSoftware();
+            if (plcSoftware == null)
+            {
+                _logger.Error("ExportTagsToXml: Не удалось получить PlcSoftware");
+                return;
+            }
+
+            // Сначала проверяем, настроен ли XML-менеджер для текущего проекта
+            if (_project != null && !string.IsNullOrEmpty(_project.Name))
+            {
+                SetCurrentProjectInXmlManager();
+            }
+
+            // Экспортируем в зависимости от типа
+            try
+            {
+                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов начат");
+
+                switch (tagType)
+                {
+                    case ExportTagType.All:
+                        // Экспортируем все типы тегов
+                        await ExportAllTagsToXmlEnhanced(plcSoftware);
+                        break;
+                    case ExportTagType.PlcTags:
+                        // Только теги ПЛК
+                        _xmlManager.ExportTagTablesToXml(plcSoftware.TagTableGroup);
+                        break;
+                    case ExportTagType.DbTags:
+                        // Только теги DB - используем улучшенный метод вместо обычного
+                        _xmlManager.ExportEnhancedDataBlocksToXml(plcSoftware.BlockGroup);
+                        break;
+                    default:
+                        _logger.Warn($"ExportTagsToXml: Неизвестный тип тегов: {tagType}");
+                        break;
+                }
+
+                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов завершен");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ExportTagsToXml: Ошибка при экспорте {tagType} тегов: {ex.Message}");
             }
         }
     }

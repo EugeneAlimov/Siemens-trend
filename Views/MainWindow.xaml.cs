@@ -41,13 +41,12 @@ namespace SiemensTrend.Views
             // Устанавливаем DataContext для TagBrowserView
             tagBrowser.DataContext = _viewModel.TagBrowserViewModel;
 
-            // Инициализируем улучшенные UI компоненты
+            // Добавьте следующую строку для инициализации улучшенных UI-элементов
             InitializeUI();
 
             // Инициализируем начальное состояние
             UpdateConnectionState();
         }
-
         private void InitializeUI()
         {
             try

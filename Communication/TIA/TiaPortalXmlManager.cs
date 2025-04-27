@@ -92,93 +92,6 @@ namespace SiemensTrend.Helpers
         }
 
         /// <summary>
-        /// Экспорт тегов в XML с возможностью выбора типа тегов
-        /// </summary>
-        public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
-        {
-            if (!IsConnected || _project == null)
-            {
-                _logger.Error("ExportTagsToXml: Нет подключения к TIA Portal");
-                return;
-            }
-
-            var plcSoftware = GetPlcSoftware();
-            if (plcSoftware == null)
-            {
-                _logger.Error("ExportTagsToXml: Не удалось получить PlcSoftware");
-                return;
-            }
-
-            // Сбрасываем токен отмены для новой операции
-            _xmlManager.ResetCancellationToken();
-
-            // Экспортируем в зависимости от типа
-            try
-            {
-                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов начат");
-
-                switch (tagType)
-                {
-                    case ExportTagType.All:
-                        // Экспортируем все типы тегов с использованием улучшенного подхода
-                        await ExportTagsToXmlEnhanced(tagType);
-                        break;
-                    case ExportTagType.PlcTags:
-                        // Только теги ПЛК - стандартный метод
-                        _xmlManager.ExportTagTablesToXml(plcSoftware.TagTableGroup);
-                        break;
-                    case ExportTagType.DbTags:
-                        // Только теги DB - улучшенный метод
-                        _xmlManager.ExportEnhancedDataBlocksToXml(plcSoftware.BlockGroup);
-                        break;
-                    default:
-                        _logger.Warn($"ExportTagsToXml: Неизвестный тип тегов: {tagType}");
-                        break;
-                }
-
-                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов завершен");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"ExportTagsToXml: Ошибка при экспорте {tagType} тегов: {ex.Message}");
-            }
-        }
-        /// <summary>
-        /// Внутренний метод для экспорта всех тегов
-        /// </summary>
-        private async Task ExportTagsToXmlInternal(Siemens.Engineering.SW.PlcSoftware plcSoftware)
-        {
-            _logger.Info("ExportTagsToXmlInternal: Начало экспорта тегов в XML");
-
-            try
-            {
-                // Экспорт таблиц тегов
-                ExportTagTablesToXml(plcSoftware.TagTableGroup);
-
-                // Проверяем отмену операции
-                _cancellationTokenSource.Token.ThrowIfCancellationRequested();
-
-                // Экспорт блоков данных
-                ExportDataBlocksToXml(plcSoftware.BlockGroup);
-
-                // Ждем небольшую паузу для завершения операций
-                await Task.Delay(100, _cancellationTokenSource.Token);
-
-                _logger.Info("ExportTagsToXmlInternal: Экспорт завершен успешно");
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.Info("ExportTagsToXmlInternal: Операция была отменена");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"ExportTagsToXmlInternal: Ошибка при экспорте: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
         /// Сброс токена отмены для новой операции
         /// </summary>
         public void ResetCancellationToken()
@@ -223,9 +136,5 @@ namespace SiemensTrend.Helpers
                 _logger.Error($"CancelAllExportOperations: Ошибка: {ex.Message}");
             }
         }
-
-        /// <summary>
-        /// Сброс токена отмены для новой операции
-        /// </summary>
     }
 }

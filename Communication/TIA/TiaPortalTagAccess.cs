@@ -13,62 +13,6 @@ namespace SiemensTrend.Communication.TIA
     public partial class TiaPortalCommunicationService
     {
         /// <summary>
-        /// Экспорт тегов в XML
-        /// </summary>
-        public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
-        {
-            if (!IsConnected || _project == null)
-            {
-                _logger.Error("ExportTagsToXml: Нет подключения к TIA Portal");
-                return;
-            }
-
-            var plcSoftware = GetPlcSoftware();
-            if (plcSoftware == null)
-            {
-                _logger.Error("ExportTagsToXml: Не удалось получить PlcSoftware");
-                return;
-            }
-
-            // Сначала проверяем, настроен ли XML-менеджер для текущего проекта
-            if (_project != null && !string.IsNullOrEmpty(_project.Name))
-            {
-                SetCurrentProjectInXmlManager();
-            }
-
-            // Экспортируем в зависимости от типа
-            try
-            {
-                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов начат");
-
-                switch (tagType)
-                {
-                    case ExportTagType.All:
-                        // Экспортируем все типы тегов
-                        await ExportAllTagsToXml(plcSoftware);
-                        break;
-                    case ExportTagType.PlcTags:
-                        // Только теги ПЛК
-                        _xmlManager.ExportTagTablesToXml(plcSoftware.TagTableGroup);
-                        break;
-                    case ExportTagType.DbTags:
-                        // Только теги DB
-                        _xmlManager.ExportDataBlocksToXml(plcSoftware.BlockGroup);
-                        break;
-                    default:
-                        _logger.Warn($"ExportTagsToXml: Неизвестный тип тегов: {tagType}");
-                        break;
-                }
-
-                _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов завершен");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"ExportTagsToXml: Ошибка при экспорте {tagType} тегов: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// Экспорт всех типов тегов из PlcSoftware
         /// </summary>
         private async Task ExportAllTagsToXml(PlcSoftware plcSoftware)
