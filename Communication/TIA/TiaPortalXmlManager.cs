@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Communication.TIA;
 using static SiemensTrend.Communication.TIA.TiaPortalCommunicationService;
+using Siemens.Engineering;
 
 namespace SiemensTrend.Helpers
 {
@@ -95,19 +96,13 @@ namespace SiemensTrend.Helpers
         /// </summary>
         public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
         {
-            if (_tiaService == null)
-            {
-                _logger.Error("ExportTagsToXml: TiaPortalCommunicationService не установлен");
-                return;
-            }
-
-            if (!_tiaService.IsConnected)
+            if (!IsConnected || _project == null)
             {
                 _logger.Error("ExportTagsToXml: Нет подключения к TIA Portal");
                 return;
             }
 
-            var plcSoftware = _tiaService.GetPlcSoftware();
+            var plcSoftware = GetPlcSoftware();
             if (plcSoftware == null)
             {
                 _logger.Error("ExportTagsToXml: Не удалось получить PlcSoftware");
@@ -115,7 +110,7 @@ namespace SiemensTrend.Helpers
             }
 
             // Сбрасываем токен отмены для новой операции
-            ResetCancellationToken();
+            _xmlManager.ResetCancellationToken();
 
             // Экспортируем в зависимости от типа
             try
@@ -125,16 +120,16 @@ namespace SiemensTrend.Helpers
                 switch (tagType)
                 {
                     case ExportTagType.All:
-                        // Экспортируем все типы тегов
-                        await ExportTagsToXmlInternal(plcSoftware);
+                        // Экспортируем все типы тегов с использованием улучшенного подхода
+                        await ExportTagsToXmlEnhanced(tagType);
                         break;
                     case ExportTagType.PlcTags:
-                        // Только теги ПЛК
-                        ExportTagTablesToXml(plcSoftware.TagTableGroup);
+                        // Только теги ПЛК - стандартный метод
+                        _xmlManager.ExportTagTablesToXml(plcSoftware.TagTableGroup);
                         break;
                     case ExportTagType.DbTags:
-                        // Только теги DB
-                        ExportDataBlocksToXml(plcSoftware.BlockGroup);
+                        // Только теги DB - улучшенный метод
+                        _xmlManager.ExportEnhancedDataBlocksToXml(plcSoftware.BlockGroup);
                         break;
                     default:
                         _logger.Warn($"ExportTagsToXml: Неизвестный тип тегов: {tagType}");
@@ -143,16 +138,11 @@ namespace SiemensTrend.Helpers
 
                 _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов завершен");
             }
-            catch (OperationCanceledException)
-            {
-                _logger.Info("ExportTagsToXml: Операция была отменена");
-            }
             catch (Exception ex)
             {
                 _logger.Error($"ExportTagsToXml: Ошибка при экспорте {tagType} тегов: {ex.Message}");
             }
         }
-
         /// <summary>
         /// Внутренний метод для экспорта всех тегов
         /// </summary>
@@ -191,7 +181,7 @@ namespace SiemensTrend.Helpers
         /// <summary>
         /// Сброс токена отмены для новой операции
         /// </summary>
-        private void ResetCancellationToken()
+        public void ResetCancellationToken()
         {
             try
             {
@@ -207,7 +197,6 @@ namespace SiemensTrend.Helpers
                 _cancellationTokenSource = new CancellationTokenSource();
             }
         }
-
         /// <summary>
         /// Аварийное прерывание всех активных операций экспорта
         /// </summary>
@@ -232,6 +221,26 @@ namespace SiemensTrend.Helpers
             catch (Exception ex)
             {
                 _logger.Error($"CancelAllExportOperations: Ошибка: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Сброс токена отмены для новой операции
+        /// </summary>
+        public void ResetCancellationToken()
+        {
+            try
+            {
+                if (_cancellationTokenSource != null)
+                {
+                    _cancellationTokenSource.Dispose();
+                }
+                _cancellationTokenSource = new CancellationTokenSource();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ResetCancellationToken: Ошибка: {ex.Message}");
+                _cancellationTokenSource = new CancellationTokenSource();
             }
         }
     }

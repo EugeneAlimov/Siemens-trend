@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Models;
 
 namespace SiemensTrend.ViewModels
@@ -137,7 +138,9 @@ namespace SiemensTrend.ViewModels
                 StatusMessage = "Получение тегов DB...";
                 ProgressValue = 10;
 
-                var dbTags = await _tiaPortalService.GetDbTagsAsync();
+                // Используем улучшенный безопасный метод вместо обычного
+                var dbTags = await _tiaPortalService.GetDbTagsSafeAsync(
+                    TiaPortalTagReaderFactory.ReaderMode.SafeMode);
                 ProgressValue = 90;
 
                 DbTags.Clear();

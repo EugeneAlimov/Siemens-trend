@@ -28,6 +28,8 @@ namespace SiemensTrend.Views
         {
             InitializeComponent();
 
+
+
             // Создаем логер
             _logger = new Logger();
 
@@ -43,6 +45,27 @@ namespace SiemensTrend.Views
 
             // Инициализируем начальное состояние
             UpdateConnectionState();
+        }
+
+        private void InitializeUI()
+        {
+            try
+            {
+                // Инициализируем улучшенные элементы для работы с тегами DB
+                InitializeEnhancedTagReading();
+
+                // Переопределяем метод получения тегов DB на улучшенный
+                OverrideGetDbTagsButton();
+
+                // Добавляем кнопку для экспорта с улучшенным подходом
+                AddEnhancedExportButton();
+
+                _logger.Info("MainWindow: UI инициализирован с улучшенными элементами для работы с DB");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"InitializeUI: Ошибка при инициализации улучшенных элементов UI: {ex.Message}");
+            }
         }
 
         /// <summary>

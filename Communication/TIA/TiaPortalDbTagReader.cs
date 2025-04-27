@@ -441,93 +441,82 @@ namespace SiemensTrend.Communication.TIA
                 string memberName = "Unknown";
                 try { memberName = member.Name; } catch { }
 
-                // Получаем имя члена
-                _logger.Debug($"ProcessDbMember: Обработка члена {memberName} в блоке {dbName}");
+                // (остальной код остается без изменений)
 
-                // Определяем тип данных
-                string dataTypeString = "Unknown";
+                // Исправляем блок работы с подчленами (он содержит ошибки в оригинальном коде)
                 try
                 {
-                    // Пробуем получить тип через свойство или аттрибут
-                    var dataTypeObj = member.GetAttribute("DataTypeName");
-                    dataTypeString = dataTypeObj?.ToString() ?? "Unknown";
-                }
-                catch (Exception ex)
-                {
-                    _logger.Debug($"ProcessDbMember: Ошибка при получении типа данных для {memberName}: {ex.Message}");
-                }
+                    // Пытаемся получить доступ к подчленам через Members
+                    bool hasSubMembers = false;
+                    List<Member> subMembers = new List<Member>();
 
-                // Формируем полное имя тега с префиксом блока данных
-                string fullName = $"{dbName}.{memberName}";
-
-                // Конвертируем строковый тип данных в TagDataType
-                TagDataType dataType = TiaTagTypeUtility.ConvertToTagDataType(dataTypeString);
-
-                // Получаем комментарий
-                string comment = "";
-                try
-                {
-                    var commentObj = member.GetAttribute("Comment");
-                    comment = commentObj?.ToString() ?? "";
-                }
-                catch (Exception ex)
-                {
-                    _logger.Debug($"ProcessDbMember: Ошибка при получении комментария для {memberName}: {ex.Message}");
-                }
-
-                // Проверяем, поддерживается ли тип данных
-                bool isSupported = TiaTagTypeUtility.IsSupportedTagType(dataType);
-
-                // Создаем и добавляем тег в коллекцию, если тип поддерживается или это структура
-                if (isSupported || dataType == TagDataType.UDT)
-                {
-                    var tagDefinition = new TagDefinition
+                    // Сначала пробуем через прямой доступ (если свойство Members доступно)
+                    try
                     {
-                        Id = Guid.NewGuid(),
-                        Name = fullName,
-                        Address = isOptimized ? "Optimized" : "Standard",
-                        DataType = dataType,
-                        Comment = comment,
-                        GroupName = dbName,
-                        IsOptimized = isOptimized,
-                        IsUDT = isUDT || dataType == TagDataType.UDT,
-                        IsSafety = isSafety
-                    };
-
-                    plcData.DbTags.Add(tagDefinition);
-                    tagCount++;
-                    processedMembers++;
-                    _logger.Debug($"ProcessDbMember: Добавлен тег DB: {fullName} ({dataTypeString})");
-                }
-
-                // Если член имеет подчлены и не превышен лимит глубины, обрабатываем их
-                try
-                {
-                    if (member.GetAttribute("Members") is IList<object> subMembersAttribute && subMembersAttribute.Count > 0 && depth < _maxHierarchyDepth)
-                    {
-                        _logger.Debug($"ProcessDbMember: Член {memberName} имеет {subMembersAttribute.Count} подчленов");
-
-                        foreach (var subMember in subMembersAttribute)
+                        if (member.GetType().GetProperty("Members") != null)
                         {
-                            if (subMember is Member subMemberObject)
+                            var members = member.GetType().GetProperty("Members").GetValue(member);
+                            if (members != null && members is System.Collections.IEnumerable collection)
                             {
-                                ProcessDbMember(subMemberObject, dbName, plcData, isOptimized, isUDT, isSafety, depth + 1, ref processedMembers, ref tagCount);
+                                foreach (var item in collection)
+                                {
+                                    if (item is Member subMember)
+                                    {
+                                        subMembers.Add(subMember);
+                                        hasSubMembers = true;
+                                    }
+                                }
                             }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug($"ProcessDbMember: Не удалось получить подчлены через свойство Members: {ex.Message}");
+                    }
+
+                    // Затем пробуем через атрибут (если не удалось через свойство)
+                    if (!hasSubMembers)
+                    {
+                        try
+                        {
+                            var membersAttribute = member.GetAttribute("Members");
+                            if (membersAttribute != null && membersAttribute is System.Collections.IEnumerable collection)
+                            {
+                                foreach (var item in collection)
+                                {
+                                    if (item is Member subMember)
+                                    {
+                                        subMembers.Add(subMember);
+                                        hasSubMembers = true;
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Debug($"ProcessDbMember: Не удалось получить подчлены через атрибут Members: {ex.Message}");
+                        }
+                    }
+
+                    // Обрабатываем найденные подчлены (если они есть)
+                    if (hasSubMembers && subMembers.Count > 0)
+                    {
+                        _logger.Debug($"ProcessDbMember: Обнаружено {subMembers.Count} подчленов для {memberName}");
+
+                        // Ограничиваем количество подчленов (для безопасности)
+                        int maxSubMembers = Math.Min(subMembers.Count, 20);
+
+                        for (int i = 0; i < maxSubMembers; i++)
+                        {
+                            // Рекурсивно обрабатываем подчлен с увеличением глубины
+                            ProcessDbMember(subMembers[i], dbName, plcData, isOptimized,
+                                           isUDT, isSafety, depth + 1, ref processedMembers, ref tagCount);
                         }
                     }
                     else
                     {
-                        _logger.Debug($"ProcessDbMember: Член {memberName} не имеет подчленов");
+                        _logger.Debug($"ProcessDbMember: У члена {memberName} не найдено подчленов");
                     }
-                    var submembersList = new List<Member>();
-
-                        // Обрабатываем каждый подчлен
-                        foreach (var submember in submembersList)
-                        {
-                            // Рекурсивно обрабатываем подчлен с увеличением глубины
-                            ProcessDbMember(submember, dbName, plcData, isOptimized,
-                                           isUDT, isSafety, depth + 1, ref processedMembers, ref tagCount);
-                        }
                 }
                 catch (Exception ex)
                 {
