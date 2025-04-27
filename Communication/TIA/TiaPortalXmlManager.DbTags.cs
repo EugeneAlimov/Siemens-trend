@@ -256,119 +256,119 @@ namespace SiemensTrend.Helpers
         /// <summary>
         /// Загрузка блоков данных из XML-файлов
         /// </summary>
-        public List<TagDefinition> LoadDbTagsFromXml()
-        {
-            if (string.IsNullOrEmpty(_currentProjectName))
-            {
-                _logger.Error("LoadDbTagsFromXml: Не установлен текущий проект");
-                return new List<TagDefinition>();
-            }
+        //public List<TagDefinition> LoadDbTagsFromXml()
+        //{
+        //    if (string.IsNullOrEmpty(_currentProjectName))
+        //    {
+        //        _logger.Error("LoadDbTagsFromXml: Не установлен текущий проект");
+        //        return new List<TagDefinition>();
+        //    }
 
-            var dbTags = new List<TagDefinition>();
+        //    var dbTags = new List<TagDefinition>();
 
-            try
-            {
-                if (!Directory.Exists(_dbExportsPath))
-                {
-                    _logger.Error($"LoadDbTagsFromXml: Директория {_dbExportsPath} не найдена");
-                    return dbTags;
-                }
+        //    try
+        //    {
+        //        if (!Directory.Exists(_dbExportsPath))
+        //        {
+        //            _logger.Error($"LoadDbTagsFromXml: Директория {_dbExportsPath} не найдена");
+        //            return dbTags;
+        //        }
 
-                string[] xmlFiles = Directory.GetFiles(_dbExportsPath, "*.xml", SearchOption.TopDirectoryOnly);
-                _logger.Info($"LoadDbTagsFromXml: Найдено {xmlFiles.Length} XML-файлов с DB");
+        //        string[] xmlFiles = Directory.GetFiles(_dbExportsPath, "*.xml", SearchOption.TopDirectoryOnly);
+        //        _logger.Info($"LoadDbTagsFromXml: Найдено {xmlFiles.Length} XML-файлов с DB");
 
-                foreach (string file in xmlFiles)
-                {
-                    if (!File.Exists(file))
-                    {
-                        _logger.Warn($"LoadDbTagsFromXml: Файл {file} не существует");
-                        continue;
-                    }
+        //        foreach (string file in xmlFiles)
+        //        {
+        //            if (!File.Exists(file))
+        //            {
+        //                _logger.Warn($"LoadDbTagsFromXml: Файл {file} не существует");
+        //                continue;
+        //            }
 
-                    try
-                    {
-                        XDocument doc = XDocument.Load(file);
+        //            try
+        //            {
+        //                XDocument doc = XDocument.Load(file);
 
-                        if (doc.Root == null)
-                        {
-                            _logger.Warn($"LoadDbTagsFromXml: Файл {file} имеет некорректную структуру XML (Root = null)");
-                            continue;
-                        }
+        //                if (doc.Root == null)
+        //                {
+        //                    _logger.Warn($"LoadDbTagsFromXml: Файл {file} имеет некорректную структуру XML (Root = null)");
+        //                    continue;
+        //                }
 
-                        string dbName = doc.Root.Attribute("Name")?.Value ?? Path.GetFileNameWithoutExtension(file);
-                        bool isOptimized = false;
+        //                string dbName = doc.Root.Attribute("Name")?.Value ?? Path.GetFileNameWithoutExtension(file);
+        //                bool isOptimized = false;
 
-                        try
-                        {
-                            isOptimized = bool.TryParse(doc.Root.Attribute("Optimized")?.Value ?? "false", out bool opt) && opt;
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Debug($"LoadDbTagsFromXml: Ошибка при получении атрибута Optimized: {ex.Message}");
-                        }
+        //                try
+        //                {
+        //                    isOptimized = bool.TryParse(doc.Root.Attribute("Optimized")?.Value ?? "false", out bool opt) && opt;
+        //                }
+        //                catch (Exception ex)
+        //                {
+        //                    _logger.Debug($"LoadDbTagsFromXml: Ошибка при получении атрибута Optimized: {ex.Message}");
+        //                }
 
-                        // Добавляем информацию о блоке данных
-                        var dbTag = new TagDefinition
-                        {
-                            Name = dbName,
-                            Address = isOptimized ? "Optimized" : "Standard",
-                            DataType = TagDataType.Bool, // Используем существующий тип
-                            GroupName = "DataBlocks",
-                            IsOptimized = isOptimized
-                        };
+        //                // Добавляем информацию о блоке данных
+        //                var dbTag = new TagDefinition
+        //                {
+        //                    Name = dbName,
+        //                    Address = isOptimized ? "Optimized" : "Standard",
+        //                    DataType = TagDataType.Bool, // Используем существующий тип
+        //                    GroupName = "DataBlocks",
+        //                    IsOptimized = isOptimized
+        //                };
 
-                        dbTags.Add(dbTag);
+        //                dbTags.Add(dbTag);
 
-                        // Добавляем переменные из XML, если они есть
-                        foreach (var varElement in doc.Descendants("Variable"))
-                        {
-                            try
-                            {
-                                string varName = varElement.Attribute("Name")?.Value ?? "Unknown";
-                                string dataTypeStr = varElement.Attribute("DataType")?.Value ?? "Unknown";
+        //                // Добавляем переменные из XML, если они есть
+        //                foreach (var varElement in doc.Descendants("Variable"))
+        //                {
+        //                    try
+        //                    {
+        //                        string varName = varElement.Attribute("Name")?.Value ?? "Unknown";
+        //                        string dataTypeStr = varElement.Attribute("DataType")?.Value ?? "Unknown";
 
-                                // Пропускаем служебную переменную-заглушку
-                                if (varName == "INFO" && dataTypeStr == "String")
-                                    continue;
+        //                        // Пропускаем служебную переменную-заглушку
+        //                        if (varName == "INFO" && dataTypeStr == "String")
+        //                            continue;
 
-                                // Формируем полное имя переменной с префиксом DB
-                                string fullName = $"{dbName}.{varName}";
+        //                        // Формируем полное имя переменной с префиксом DB
+        //                        string fullName = $"{dbName}.{varName}";
 
-                                TagDataType dataType = ConvertStringToTagDataType(dataTypeStr);
+        //                        TagDataType dataType = ConvertStringToTagDataType(dataTypeStr);
 
-                                dbTags.Add(new TagDefinition
-                                {
-                                    Name = fullName,
-                                    DataType = dataType,
-                                    Address = isOptimized ? "Optimized" : "Standard",
-                                    GroupName = dbName,
-                                    IsOptimized = isOptimized
-                                });
-                            }
-                            catch (Exception varEx)
-                            {
-                                _logger.Debug($"LoadDbTagsFromXml: Ошибка при обработке переменной: {varEx.Message}");
-                                // Продолжаем с другими переменными
-                            }
-                        }
+        //                        dbTags.Add(new TagDefinition
+        //                        {
+        //                            Name = fullName,
+        //                            DataType = dataType,
+        //                            Address = isOptimized ? "Optimized" : "Standard",
+        //                            GroupName = dbName,
+        //                            IsOptimized = isOptimized
+        //                        });
+        //                    }
+        //                    catch (Exception varEx)
+        //                    {
+        //                        _logger.Debug($"LoadDbTagsFromXml: Ошибка при обработке переменной: {varEx.Message}");
+        //                        // Продолжаем с другими переменными
+        //                    }
+        //                }
 
-                        _logger.Info($"LoadDbTagsFromXml: Загружен DB {dbName}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error($"LoadDbTagsFromXml: Ошибка при обработке файла {Path.GetFileName(file)}: {ex.Message}");
-                        // Продолжаем с другими файлами
-                    }
-                }
+        //                _logger.Info($"LoadDbTagsFromXml: Загружен DB {dbName}");
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                _logger.Error($"LoadDbTagsFromXml: Ошибка при обработке файла {Path.GetFileName(file)}: {ex.Message}");
+        //                // Продолжаем с другими файлами
+        //            }
+        //        }
 
-                _logger.Info($"LoadDbTagsFromXml: Всего загружено {dbTags.Count} блоков данных");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"LoadDbTagsFromXml: Ошибка: {ex.Message}");
-            }
+        //        _logger.Info($"LoadDbTagsFromXml: Всего загружено {dbTags.Count} блоков данных");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"LoadDbTagsFromXml: Ошибка: {ex.Message}");
+        //    }
 
-            return dbTags;
-        }
+        //    return dbTags;
+        //}
     }
 }

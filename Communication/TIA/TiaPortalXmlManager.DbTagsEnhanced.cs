@@ -7,7 +7,7 @@ using System.Xml.Linq;
 using Siemens.Engineering;
 using Siemens.Engineering.SW.Blocks;
 using SiemensTrend.Core.Models;
-
+using System.Xml.Linq;
 namespace SiemensTrend.Helpers
 {
     /// <summary>
@@ -173,7 +173,7 @@ namespace SiemensTrend.Helpers
                                 new XElement("DataBlock",
                                     new XAttribute("Name", fullName),
                                     new XAttribute("Optimized", isOptimized),
-                                    varElement.Element("Variables").Clone()
+                                    new XElement(varElement.Element("Variables"))
                                 )
                             );
 

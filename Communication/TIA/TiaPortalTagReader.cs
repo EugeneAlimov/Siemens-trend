@@ -303,7 +303,9 @@ namespace SiemensTrend.Communication.TIA
 
                         // Определяем оптимизацию, если возможно
                         bool isOptimized = false;
-                        try { isOptimized = db.MemoryLayout == Siemens.Engineering.MemoryLayout.Optimized; }
+                        try { 
+                            isOptimized = db.MemoryLayout == Siemens.Engineering.SW.Blocks.MemoryLayout.Optimized; 
+                        }
                         catch { /* Игнорируем ошибки */ }
 
                         // Создаем тег для блока данных

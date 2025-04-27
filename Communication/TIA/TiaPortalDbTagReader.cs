@@ -503,20 +503,23 @@ namespace SiemensTrend.Communication.TIA
                 // Если член имеет подчлены и не превышен лимит глубины, обрабатываем их
                 try
                 {
-                    if (member.Members != null && member.Members.Count > 0 && depth < _maxHierarchyDepth)
+                    if (member.GetAttribute("Members") is IList<object> subMembersAttribute && subMembersAttribute.Count > 0 && depth < _maxHierarchyDepth)
                     {
-                        _logger.Debug($"ProcessDbMember: Член {memberName} имеет {member.Members.Count} подчленов");
+                        _logger.Debug($"ProcessDbMember: Член {memberName} имеет {subMembersAttribute.Count} подчленов");
 
-                        // Создаем защищенную копию списка подчленов
-                        var submembersList = new List<Member>();
-                        foreach (var submember in member.Members)
+                        foreach (var subMember in subMembersAttribute)
                         {
-                            if (submember != null)
+                            if (subMember is Member subMemberObject)
                             {
-                                submembersList.Add(submember);
-                                if (submembersList.Count >= 50) break; // Ограничение количества подчленов
+                                ProcessDbMember(subMemberObject, dbName, plcData, isOptimized, isUDT, isSafety, depth + 1, ref processedMembers, ref tagCount);
                             }
                         }
+                    }
+                    else
+                    {
+                        _logger.Debug($"ProcessDbMember: Член {memberName} не имеет подчленов");
+                    }
+                    var submembersList = new List<Member>();
 
                         // Обрабатываем каждый подчлен
                         foreach (var submember in submembersList)
@@ -525,7 +528,6 @@ namespace SiemensTrend.Communication.TIA
                             ProcessDbMember(submember, dbName, plcData, isOptimized,
                                            isUDT, isSafety, depth + 1, ref processedMembers, ref tagCount);
                         }
-                    }
                 }
                 catch (Exception ex)
                 {
