@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using SiemensTrend.Communication.TIA;
 
 namespace SiemensTrend.Views
@@ -28,27 +30,42 @@ namespace SiemensTrend.Views
 
                 // Заполняем список доступными режимами
                 var modes = _viewModel.GetAvailableReaderModes();
-                foreach (var mode in modes)
+                if (modes != null)
                 {
-                    readerModeCombo.Items.Add(mode);
+                    foreach (var mode in modes)
+                    {
+                        readerModeCombo.Items.Add(mode);
+                    }
+
+                    // Устанавливаем текущий режим, если доступен метод
+                    if (_viewModel.SelectedReaderMode != null)
+                    {
+                        readerModeCombo.SelectedItem = _viewModel.SelectedReaderMode;
+                    }
+                    else
+                    {
+                        // Установка режима по умолчанию
+                        if (readerModeCombo.Items.Count > 0)
+                            readerModeCombo.SelectedIndex = 0;
+                    }
                 }
 
-                // Устанавливаем текущий режим
-                readerModeCombo.SelectedItem = _viewModel.SelectedReaderMode;
-
-                // Подписываемся на изменение выбора
-                readerModeCombo.SelectionChanged += (sender, e) =>
-                {
-                    if (readerModeCombo.SelectedItem is TiaPortalTagReaderFactory.ReaderMode mode)
-                    {
-                        _viewModel.SelectedReaderMode = mode;
-                        UpdateReaderModeDescription();
-                    }
-                };
-
-                // Добавляем элементы в панель инструментов
                 // Находим нужную панель инструментов с кнопками получения тегов
-                var toolbarTray = FindName("toolBarTray") as ToolBarTray;
+                ToolBarTray toolbarTray = null;
+
+                // Поиск по имени
+                toolbarTray = FindName("toolBarTray") as ToolBarTray;
+
+                // Если не нашли по имени, то поищем по типу в визуальном дереве
+                if (toolbarTray == null)
+                {
+                    var toolbarTrays = FindVisualChildren<ToolBarTray>(this);
+                    if (toolbarTrays.Count > 0)
+                    {
+                        toolbarTray = toolbarTrays[0];
+                    }
+                }
+
                 if (toolbarTray != null && toolbarTray.ToolBars.Count > 0)
                 {
                     var tagToolbar = toolbarTray.ToolBars[0]; // Предполагаем, что нужная панель инструментов первая
@@ -68,36 +85,21 @@ namespace SiemensTrend.Views
                     tagToolbar.Items.Add(readerModeCombo);
 
                     // Добавляем улучшенные кнопки
-                    var btnGetDbTagsSafe = CreateToolbarButton("Получить DB (безопасно)", BtnGetDbTagsSafe_Click);
+                    var btnGetDbTagsSafe = CreateToolbarButton("Получить теги DB (безопасно)", BtnGetDbTagsSafe_Click);
                     tagToolbar.Items.Add(btnGetDbTagsSafe);
+
+                    _logger.Info("InitializeEnhancedTagReading: Элементы управления для улучшенного чтения тегов инициализированы");
                 }
-
-                // Создаем текстовый блок для описания режима
-                var modeDescriptionBlock = new TextBlock
+                else
                 {
-                    Name = "txtReaderModeDescription",
-                    Text = _viewModel.CurrentReaderModeDescription,
-                    Margin = new Thickness(5),
-                    TextWrapping = TextWrapping.Wrap
-                };
-
-                // Находим статусную панель и добавляем в нее описание режима
-                var statusBar = FindName("statusBar") as StatusBar;
-                if (statusBar != null)
-                {
-                    var statusBarItem = new StatusBarItem();
-                    statusBarItem.Content = modeDescriptionBlock;
-                    statusBar.Items.Add(statusBarItem);
+                    _logger.Warn("InitializeEnhancedTagReading: Не удалось найти панель инструментов");
                 }
-
-                _logger.Info("InitializeEnhancedTagReading: Элементы управления для улучшенного чтения тегов инициализированы");
             }
             catch (Exception ex)
             {
                 _logger.Error($"InitializeEnhancedTagReading: Ошибка при инициализации элементов управления: {ex.Message}");
             }
         }
-
         /// <summary>
         /// Создание кнопки для панели инструментов
         /// </summary>
@@ -274,7 +276,24 @@ namespace SiemensTrend.Views
             try
             {
                 // Найти существующую панель инструментов
-                var toolbarTray = FindName("toolBarTray") as ToolBarTray;
+                // Проблема: используется имя toolBarTray, но в XAML может быть другое название
+                // Попробуем более надежный способ поиска:
+
+                ToolBarTray toolbarTray = null;
+
+                // Поиск по имени
+                toolbarTray = FindName("toolBarTray") as ToolBarTray;
+
+                // Если не нашли по имени, то поищем по типу в визуальном дереве
+                if (toolbarTray == null)
+                {
+                    var toolbarTrays = FindVisualChildren<ToolBarTray>(this);
+                    if (toolbarTrays.Count > 0)
+                    {
+                        toolbarTray = toolbarTrays[0];
+                    }
+                }
+
                 if (toolbarTray != null && toolbarTray.ToolBars.Count > 0)
                 {
                     var toolbar = toolbarTray.ToolBars[0]; // Предполагаем, что нужная панель инструментов первая
@@ -297,6 +316,26 @@ namespace SiemensTrend.Views
             {
                 _logger.Error($"AddEnhancedExportButton: Ошибка при добавлении кнопки: {ex.Message}");
             }
+        }
+
+        // Добавьте вспомогательный метод для поиска элементов в визуальном дереве
+        private List<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
+        {
+            List<T> result = new List<T>();
+            if (depObj == null) return result;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(depObj, i);
+
+                if (child is T)
+                    result.Add((T)child);
+
+                // Рекурсивно ищем в дочерних элементах
+                result.AddRange(FindVisualChildren<T>(child));
+            }
+
+            return result;
         }
     }
 }

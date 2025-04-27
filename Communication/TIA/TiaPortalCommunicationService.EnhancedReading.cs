@@ -75,11 +75,20 @@ namespace SiemensTrend.Communication.TIA
                     // Создаем пустой объект для хранения данных
                     var plcData = new PlcData();
 
-                    // Читаем только блоки данных
-                    await Task.Run(() => dbTagReader.ReadDataBlocks(plcData));
-
-                    _logger.Info($"GetDbTagsSafeAsync: Прямое чтение из TIA Portal выполнено, получено {plcData.DbTags.Count} тегов DB");
-                    return plcData.DbTags;
+                    // ВАЖНО: НЕ используем Task.Run для операций с Openness API!
+                    // Вместо этого просто вызываем метод напрямую, так как он должен выполняться в STA-потоке
+                    try
+                    {
+                        // Читаем только блоки данных напрямую в текущем потоке
+                        dbTagReader.ReadDataBlocks(plcData);
+                        _logger.Info($"GetDbTagsSafeAsync: Прямое чтение из TIA Portal выполнено, получено {plcData.DbTags.Count} тегов DB");
+                        return plcData.DbTags;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"GetDbTagsSafeAsync: Ошибка при прямом чтении блоков данных: {ex.Message}");
+                        // Продолжаем выполнение и пробуем загрузить из XML
+                    }
                 }
 
                 // Убедимся, что текущий проект установлен в XML менеджере
@@ -100,14 +109,14 @@ namespace SiemensTrend.Communication.TIA
                 if (IsConnected && _project != null)
                 {
                     _logger.Info("GetDbTagsSafeAsync: XML не найдены, выполняем экспорт");
-                    
+
                     // Получаем PlcSoftware
                     var plcSoftware = GetPlcSoftware();
                     if (plcSoftware != null)
                     {
                         // Используем улучшенный метод XML-менеджера для создания XML-файлов с расширенной информацией
                         _xmlManager.ExportEnhancedDataBlocksToXml(plcSoftware.BlockGroup);
-                        
+
                         // Загружаем созданные XML
                         dbsFromXml = _xmlManager.LoadDbTagsFromXml();
                         _logger.Info($"GetDbTagsSafeAsync: После экспорта загружено {dbsFromXml.Count} тегов блоков данных");
@@ -210,56 +219,7 @@ namespace SiemensTrend.Communication.TIA
                 throw; // Пробрасываем исключение для обработки в вызывающем методе
             }
         }
-        /// <summary>
-        /// Проверка наличия кэшированных данных для проекта
-        /// </summary>
-        /// <param name="projectName">Имя проекта</param>
-        /// <returns>True, если есть кэшированные данные</returns>
-        public bool HasCachedDbTags(string projectName)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(projectName))
-                {
-                    _logger.Warn("HasCachedDbTags: Пустое имя проекта");
-                    return false;
-                }
-                
-                return _xmlManager.HasExportedDataForProject(projectName);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"HasCachedDbTags: Ошибка при проверке кэша: {ex.Message}");
-                return false;
-            }
-        }
-        
-        /// <summary>
-        /// Очистка кэша тегов DB для текущего проекта
-        /// </summary>
-        /// <returns>True, если кэш успешно очищен</returns>
-        public bool ClearDbTagsCache()
-        {
-            try
-            {
-                if (_project == null || string.IsNullOrEmpty(_project.Name))
-                {
-                    _logger.Warn("ClearDbTagsCache: Нет активного проекта");
-                    return false;
-                }
-                
-                string projectName = _project.Name;
-                bool result = _xmlManager.ClearProjectCache(projectName);
-                
-                _logger.Info($"ClearDbTagsCache: Кэш для проекта {projectName} {(result ? "успешно очищен" : "не удалось очистить")}");
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"ClearDbTagsCache: Ошибка при очистке кэша: {ex.Message}");
-                return false;
-            }
-        }
+
 
         public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
         {
