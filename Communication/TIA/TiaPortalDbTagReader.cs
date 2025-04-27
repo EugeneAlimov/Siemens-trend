@@ -441,9 +441,6 @@ namespace SiemensTrend.Communication.TIA
                 string memberName = "Unknown";
                 try { memberName = member.Name; } catch { }
 
-                // (остальной код остается без изменений)
-
-                // Исправляем блок работы с подчленами (он содержит ошибки в оригинальном коде)
                 try
                 {
                     // Пытаемся получить доступ к подчленам через Members

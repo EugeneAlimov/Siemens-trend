@@ -227,21 +227,5 @@ namespace SiemensTrend.Helpers
         /// <summary>
         /// Сброс токена отмены для новой операции
         /// </summary>
-        public void ResetCancellationToken()
-        {
-            try
-            {
-                if (_cancellationTokenSource != null)
-                {
-                    _cancellationTokenSource.Dispose();
-                }
-                _cancellationTokenSource = new CancellationTokenSource();
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"ResetCancellationToken: Ошибка: {ex.Message}");
-                _cancellationTokenSource = new CancellationTokenSource();
-            }
-        }
     }
 }

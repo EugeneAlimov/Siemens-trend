@@ -224,6 +224,12 @@ namespace SiemensTrend.Helpers
 
                 _logger.Info($"ExportEnhancedDataBlocksToXml: Найдено {blockNames.Count} уникальных имен блоков данных");
 
+                if (blockNames.Count == 0)
+                {
+                    _logger.Warn("ExportEnhancedDataBlocksToXml: Нет уникальных имен блоков данных для экспорта");
+                    return;
+                }
+
                 // Для каждого имени создаем расширенный XML
                 foreach (var blockName in blockNames)
                 {

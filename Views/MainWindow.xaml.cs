@@ -28,8 +28,6 @@ namespace SiemensTrend.Views
         {
             InitializeComponent();
 
-
-
             // Создаем логер
             _logger = new Logger();
 
@@ -42,6 +40,9 @@ namespace SiemensTrend.Views
 
             // Устанавливаем DataContext для TagBrowserView
             tagBrowser.DataContext = _viewModel.TagBrowserViewModel;
+
+            // Инициализируем улучшенные UI компоненты
+            InitializeUI();
 
             // Инициализируем начальное состояние
             UpdateConnectionState();

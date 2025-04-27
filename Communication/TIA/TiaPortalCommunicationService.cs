@@ -240,7 +240,7 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Экспорт тегов в XML с улучшенным подходом для блоков данных
         /// </summary>
-        /// <param name="tagType">Тип тегов для экспорта</param>
+        //<param name="tagType">Тип тегов для экспорта</param>
         public async Task ExportTagsToXmlEnhanced(ExportTagType tagType = ExportTagType.All)
         {
             if (!IsConnected || _project == null)
@@ -324,7 +324,7 @@ namespace SiemensTrend.Communication.TIA
             }
         }
 
-        // Измененный метод ExportTagsToXml
+        //Измененный метод ExportTagsToXml
         public async Task ExportTagsToXml(ExportTagType tagType = ExportTagType.All)
         {
             if (!IsConnected || _project == null)
@@ -340,13 +340,35 @@ namespace SiemensTrend.Communication.TIA
                 return;
             }
 
+            // Сначала проверяем, настроен ли XML-менеджер для текущего проекта
+            if (_project != null && !string.IsNullOrEmpty(_project.Name))
+            {
+                SetCurrentProjectInXmlManager();
+            }
+
             // Экспортируем в зависимости от типа
             try
             {
                 _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов начат");
 
-                // Используем улучшенный метод для всех типов экспорта
-                await ExportTagsToXmlEnhanced(tagType);
+                switch (tagType)
+                {
+                    case ExportTagType.All:
+                        // Экспортируем все типы тегов
+                        await ExportAllTagsToXmlEnhanced(plcSoftware);
+                        break;
+                    case ExportTagType.PlcTags:
+                        // Только теги ПЛК
+                        _xmlManager.ExportTagTablesToXml(plcSoftware.TagTableGroup);
+                        break;
+                    case ExportTagType.DbTags:
+                        // Только теги DB - используем улучшенный метод вместо обычного
+                        _xmlManager.ExportEnhancedDataBlocksToXml(plcSoftware.BlockGroup);
+                        break;
+                    default:
+                        _logger.Warn($"ExportTagsToXml: Неизвестный тип тегов: {tagType}");
+                        break;
+                }
 
                 _logger.Info($"ExportTagsToXml: Экспорт {tagType} тегов завершен");
             }
