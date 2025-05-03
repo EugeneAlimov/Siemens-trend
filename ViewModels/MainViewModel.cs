@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -174,44 +174,44 @@ namespace SiemensTrend.ViewModels
             }
         }
         
-/// <summary>
-/// Загружает теги из хранилища
-/// </summary>
-private void LoadTagsFromStorage()
-        {
-            try
-            {
-                _logger.Info("LoadTagsFromStorage: Загрузка тегов из хранилища");
-
-                var tags = _tagManager.LoadTags();
-
-                // Очищаем текущие коллекции
-                PlcTags.Clear();
-                DbTags.Clear();
-                AvailableTags.Clear();
-
-                // Распределяем теги по коллекциям
-                foreach (var tag in tags)
+        /// <summary>
+        /// Загружает теги из хранилища
+        /// </summary>
+        private void LoadTagsFromStorage()
                 {
-                    AvailableTags.Add(tag);
+                    try
+                    {
+                        _logger.Info("LoadTagsFromStorage: Загрузка тегов из хранилища");
 
-                    if (tag.IsDbTag)
-                    {
-                        DbTags.Add(tag);
+                        var tags = _tagManager.LoadTags();
+
+                        // Очищаем текущие коллекции
+                        PlcTags.Clear();
+                        DbTags.Clear();
+                        AvailableTags.Clear();
+
+                        // Распределяем теги по коллекциям
+                        foreach (var tag in tags)
+                        {
+                            AvailableTags.Add(tag);
+
+                            if (tag.IsDbTag)
+                            {
+                                DbTags.Add(tag);
+                            }
+                            else
+                            {
+                                PlcTags.Add(tag);
+                            }
+                        }
+
+                        _logger.Info($"LoadTagsFromStorage: Загружено {PlcTags.Count} тегов PLC и {DbTags.Count} тегов DB");
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        PlcTags.Add(tag);
+                        _logger.Error($"LoadTagsFromStorage: Ошибка загрузки тегов: {ex.Message}");
                     }
                 }
-
-                _logger.Info($"LoadTagsFromStorage: Загружено {PlcTags.Count} тегов PLC и {DbTags.Count} тегов DB");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"LoadTagsFromStorage: Ошибка загрузки тегов: {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// Сохраняет теги в хранилище
