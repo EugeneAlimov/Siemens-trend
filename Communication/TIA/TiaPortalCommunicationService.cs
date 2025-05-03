@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Siemens.Engineering;
 using Siemens.Engineering.SW;
 using SiemensTrend.Core.Logging;
-using SiemensTrend.Helpers;
+
 
 namespace SiemensTrend.Communication.TIA
 {
@@ -16,8 +16,8 @@ namespace SiemensTrend.Communication.TIA
         private TiaPortal _tiaPortal;
         private Project _project;
         private bool _isConnected;
-        private TiaPortalTagReader _tagReader;
-        private readonly TiaPortalXmlManager _xmlManager;
+        //private TiaPortalTagReader _tagReader;
+        //private readonly TiaPortalXmlManager _xmlManager;
 
         /// <summary>
         /// Флаг подключения к TIA Portal
@@ -32,7 +32,7 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Доступ к XML-менеджеру
         /// </summary>
-        public TiaPortalXmlManager XmlManager => _xmlManager;
+        //public TiaPortalXmlManager XmlManager => _xmlManager;
 
         /// <summary>
         /// Типы тегов для экспорта
@@ -51,7 +51,7 @@ namespace SiemensTrend.Communication.TIA
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _logger.Info("Создание экземпляра TiaPortalCommunicationService");
-            _xmlManager = new TiaPortalXmlManager(_logger, this);
+            //_xmlManager = new TiaPortalXmlManager(_logger, this);
             _logger.Info("Экземпляр TiaPortalCommunicationService создан успешно");
         }
 
@@ -68,7 +68,7 @@ namespace SiemensTrend.Communication.TIA
                 try
                 {
                     // Если есть активные асинхронные операции, отменяем их
-                    _xmlManager?.CancelAllExportOperations();
+                    //_xmlManager?.CancelAllExportOperations();
                 }
                 catch (Exception ex)
                 {
@@ -76,7 +76,7 @@ namespace SiemensTrend.Communication.TIA
                 }
 
                 // Освобождаем ресурсы
-                _tagReader = null;
+                //_tagReader = null;
                 _project = null;
                 _tiaPortal = null;
                 _isConnected = false;
@@ -206,7 +206,7 @@ namespace SiemensTrend.Communication.TIA
                 try
                 {
                     string projectName = _project.Name;
-                    _xmlManager.SetCurrentProject(projectName);
+                    //_xmlManager.SetCurrentProject(projectName);
                     _logger.Info($"SetCurrentProjectInXmlManager: Установлен проект {projectName} для работы с XML");
                 }
                 catch (Exception ex)

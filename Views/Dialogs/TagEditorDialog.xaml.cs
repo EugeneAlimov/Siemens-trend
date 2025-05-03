@@ -151,7 +151,7 @@ namespace SiemensTrend.Views.Dialogs
                         DataType = dataType,
                         GroupName = group,
                         Comment = comment,
-                        IsDbTag = isDbTag
+                        //IsDbTag = isDbTag
                     };
                 }
                 else // Редактирование
@@ -164,7 +164,7 @@ namespace SiemensTrend.Views.Dialogs
                         DataType = dataType,
                         GroupName = group,
                         Comment = comment,
-                        IsDbTag = isDbTag
+                        //IsDbTag = isDbTag
                     };
                 }
 

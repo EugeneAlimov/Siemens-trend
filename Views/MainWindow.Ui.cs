@@ -27,14 +27,14 @@ namespace SiemensTrend.Views
                 // Обновляем доступность кнопок
                 btnConnect.IsEnabled = !_viewModel.IsConnected;
                 btnDisconnect.IsEnabled = _viewModel.IsConnected;
-                btnGetPlcs.IsEnabled = _viewModel.IsConnected;
-                btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
-                btnGetDbs.IsEnabled = _viewModel.IsConnected;
-                btnGetDbTags.IsEnabled = _viewModel.IsConnected;
+                //btnGetPlcs.IsEnabled = _viewModel.IsConnected;
+                //btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
+                //btnGetDbs.IsEnabled = _viewModel.IsConnected;
+                //btnGetDbTags.IsEnabled = _viewModel.IsConnected;
                 btnStartMonitoring.IsEnabled = _viewModel.IsConnected && _viewModel.MonitoredTags.Count > 0;
                 btnStopMonitoring.IsEnabled = _viewModel.IsConnected;
-                btnExportTags.IsEnabled = _viewModel.IsConnected &&
-                    (_viewModel.PlcTags.Count > 0 || _viewModel.DbTags.Count > 0);
+                //btnExportTags.IsEnabled = _viewModel.IsConnected &&
+                    //(_viewModel.PlcTags.Count > 0 || _viewModel.DbTags.Count > 0);
             }
             catch (Exception ex)
             {

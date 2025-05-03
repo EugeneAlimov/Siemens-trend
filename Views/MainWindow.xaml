@@ -11,7 +11,7 @@
         WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisConverter"/>
+        <!--   <converters:BoolToVisibilityConverter x:Key="BoolToVisConverter"/> -->
     </Window.Resources>
 
     <Grid>
@@ -31,8 +31,8 @@
                 <Button x:Name="btnEditTag" Content="Редактировать тег" Margin="3" Padding="5,3" Click="BtnEditTag_Click"/>
                 <Button x:Name="btnRemoveTag" Content="Удалить тег" Margin="3" Padding="5,3" Click="BtnRemoveTag_Click"/>
                 <Separator/>
-                <Button x:Name="btnSaveToXml" Content="Сохранить в XML" Margin="3" Padding="5,3" Click="BtnSaveToXml_Click"/>
-                <Button x:Name="btnLoadFromXml" Content="Загрузить из XML" Margin="3" Padding="5,3" Click="BtnLoadFromXml_Click"/>
+                <!--        <Button x:Name="btnSaveToXml" Content="Сохранить в XML" Margin="3" Padding="5,3" Click="BtnSaveToXml_Click"/> -->
+                <!--    <Button x:Name="btnLoadFromXml" Content="Загрузить из XML" Margin="3" Padding="5,3" Click="BtnLoadFromXml_Click"/> -->
                 <Button x:Name="btnSaveTags" Content="Сохранить теги" Margin="3" Padding="5,3" Click="BtnSaveTags_Click"/>
                 <Separator/>
                 <Button x:Name="btnStartMonitoring" Content="Запустить мониторинг" Margin="3" Padding="5,3" Click="BtnStartMonitoring_Click"/>
@@ -60,7 +60,7 @@
 
                 <!-- Доступные теги -->
                 <TextBlock Grid.Row="0" Margin="5" FontWeight="Bold" Text="Доступные теги:"/>
-                <local:TagBrowserView Grid.Row="1" x:Name="tagBrowser" Margin="5"/>
+                <!-- <local:TagBrowserView Grid.Row="1" x:Name="tagBrowser" Margin="5"/>  -->
 
                 <!-- Список тегов для мониторинга -->
                 <TextBlock Grid.Row="2" Margin="5" FontWeight="Bold" 
@@ -156,7 +156,8 @@
                         </DataGrid>
                     </TabItem>
                     <TabItem Header="График">
-                        <local:ChartView x:Name="chartView"/>
+                        <!--    <local:ChartView x:Name="chartView"/> -->
+                        <!--    Закомментировал область графиков -->
                     </TabItem>
                 </TabControl>
             </Grid>

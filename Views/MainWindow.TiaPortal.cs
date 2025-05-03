@@ -48,7 +48,7 @@ namespace SiemensTrend.Views
                 // Инициализируем модель после подключения (без загрузки тегов)
                 if (_viewModel.IsConnected)
                 {
-                    _viewModel.InitializeAfterConnection();
+                    //_viewModel.InitializeAfterConnection();
 
                     // Сообщаем пользователю, что он может загрузить теги вручную
                     _viewModel.StatusMessage = "Подключено успешно. Используйте кнопки 'Получить теги ПЛК' и 'Получить DB' для загрузки тегов.";
@@ -91,162 +91,162 @@ namespace SiemensTrend.Views
         /// <summary>
         /// Обработчик нажатия кнопки "Получить ПЛК"
         /// </summary>
-        private async void BtnGetPlcs_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("Запрос списка доступных ПЛК");
+        //private async void BtnGetPlcs_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("Запрос списка доступных ПЛК");
 
-                // Здесь будет вызов соответствующего метода ViewModel
-                // Например: await _viewModel.GetAvailablePlcsAsync();
+        //        // Здесь будет вызов соответствующего метода ViewModel
+        //        // Например: await _viewModel.GetAvailablePlcsAsync();
 
-                // Пока просто выводим сообщение
-                _viewModel.StatusMessage = "Получение списка ПЛК...";
-                await Task.Delay(500); // Имитация работы
-                _viewModel.StatusMessage = "Список ПЛК получен";
+        //        // Пока просто выводим сообщение
+        //        _viewModel.StatusMessage = "Получение списка ПЛК...";
+        //        await Task.Delay(500); // Имитация работы
+        //        _viewModel.StatusMessage = "Список ПЛК получен";
 
-                _logger.Info("Список ПЛК получен");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении списка ПЛК: {ex.Message}");
-                MessageBox.Show($"Ошибка при получении списка ПЛК: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //        _logger.Info("Список ПЛК получен");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при получении списка ПЛК: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при получении списка ПЛК: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
         /// <summary>
         /// Обработчик нажатия кнопки "Получить теги ПЛК"
         /// </summary>
-        private async void BtnGetPlcTags_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("Запрос тегов ПЛК");
+        //private async void BtnGetPlcTags_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("Запрос тегов ПЛК");
 
-                // Проверяем соединение перед запросом тегов
-                if (!_viewModel.IsConnected)
-                {
-                    _logger.Warn("Попытка получить теги без установленного соединения");
-                    MessageBox.Show("Необходимо сначала подключиться к TIA Portal.",
-                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+        //        // Проверяем соединение перед запросом тегов
+        //        if (!_viewModel.IsConnected)
+        //        {
+        //            _logger.Warn("Попытка получить теги без установленного соединения");
+        //            MessageBox.Show("Необходимо сначала подключиться к TIA Portal.",
+        //                "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+        //            return;
+        //        }
 
-                // Отключаем кнопку на время загрузки
-                btnGetPlcTags.IsEnabled = false;
-                _viewModel.IsLoading = true;
-                _viewModel.StatusMessage = "Получение тегов ПЛК...";
-                _viewModel.ProgressValue = 10;
+        //        // Отключаем кнопку на время загрузки
+        //        btnGetPlcTags.IsEnabled = false;
+        //        _viewModel.IsLoading = true;
+        //        _viewModel.StatusMessage = "Получение тегов ПЛК...";
+        //        _viewModel.ProgressValue = 10;
 
-                await _viewModel.GetPlcTagsAsync();
+        //        await _viewModel.GetPlcTagsAsync();
 
-                _logger.Info($"Получено {_viewModel.PlcTags.Count} тегов ПЛК");
-                _viewModel.StatusMessage = $"Получено {_viewModel.PlcTags.Count} тегов ПЛК";
-                _viewModel.ProgressValue = 100;
+        //        _logger.Info($"Получено {_viewModel.PlcTags.Count} тегов ПЛК");
+        //        _viewModel.StatusMessage = $"Получено {_viewModel.PlcTags.Count} тегов ПЛК";
+        //        _viewModel.ProgressValue = 100;
 
-                // Проверяем состояние соединения после получения тегов
-                if (!_viewModel.IsConnected)
-                {
-                    _logger.Warn("Соединение было потеряно после получения тегов");
-                    MessageBox.Show("Соединение с TIA Portal было потеряно. Пожалуйста, подключитесь снова.",
-                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
-                MessageBox.Show($"Ошибка при получении тегов ПЛК: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                _viewModel.StatusMessage = "Ошибка при получении тегов ПЛК";
-                _viewModel.ProgressValue = 0;
-            }
-            finally
-            {
-                btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
-                _viewModel.IsLoading = false;
-                UpdateConnectionState();
-            }
-        }
+        //        // Проверяем состояние соединения после получения тегов
+        //        if (!_viewModel.IsConnected)
+        //        {
+        //            _logger.Warn("Соединение было потеряно после получения тегов");
+        //            MessageBox.Show("Соединение с TIA Portal было потеряно. Пожалуйста, подключитесь снова.",
+        //                "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при получении тегов ПЛК: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при получении тегов ПЛК: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //        _viewModel.StatusMessage = "Ошибка при получении тегов ПЛК";
+        //        _viewModel.ProgressValue = 0;
+        //    }
+        //    finally
+        //    {
+        //        btnGetPlcTags.IsEnabled = _viewModel.IsConnected;
+        //        _viewModel.IsLoading = false;
+        //        UpdateConnectionState();
+        //    }
+        //}
 
         /// <summary>
         /// Обработчик нажатия кнопки "Получить DB"
         /// </summary>
-        private async void BtnGetDbs_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("Запрос списка блоков данных");
+        //private async void BtnGetDbs_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("Запрос списка блоков данных");
 
-                // Отключаем кнопку на время загрузки
-                btnGetDbs.IsEnabled = false;
-                // Показываем индикатор загрузки
-                _viewModel.IsLoading = true;
-                _viewModel.StatusMessage = "Получение блоков данных...";
-                _viewModel.ProgressValue = 10;
+        //        // Отключаем кнопку на время загрузки
+        //        btnGetDbs.IsEnabled = false;
+        //        // Показываем индикатор загрузки
+        //        _viewModel.IsLoading = true;
+        //        _viewModel.StatusMessage = "Получение блоков данных...";
+        //        _viewModel.ProgressValue = 10;
 
-                // Здесь в реальном проекте будет вызов к модели представления
-                await Task.Delay(800); // Имитация работы
+        //        // Здесь в реальном проекте будет вызов к модели представления
+        //        await Task.Delay(800); // Имитация работы
 
-                _viewModel.StatusMessage = "Блоки данных получены";
-                _viewModel.ProgressValue = 100;
+        //        _viewModel.StatusMessage = "Блоки данных получены";
+        //        _viewModel.ProgressValue = 100;
 
-                _logger.Info("Блоки данных получены");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении блоков данных: {ex.Message}");
-                MessageBox.Show($"Ошибка при получении блоков данных: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                _viewModel.StatusMessage = "Ошибка при получении блоков данных";
-                _viewModel.ProgressValue = 0;
-            }
-            finally
-            {
-                // Включаем кнопку обратно
-                btnGetDbs.IsEnabled = _viewModel.IsConnected;
-                // Скрываем индикатор загрузки
-                _viewModel.IsLoading = false;
-            }
-        }
+        //        _logger.Info("Блоки данных получены");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при получении блоков данных: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при получении блоков данных: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //        _viewModel.StatusMessage = "Ошибка при получении блоков данных";
+        //        _viewModel.ProgressValue = 0;
+        //    }
+        //    finally
+        //    {
+        //        // Включаем кнопку обратно
+        //        btnGetDbs.IsEnabled = _viewModel.IsConnected;
+        //        // Скрываем индикатор загрузки
+        //        _viewModel.IsLoading = false;
+        //    }
+        //}
 
         /// <summary>
         /// Обработчик нажатия кнопки "Получить теги DB"
         /// </summary>
-        private async void BtnGetDbTags_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("Запрос тегов DB");
+        //private async void BtnGetDbTags_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("Запрос тегов DB");
 
-                // Отключаем кнопку на время загрузки
-                btnGetDbTags.IsEnabled = false;
-                // Показываем индикатор загрузки
-                _viewModel.IsLoading = true;
-                _viewModel.StatusMessage = "Получение тегов DB...";
-                _viewModel.ProgressValue = 10;
+        //        // Отключаем кнопку на время загрузки
+        //        //btnGetDbTags.IsEnabled = false;
+        //        // Показываем индикатор загрузки
+        //        _viewModel.IsLoading = true;
+        //        _viewModel.StatusMessage = "Получение тегов DB...";
+        //        _viewModel.ProgressValue = 10;
 
-                await _viewModel.GetDbTagsAsync();
+        //        //await _viewModel.GetDbTagsAsync();
 
-                _logger.Info($"Получено {_viewModel.DbTags.Count} тегов DB");
-                _viewModel.StatusMessage = $"Получено {_viewModel.DbTags.Count} тегов DB";
-                _viewModel.ProgressValue = 100;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении тегов DB: {ex.Message}");
-                MessageBox.Show($"Ошибка при получении тегов DB: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                _viewModel.StatusMessage = "Ошибка при получении тегов DB";
-                _viewModel.ProgressValue = 0;
-            }
-            finally
-            {
-                // Включаем кнопку обратно
-                btnGetDbTags.IsEnabled = _viewModel.IsConnected;
-                // Скрываем индикатор загрузки
-                _viewModel.IsLoading = false;
-            }
-        }
+        //        _logger.Info($"Получено {_viewModel.DbTags.Count} тегов DB");
+        //        _viewModel.StatusMessage = $"Получено {_viewModel.DbTags.Count} тегов DB";
+        //        _viewModel.ProgressValue = 100;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при получении тегов DB: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при получении тегов DB: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //        _viewModel.StatusMessage = "Ошибка при получении тегов DB";
+        //        _viewModel.ProgressValue = 0;
+        //    }
+        //    finally
+        //    {
+        //        // Включаем кнопку обратно
+        //        //btnGetDbTags.IsEnabled = _viewModel.IsConnected;
+        //        // Скрываем индикатор загрузки
+        //        _viewModel.IsLoading = false;
+        //    }
+        //}
     }
 }

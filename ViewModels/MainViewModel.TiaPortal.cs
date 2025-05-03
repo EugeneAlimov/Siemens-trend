@@ -12,7 +12,7 @@ namespace SiemensTrend.ViewModels
     public partial class MainViewModel
     {
         // Объект для работы с TIA Portal
-        private TiaPortalCommunicationService _tiaPortalService;
+        //private TiaPortalCommunicationService _tiaPortalService;
 
         /// <summary>
         /// Список проектов TIA Portal для выбора
@@ -130,7 +130,7 @@ namespace SiemensTrend.ViewModels
                     IsConnected = true;
 
                     // Инициализируем обозреватель тегов после успешного подключения
-                    InitializeTagBrowser();
+                    //InitializeTagBrowser();
 
                     return true;
                 }
@@ -217,7 +217,7 @@ namespace SiemensTrend.ViewModels
                         IsConnected = true;  // Важно: явно устанавливаем этот флаг!
 
                         // Инициализируем обозреватель тегов после успешного подключения
-                        InitializeTagBrowser();
+                        //InitializeTagBrowser();
                     }
                     else
                     {

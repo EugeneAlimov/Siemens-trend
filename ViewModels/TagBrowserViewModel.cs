@@ -137,7 +137,7 @@ namespace SiemensTrend.ViewModels
                 try
                 {
                     // Получаем данные из TIA Portal
-                    _plcData = await _tiaService.GetAllProjectTagsAsync();
+                    //_plcData = await _tiaService.GetAllProjectTagsAsync();
                     _logger.Info($"Получено {_plcData.PlcTags.Count} тегов ПЛК и {_plcData.DbTags.Count} тегов DB");
 
                     // Добавляем теги ПЛК в дерево

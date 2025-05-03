@@ -35,33 +35,33 @@ namespace SiemensTrend.Views
                     _logger.Info($"Выбран проект для открытия: {projectPath}");
 
                     // Проверяем наличие кэшированных данных
-                    bool hasCachedData = _viewModel.CheckCachedProjectData(projectName);
+                    //bool hasCachedData = _viewModel.CheckCachedProjectData(projectName);
 
-                    if (hasCachedData)
-                    {
-                        // Спрашиваем пользователя, хочет ли он использовать кэш
-                        var dialogResult = MessageBox.Show(
-                            $"Найдены кэшированные данные для проекта {projectName}. Хотите использовать их вместо открытия проекта?",
-                            "Кэшированные данные",
-                            MessageBoxButton.YesNoCancel,
-                            MessageBoxImage.Question);
+                    //if (hasCachedData)
+                    //{
+                    //    // Спрашиваем пользователя, хочет ли он использовать кэш
+                    //    var dialogResult = MessageBox.Show(
+                    //        $"Найдены кэшированные данные для проекта {projectName}. Хотите использовать их вместо открытия проекта?",
+                    //        "Кэшированные данные",
+                    //        MessageBoxButton.YesNoCancel,
+                    //        MessageBoxImage.Question);
 
-                        if (dialogResult == MessageBoxResult.Yes)
-                        {
-                            // Загружаем данные из кэша
-                            _logger.Info($"Использование кэшированных данных для проекта {projectName}");
-                            _viewModel.LoadCachedProjectDataAsync(projectName);
-                            UpdateConnectionState();
-                            return;
-                        }
-                        else if (dialogResult == MessageBoxResult.Cancel)
-                        {
-                            // Отменяем операцию
-                            _logger.Info("Операция отменена пользователем");
-                            return;
-                        }
-                        // Для MessageBoxResult.No - продолжаем открытие проекта
-                    }
+                    //    if (dialogResult == MessageBoxResult.Yes)
+                    //    {
+                    //        // Загружаем данные из кэша
+                    //        _logger.Info($"Использование кэшированных данных для проекта {projectName}");
+                    //        _viewModel.LoadCachedProjectDataAsync(projectName);
+                    //        UpdateConnectionState();
+                    //        return;
+                    //    }
+                    //    else if (dialogResult == MessageBoxResult.Cancel)
+                    //    {
+                    //        // Отменяем операцию
+                    //        _logger.Info("Операция отменена пользователем");
+                    //        return;
+                    //    }
+                    //    // Для MessageBoxResult.No - продолжаем открытие проекта
+                    //}
 
                     // Запускаем процесс открытия проекта и подключения к нему
                     _viewModel.StatusMessage = $"Открытие проекта: {projectName}...";
@@ -186,7 +186,7 @@ namespace SiemensTrend.Views
                         _logger.Info($"Успешное подключение к проекту: {dialog.SelectedProject.Name}");
 
                         // Инициализируем модель после подключения (без загрузки тегов)
-                        _viewModel.InitializeAfterConnection();
+                        //_viewModel.InitializeAfterConnection();
 
                         // ВАЖНО: НЕ запускаем автоматическую загрузку тегов!
                         // Вместо этого сообщаем пользователю, что он может загрузить теги вручную

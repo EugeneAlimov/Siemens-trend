@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Windows.Input;
 using SiemensTrend.Communication;
-using SiemensTrend.Communication.S7;
+using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using SiemensTrend.Storage.TagManagement;
 
-using SiemensTrend.Storage.TagManagement;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows.Input;
 namespace SiemensTrend.ViewModels
 {
     /// <summary>
@@ -19,6 +18,8 @@ namespace SiemensTrend.ViewModels
     /// </summary>
     public partial class MainViewModel : ViewModelBase
     {
+        // Общие поля для всех частичных классов MainViewModel
+
         /// <summary>
         /// Logger for event recording
         /// </summary>
@@ -34,10 +35,15 @@ namespace SiemensTrend.ViewModels
         /// </summary>
         protected TagManager _tagManager;
 
+        // Поле для работы с TIA Portal - оставляем только в этом файле,
+        // в других частичных классах его нужно удалить
+        private TiaPortalCommunicationService _tiaPortalService;
+
         private bool _isConnected;
         private bool _isLoading;
         private string _statusMessage;
         private int _progressValue;
+
         /// <summary>
         /// Команда для добавления тега в мониторинг
         /// </summary>
@@ -129,49 +135,61 @@ namespace SiemensTrend.ViewModels
         /// Constructor
         /// </summary>
         /// <param name="logger">Logger</param>
-        /// <summary>
-        /// ÐšÐ¾Ð½ÑÑ‚Ñ€ÑƒÐºÑ‚Ð¾Ñ€
-        /// </summary>
-        /// <param name="logger">Ð›Ð¾Ð³Ð³ÐµÑ€</param>
         public MainViewModel(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _logger.Info("Initializing MainViewModel");
 
-            // Ð˜Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð¸Ñ€ÑƒÐµÐ¼ ÐºÐ¾Ð»Ð»ÐµÐºÑ†Ð¸Ð¸
+            // Инициализируем коллекции
             AvailableTags = new ObservableCollection<TagDefinition>();
             MonitoredTags = new ObservableCollection<TagDefinition>();
             PlcTags = new ObservableCollection<TagDefinition>();
             DbTags = new ObservableCollection<TagDefinition>();
 
-            // Ð˜Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð¸Ñ€ÑƒÐµÐ¼ Ð½Ð°Ñ‡Ð°Ð»ÑŒÐ½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ
+            // Инициализируем начальные значения
             IsConnected = false;
             IsLoading = false;
             StatusMessage = "Ready to work";
             ProgressValue = 0;
 
-            // Ð˜Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð¸Ñ€ÑƒÐµÐ¼ Ð¼ÐµÐ½ÐµÐ´Ð¶ÐµÑ€ Ñ‚ÐµÐ³Ð¾Ð²
+            // Инициализируем менеджер тегов
             _tagManager = new TagManager(_logger);
-            
-            // Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÐµÐ¼ Ñ‚ÐµÐ³Ð¸ Ð¸Ð· Ñ…Ñ€Ð°Ð½Ð¸Ð»Ð¸Ñ‰Ð°
+
+            // Загружаем теги из хранилища
             LoadTagsFromStorage();
 
-            // Fix for the ambiguous constructor call
-            AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(AddTagToMonitoring, null);
+            // Команды - создаем новые внутренние методы без конфликта имен
+            AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(OnAddTagToMonitoring);
+            RemoveTagFromMonitoringCommand = new RelayCommand<TagDefinition>(OnRemoveTagFromMonitoring);
 
-            RemoveTagFromMonitoringCommand = new RelayCommand<TagDefinition>(RemoveTagFromMonitoring);
-            
-            _logger.Info("MainViewModel Ð¸Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ð½ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾");
-            
-            // ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð·Ð°Ð³Ñ€ÑƒÐ¶Ð°ÐµÐ¼ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ðµ Ñ‚ÐµÐ³Ð¸
-            try
-            {
-                LoadTagsFromXmlAsync().Wait();
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ðµ Ñ‚ÐµÐ³Ð¸: {ex.Message}");
-            }
+            _logger.Info("MainViewModel инициализирован успешно");
+
+            // Инициализируем приложение
+            Initialize();
+        }
+
+        /// <summary>
+        /// Добавление тега в мониторинг (обработчик команды)
+        /// </summary>
+        private void OnAddTagToMonitoring(TagDefinition tag)
+        {
+            if (tag == null || MonitoredTags.Contains(tag))
+                return;
+
+            MonitoredTags.Add(tag);
+            _logger.Info($"Тег {tag.Name} добавлен в мониторинг");
+        }
+
+        /// <summary>
+        /// Удаление тега из мониторинга (обработчик команды)
+        /// </summary>
+        private void OnRemoveTagFromMonitoring(TagDefinition tag)
+        {
+            if (tag == null || !MonitoredTags.Contains(tag))
+                return;
+
+            MonitoredTags.Remove(tag);
+            _logger.Info($"Тег {tag.Name} удален из мониторинга");
         }
 
         /// <summary>
@@ -408,6 +426,113 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
+        /// Сохранение тегов в XML файл
+        /// </summary>
+        /// <param name="filePath">Путь к файлу (если null, будет использован путь по умолчанию)</param>
+        public async Task SaveTagsToXmlAsync(string filePath = null)
+        {
+            try
+            {
+                _logger.Info("SaveTagsToXmlAsync: Сохранение тегов в XML");
+
+                // Если путь не указан, используем путь по умолчанию
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    string appDataPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "SiemensTrend");
+
+                    // Создаем директорию, если нужно
+                    if (!Directory.Exists(appDataPath))
+                    {
+                        Directory.CreateDirectory(appDataPath);
+                    }
+
+                    filePath = Path.Combine(appDataPath, "UserTags.xml");
+                }
+
+                // Собираем все теги
+                var allTags = new List<TagDefinition>();
+                allTags.AddRange(PlcTags);
+                allTags.AddRange(DbTags);
+
+                // Сохраняем теги
+                await Task.Run(() => _tagManager.SaveTagsToXml(allTags, filePath));
+
+                _logger.Info($"SaveTagsToXmlAsync: Сохранено {allTags.Count} тегов в {filePath}");
+                StatusMessage = $"Сохранено {allTags.Count} тегов";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"SaveTagsToXmlAsync: Ошибка: {ex.Message}");
+                StatusMessage = "Ошибка при сохранении тегов в XML";
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Загрузка тегов из XML файла
+        /// </summary>
+        /// <param name="filePath">Путь к файлу (если null, будет использован путь по умолчанию)</param>
+        public async Task LoadTagsFromXmlAsync(string filePath = null)
+        {
+            try
+            {
+                _logger.Info("LoadTagsFromXmlAsync: Загрузка тегов из XML");
+
+                // Если путь не указан, используем путь по умолчанию
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    string appDataPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "SiemensTrend");
+
+                    filePath = Path.Combine(appDataPath, "UserTags.xml");
+                }
+
+                // Проверяем существование файла
+                if (!File.Exists(filePath))
+                {
+                    _logger.Warn($"LoadTagsFromXmlAsync: Файл не существует: {filePath}");
+                    StatusMessage = "Файл с тегами не существует";
+                    return;
+                }
+
+                // Загружаем теги
+                var tags = await Task.Run(() => _tagManager.LoadTagsFromXml(filePath));
+
+                // Очищаем текущие коллекции
+                PlcTags.Clear();
+                DbTags.Clear();
+                AvailableTags.Clear();
+
+                // Распределяем теги по коллекциям
+                foreach (var tag in tags)
+                {
+                    AvailableTags.Add(tag);
+
+                    if (tag.IsDbTag)
+                    {
+                        DbTags.Add(tag);
+                    }
+                    else
+                    {
+                        PlcTags.Add(tag);
+                    }
+                }
+
+                _logger.Info($"LoadTagsFromXmlAsync: Загружено {tags.Count} тегов");
+                StatusMessage = $"Загружено {tags.Count} тегов";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"LoadTagsFromXmlAsync: Ошибка: {ex.Message}");
+                StatusMessage = "Ошибка при загрузке тегов из XML";
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Current project name
         /// </summary>
         public string CurrentProjectName
@@ -425,164 +550,4 @@ namespace SiemensTrend.ViewModels
         /// </summary>
         public int MaxMonitoredTags => 10;
     }
-
-    /// <summary>
-    /// Команда с параметром
-    /// </summary>
-    public class RelayCommand<T> : ICommand
-    {
-        private readonly Action<T> _execute;
-        private readonly Predicate<T> _canExecute;
-
-        public event EventHandler CanExecuteChanged
-        {
-            add { CommandManager.RequerySuggested += value; }
-            remove { CommandManager.RequerySuggested -= value; }
-        }
-
-        public RelayCommand(Action<T> execute, Predicate<T> canExecute = null)
-        {
-            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
-            _canExecute = canExecute;
-        }
-
-        public bool CanExecute(object parameter) => _canExecute?.Invoke((T)parameter) ?? true;
-
-        public void Execute(object parameter) => _execute((T)parameter);
-    }
-
-    /// <summary>
-    /// Команда без параметров
-    /// </summary>
-    public class RelayCommand : ICommand
-    {
-        private readonly Action _execute;
-        private readonly Func<bool> _canExecute;
-
-        public event EventHandler CanExecuteChanged
-        {
-            add { CommandManager.RequerySuggested += value; }
-            remove { CommandManager.RequerySuggested -= value; }
-        }
-
-        public RelayCommand(Action execute, Func<bool> canExecute = null)
-        {
-            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
-            _canExecute = canExecute;
-        }
-
-        public bool CanExecute(object parameter) => _canExecute?.Invoke() ?? true;
-
-        public void Execute(object parameter) => _execute();
-    }
-
-        /// <summary>
-        /// ï¿½ï¿½ï¿½à ­ï¿½ï¿½ï¿½ï¿½ â¥£ï¿½ï¿½ ï¿½ XML-ä ©ï¿½
-        /// </summary>
-        /// <param name="filePath">ï¿½ï¿½ï¿½ï¿½ ï¿½ ä ©ï¿½ï¿½ (ï¿½á«¨ null, ï¿½ã¤¥ï¿½ ï¿½á¯®ï¿½ì§®ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ã¬®ï¿½ç ­ï¿½ï¿½)</param>
-        /// <returns>Task</returns>
-        public async Task SaveTagsToXmlAsync(string filePath = null)
-        {
-            try
-            {
-                _logger.Info("SaveTagsToXmlAsync: ï¿½ï¿½ï¿½à ­ï¿½ï¿½ï¿½ï¿½ â¥£ï¿½ï¿½ ï¿½ XML");
-                
-                // ï¿½á«¨ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ãª ï¿½ï¿½ï¿½, ï¿½á¯®ï¿½ï¿½ã¥¬ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ã¬®ï¿½ç ­ï¿½ï¿½
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    string appDataPath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "SiemensTrend");
-                        
-                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½à¥ªï¿½ï¿½ï¿½, ï¿½á«¨ ï¿½ã¦­ï¿½
-                    if (!Directory.Exists(appDataPath))
-                    {
-                        Directory.CreateDirectory(appDataPath);
-                    }
-                    
-                    filePath = Path.Combine(appDataPath, "UserTags.xml");
-                }
-                
-                // ï¿½ï¿½ï¿½ï¿½à ¥ï¿½ ï¿½ï¿½ â¥£ï¿½
-                var allTags = new List<TagDefinition>();
-                allTags.AddRange(PlcTags);
-                allTags.AddRange(DbTags);
-                
-                // ï¿½ï¿½ï¿½à ­ï¥¬ â¥£ï¿½
-                await Task.Run(() => _tagManager.SaveTagsToXml(allTags, filePath));
-                
-                _logger.Info($"SaveTagsToXmlAsync: ï¿½ï¿½ï¿½à ­ï¿½ï¿½ï¿½ {allTags.Count} â¥£ï¿½ï¿½ ï¿½ {filePath}");
-                StatusMessage = $"ï¿½ï¿½ï¿½à ­ï¿½ï¿½ï¿½ {allTags.Count} â¥£ï¿½ï¿½";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"SaveTagsToXmlAsync: ï¿½è¨¡ï¿½ï¿½: {ex.Message}");
-                StatusMessage = "ï¿½è¨¡ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½à ­ï¿½ï¿½ï¿½ï¿½ â¥£ï¿½ï¿½ ï¿½ XML";
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// ï¿½ï¿½ï¿½ï¿½ã§ªï¿½ â¥£ï¿½ï¿½ ï¿½ï¿½ XML-ä ©ï¿½ï¿½
-        /// </summary>
-        /// <param name="filePath">ï¿½ï¿½ï¿½ï¿½ ï¿½ ä ©ï¿½ï¿½ (ï¿½á«¨ null, ï¿½ã¤¥ï¿½ ï¿½á¯®ï¿½ì§®ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ã¬®ï¿½ç ­ï¿½ï¿½)</param>
-        /// <returns>Task</returns>
-        public async Task LoadTagsFromXmlAsync(string filePath = null)
-        {
-            try
-            {
-                _logger.Info("LoadTagsFromXmlAsync: ï¿½ï¿½ï¿½ï¿½ã§ªï¿½ â¥£ï¿½ï¿½ ï¿½ï¿½ XML");
-                
-                // ï¿½á«¨ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ãª ï¿½ï¿½ï¿½, ï¿½á¯®ï¿½ï¿½ã¥¬ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ã¬®ï¿½ç ­ï¿½ï¿½
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    string appDataPath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "SiemensTrend");
-                    
-                    filePath = Path.Combine(appDataPath, "UserTags.xml");
-                }
-                
-                // ï¿½à®¢ï¿½ï¿½ï¥¬ ï¿½ï¿½ï¿½ï¿½â¢®ï¿½ï¿½ï¿½ï¿½ï¿½ ä ©ï¿½ï¿½
-                if (!File.Exists(filePath))
-                {
-                    _logger.Warn($"LoadTagsFromXmlAsync: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: {filePath}");
-                    StatusMessage = "ï¿½ï¿½ï¿½ï¿½ ï¿½ â¥£ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½";
-                    return;
-                }
-                
-                // ï¿½ï¿½ï¿½ï¿½ã¦ ï¿½ï¿½ â¥£ï¿½
-                var tags = await Task.Run(() => _tagManager.LoadTagsFromXml(filePath));
-                
-                // ï¿½ï¿½é ¥ï¿½ â¥ªï¿½é¨¥ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ¨¨
-                PlcTags.Clear();
-                DbTags.Clear();
-                AvailableTags.Clear();
-                
-                // ï¿½ï¿½ï¿½à¥¤ï¿½ï¿½ï¥¬ â¥£ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-                foreach (var tag in tags)
-                {
-                    AvailableTags.Add(tag);
-                    
-                    if (tag.IsDbTag)
-                    {
-                        DbTags.Add(tag);
-                    }
-                    else
-                    {
-                        PlcTags.Add(tag);
-                    }
-                }
-                
-                _logger.Info($"LoadTagsFromXmlAsync: ï¿½ï¿½ï¿½ï¿½ã¦¥ï¿½ï¿½ {tags.Count} â¥£ï¿½ï¿½");
-                StatusMessage = $"ï¿½ï¿½ï¿½ï¿½ã¦¥ï¿½ï¿½ {tags.Count} â¥£ï¿½ï¿½";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"LoadTagsFromXmlAsync: ï¿½è¨¡ï¿½ï¿½: {ex.Message}");
-                StatusMessage = "ï¿½è¨¡ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ã§ªï¿½ â¥£ï¿½ï¿½ ï¿½ï¿½ XML";
-                throw;
-            }
-        }
 }
-

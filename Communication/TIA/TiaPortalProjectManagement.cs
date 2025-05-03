@@ -186,7 +186,7 @@ namespace SiemensTrend.Communication.TIA
                 // Создаем читатель тегов только после успешной проверки проекта
                 try
                 {
-                    _tagReader = new TiaPortalTagReader(_logger, this);
+                    //_tagReader = new TiaPortalTagReader(_logger, this);
                     _logger.Info("ConnectToProject: TiaPortalTagReader создан успешно");
                 }
                 catch (Exception ex)
@@ -334,7 +334,7 @@ namespace SiemensTrend.Communication.TIA
                     // Создаем читатель тегов после успешного открытия проекта
                     try
                     {
-                        _tagReader = new TiaPortalTagReader(_logger, this);
+                        //_tagReader = new TiaPortalTagReader(_logger, this);
                         _logger.Info("OpenProjectSync: TiaPortalTagReader создан успешно");
                     }
                     catch (Exception ex)

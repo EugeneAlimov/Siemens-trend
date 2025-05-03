@@ -25,7 +25,7 @@ namespace SiemensTrend.ViewModels
                 StatusMessage = "Экспорт тегов в XML...";
                 ProgressValue = 10;
 
-                await _tiaPortalService.ExportTagsToXml();
+                //await _tiaPortalService.ExportTagsToXml();
 
                 ProgressValue = 100;
                 StatusMessage = "Экспорт тегов в XML завершен";
@@ -169,42 +169,42 @@ namespace SiemensTrend.ViewModels
                 }
 
                 // Устанавливаем имя текущего проекта в XML Manager
-                var xmlManager = GetXmlManager();
-                if (xmlManager != null)
-                {
-                    xmlManager.SetCurrentProject(projectName);
-                    _logger.Info($"LoadCachedProjectDataAsync: Установлен текущий проект {projectName} в XmlManager");
-                }
-                else
-                {
-                    _logger.Error("LoadCachedProjectDataAsync: Не удалось получить доступ к XmlManager");
-                    IsLoading = false;
-                    return false;
-                }
+                //var xmlManager = GetXmlManager();
+                //if (xmlManager != null)
+                //{
+                //    xmlManager.SetCurrentProject(projectName);
+                //    _logger.Info($"LoadCachedProjectDataAsync: Установлен текущий проект {projectName} в XmlManager");
+                //}
+                //else
+                //{
+                //    _logger.Error("LoadCachedProjectDataAsync: Не удалось получить доступ к XmlManager");
+                //    IsLoading = false;
+                //    return false;
+                //}
 
                 // Загружаем теги ПЛК из кэша
                 ProgressValue = 30;
                 StatusMessage = "Загрузка тегов ПЛК из кэша...";
 
-                var plcTags = await _tiaPortalService.GetPlcTagsAsync();
-                PlcTags.Clear();
-                foreach (var tag in plcTags)
-                {
-                    PlcTags.Add(tag);
-                }
-                _logger.Info($"LoadCachedProjectDataAsync: Загружено {plcTags.Count} тегов ПЛК");
+                //var plcTags = await _tiaPortalService.GetPlcTagsAsync();
+                //PlcTags.Clear();
+                //foreach (var tag in plcTags)
+                //{
+                //    PlcTags.Add(tag);
+                //}
+                //_logger.Info($"LoadCachedProjectDataAsync: Загружено {plcTags.Count} тегов ПЛК");
 
                 // Загружаем теги DB из кэша
                 ProgressValue = 60;
                 StatusMessage = "Загрузка блоков данных из кэша...";
 
-                var dbTags = await _tiaPortalService.GetDbTagsAsync();
-                DbTags.Clear();
-                foreach (var tag in dbTags)
-                {
-                    DbTags.Add(tag);
-                }
-                _logger.Info($"LoadCachedProjectDataAsync: Загружено {dbTags.Count} блоков данных");
+                //var dbTags = await _tiaPortalService.GetDbTagsAsync();
+                //DbTags.Clear();
+                //foreach (var tag in dbTags)
+                //{
+                //    DbTags.Add(tag);
+                //}
+                //_logger.Info($"LoadCachedProjectDataAsync: Загружено {dbTags.Count} блоков данных");
 
                 ProgressValue = 100;
                 StatusMessage = $"Загрузка кэшированных данных проекта {projectName} завершена";
