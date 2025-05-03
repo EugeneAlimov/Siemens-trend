@@ -119,48 +119,5 @@ namespace SiemensTrend.ViewModels
                 IsLoading = false;
             }
         }
-
-        /// <summary>
-        /// Получение тегов блоков данных из проекта
-        /// </summary>
-        public async Task GetDbTagsAsync()
-        {
-            try
-            {
-                if (_tiaPortalService == null)
-                {
-                    _logger.Error("GetDbTagsAsync: Сервис TIA Portal не инициализирован");
-                    StatusMessage = "Ошибка: сервис TIA Portal не инициализирован";
-                    return;
-                }
-
-                IsLoading = true;
-                StatusMessage = "Получение тегов DB...";
-                ProgressValue = 10;
-
-                // Используем улучшенный безопасный метод вместо обычного
-                var dbTags = await _tiaPortalService.GetDbTagsSafeAsync(
-                    TiaPortalTagReaderFactory.ReaderMode.SafeMode);
-                ProgressValue = 90;
-
-                DbTags.Clear();
-                foreach (var tag in dbTags)
-                {
-                    DbTags.Add(tag);
-                }
-
-                StatusMessage = $"Получено {dbTags.Count} тегов DB";
-                ProgressValue = 100;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"GetDbTagsAsync: Ошибка: {ex.Message}");
-                StatusMessage = "Ошибка получения тегов DB";
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
     }
 }
