@@ -76,26 +76,6 @@ namespace SiemensTrend.ViewModels
         public event EventHandler<TagDefinition> TagSelected;
 
         /// <summary>
-        /// Конструктор
-        /// </summary>
-        public TagBrowserViewModel(Logger logger, TiaPortalCommunicationService tiaService)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _tiaService = tiaService ?? throw new ArgumentNullException(nameof(tiaService));
-            _plcData = new PlcData();
-
-            RootItems = new ObservableCollection<TreeViewItemViewModel>();
-
-            // Инициализируем команды
-            RefreshCommand = new RelayCommand(RefreshTags);
-            AddTagCommand = new RelayCommand<TreeViewItemViewModel>(AddTagToMonitoring);
-            SearchCommand = new RelayCommand(SearchTags);
-
-            // Инициализируем дерево
-            InitializeTree();
-        }
-
-        /// <summary>
         /// Инициализация дерева тегов
         /// </summary>
         private void InitializeTree()
@@ -268,18 +248,6 @@ namespace SiemensTrend.ViewModels
 
             // Иначе возвращаем как есть
             return fullName;
-        }
-
-        /// <summary>
-        /// Добавление тега в мониторинг
-        /// </summary>
-        private void AddTagToMonitoring(TreeViewItemViewModel item)
-        {
-            if (item?.Tag is TagDefinition tagDef)
-            {
-                TagSelected?.Invoke(this, tagDef);
-                _logger.Info($"Выбран тег для мониторинга: {tagDef.Name}");
-            }
         }
 
         /// <summary>
