@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SiemensTrend.Views"
         xmlns:viewModels="clr-namespace:SiemensTrend.ViewModels"
-        xmlns:converters="clr-namespace:SiemensTrend.Visualization.Converters;assembly=SiemensTrend"
+        xmlns:converters="clr-namespace:SiemensTrend.Visualization.Converters"
         mc:Ignorable="d"
         Title="Siemens Trend Monitor" Height="700" Width="1000"
         WindowStartupLocation="CenterScreen">

@@ -6,7 +6,6 @@ using SiemensTrend.Communication;
 using SiemensTrend.Communication.S7;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
-using SiemensTrend.Helpers;
 using SiemensTrend.Storage.TagManagement;
 
 using SiemensTrend.Storage.TagManagement;
@@ -156,9 +155,10 @@ namespace SiemensTrend.ViewModels
             
             // Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÐµÐ¼ Ñ‚ÐµÐ³Ð¸ Ð¸Ð· Ñ…Ñ€Ð°Ð½Ð¸Ð»Ð¸Ñ‰Ð°
             LoadTagsFromStorage();
-            
-            // Ð˜Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð¸Ñ€ÑƒÐµÐ¼ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹
-            AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(AddTagToMonitoring);
+
+            // Fix for the ambiguous constructor call
+            AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(AddTagToMonitoring, null);
+
             RemoveTagFromMonitoringCommand = new RelayCommand<TagDefinition>(RemoveTagFromMonitoring);
             
             _logger.Info("MainViewModel Ð¸Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð¸Ñ€Ð¾Ð²Ð°Ð½ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾");
@@ -173,8 +173,7 @@ namespace SiemensTrend.ViewModels
                 _logger.Warn($"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ðµ Ñ‚ÐµÐ³Ð¸: {ex.Message}");
             }
         }
-        }
-
+        
 /// <summary>
 /// Загружает теги из хранилища
 /// </summary>
