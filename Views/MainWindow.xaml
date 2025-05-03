@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SiemensTrend.Views"
         xmlns:viewModels="clr-namespace:SiemensTrend.ViewModels"
-        xmlns:converters="clr-namespace:SiemensTrend.Visualization.Converters"
+        xmlns:converters="clr-namespace:SiemensTrend.Visualization.Converters;assembly=SiemensTrend"
         mc:Ignorable="d"
         Title="Siemens Trend Monitor" Height="700" Width="1000"
         WindowStartupLocation="CenterScreen">
@@ -37,9 +37,6 @@
                 <Separator/>
                 <Button x:Name="btnStartMonitoring" Content="Запустить мониторинг" Margin="3" Padding="5,3" Click="BtnStartMonitoring_Click"/>
                 <Button x:Name="btnStopMonitoring" Content="Остановить мониторинг" Margin="3" Padding="5,3" Click="BtnStopMonitoring_Click"/>
-                <Separator/>
-                <Button x:Name="btnSaveLog" Content="Сохранить лог" Margin="3" Padding="5,3" Click="BtnSaveLog_Click"/>
-                <Button x:Name="btnClearLog" Content="Очистить лог" Margin="3" Padding="5,3" Click="BtnClearLog_Click"/>
                 <Separator/>
                 <Button x:Name="btnCreateTestTags" Content="Создать тестовые теги" Margin="3" Padding="5,3" Click="BtnCreateTestTags_Click"/>
             </ToolBar>

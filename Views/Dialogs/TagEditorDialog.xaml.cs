@@ -5,12 +5,12 @@ using SiemensTrend.Core.Models;
 namespace SiemensTrend.Views.Dialogs
 {
     /// <summary>
-    /// Interaction logic for TagEditorDialog.xaml
+    /// Логика взаимодействия для TagEditorDialog.xaml
     /// </summary>
     public partial class TagEditorDialog : Window
     {
         /// <summary>
-        /// Dialog mode (create or edit)
+        /// Режим диалога (создание или редактирование)
         /// </summary>
         public enum DialogMode
         {
@@ -22,41 +22,41 @@ namespace SiemensTrend.Views.Dialogs
         private TagDefinition _originalTag;
 
         /// <summary>
-        /// Result tag
+        /// Результирующий тег
         /// </summary>
         public TagDefinition Tag { get; private set; }
 
         /// <summary>
-        /// Constructor for creating a new tag
+        /// Конструктор для создания нового тега
         /// </summary>
         public TagEditorDialog()
         {
             InitializeComponent();
             _mode = DialogMode.Create;
-            Title = "Create New Tag";
+            Title = "Создание нового тега";
             
-            // Set default values
+            // Устанавливаем значения по умолчанию
             cmbDataType.SelectedIndex = 0; // Bool
         }
 
         /// <summary>
-        /// Constructor for editing an existing tag
+        /// Конструктор для редактирования существующего тега
         /// </summary>
-        /// <param name="tag">Tag to edit</param>
+        /// <param name="tag">Тег для редактирования</param>
         public TagEditorDialog(TagDefinition tag)
         {
             InitializeComponent();
             _mode = DialogMode.Edit;
             _originalTag = tag;
-            Title = "Edit Tag";
+            Title = "Редактирование тега";
             
-            // Fill fields with tag data
+            // Заполняем поля данными тега
             txtName.Text = tag.Name;
             txtAddress.Text = tag.Address;
             txtGroup.Text = tag.GroupName;
             txtComment.Text = tag.Comment;
             
-            // Select data type
+            // Выбираем тип данных
             switch (tag.DataType)
             {
                 case TagDataType.Bool:
@@ -76,13 +76,13 @@ namespace SiemensTrend.Views.Dialogs
                     break;
             }
             
-            // Select tag type
+            // Выбираем тип тега
             rbPlcTag.IsChecked = !tag.IsDbTag;
             rbDbTag.IsChecked = tag.IsDbTag;
         }
 
         /// <summary>
-        /// Cancel button click handler
+        /// Обработчик нажатия кнопки "Отмена"
         /// </summary>
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
@@ -91,35 +91,35 @@ namespace SiemensTrend.Views.Dialogs
         }
 
         /// <summary>
-        /// Save button click handler
+        /// Обработчик нажатия кнопки "Сохранить"
         /// </summary>
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Check required fields
+                // Проверяем обязательные поля
                 if (string.IsNullOrWhiteSpace(txtName.Text))
                 {
-                    MessageBox.Show("Please enter tag name", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Пожалуйста, введите имя тега", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                     txtName.Focus();
                     return;
                 }
 
                 if (string.IsNullOrWhiteSpace(txtAddress.Text))
                 {
-                    MessageBox.Show("Please enter tag address", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("Пожалуйста, введите адрес тега", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                     txtAddress.Focus();
                     return;
                 }
 
-                // Get values from fields
+                // Получаем значения из полей
                 string name = txtName.Text.Trim();
                 string address = txtAddress.Text.Trim();
                 string group = txtGroup.Text.Trim();
                 string comment = txtComment.Text.Trim();
                 bool isDbTag = rbDbTag.IsChecked ?? false;
 
-                // Get selected data type
+                // Получаем выбранный тип данных
                 TagDataType dataType;
                 switch (cmbDataType.SelectedIndex)
                 {
@@ -140,7 +140,7 @@ namespace SiemensTrend.Views.Dialogs
                         break;
                 }
 
-                // Create new tag or update existing
+                // Создаем новый тег или обновляем существующий
                 if (_mode == DialogMode.Create)
                 {
                     Tag = new TagDefinition
@@ -154,7 +154,7 @@ namespace SiemensTrend.Views.Dialogs
                         IsDbTag = isDbTag
                     };
                 }
-                else // Edit
+                else // Редактирование
                 {
                     Tag = new TagDefinition
                     {
@@ -173,8 +173,8 @@ namespace SiemensTrend.Views.Dialogs
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error saving tag: {ex.Message}", 
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Ошибка при сохранении тега: {ex.Message}", 
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

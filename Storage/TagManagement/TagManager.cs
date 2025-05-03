@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
@@ -8,7 +8,7 @@ using SiemensTrend.Core.Models;
 namespace SiemensTrend.Storage.TagManagement
 {
     /// <summary>
-    /// Class for tag management (manual adding, editing, saving)
+    /// Класс для управления тегами (ручное добавление, редактирование, сохранение)
     /// </summary>
     public class TagManager
     {
@@ -16,70 +16,70 @@ namespace SiemensTrend.Storage.TagManagement
         private readonly string _tagsFilePath;
 
         /// <summary>
-        /// Constructor
+        /// Конструктор
         /// </summary>
-        /// <param name="logger">Logger</param>
+        /// <param name="logger">Логгер</param>
         public TagManager(Logger logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
-            // Define path to tag storage file
+            // Определяем путь к файлу хранения тегов
             string appDataPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "SiemensTrend");
                 
-            // Create directory if it doesn't exist
+            // Создаем директорию, если она не существует
             if (!Directory.Exists(appDataPath))
             {
                 Directory.CreateDirectory(appDataPath);
             }
             
             _tagsFilePath = Path.Combine(appDataPath, "Tags.xml");
-            _logger.Info($"TagManager: Initialized with tags file path: {_tagsFilePath}");
+            _logger.Info($"TagManager: Инициализирован с путем к файлу тегов: {_tagsFilePath}");
         }
 
         /// <summary>
-        /// Load tags from XML file
+        /// Загрузка тегов из XML файла
         /// </summary>
-        /// <returns>List of tags</returns>
+        /// <returns>Список тегов</returns>
         public List<TagDefinition> LoadTags()
         {
             try
             {
                 if (!File.Exists(_tagsFilePath))
                 {
-                    _logger.Info("LoadTags: Tags file doesn't exist, returning empty list");
+                    _logger.Info("LoadTags: Файл тегов не существует, возвращаем пустой список");
                     return new List<TagDefinition>();
                 }
 
-                _logger.Info($"LoadTags: Loading tags from file {_tagsFilePath}");
+                _logger.Info($"LoadTags: Загрузка тегов из файла {_tagsFilePath}");
                 
                 using (var fileStream = new FileStream(_tagsFilePath, FileMode.Open, FileAccess.Read))
                 {
                     var serializer = new XmlSerializer(typeof(List<TagDefinition>));
                     var tags = (List<TagDefinition>)serializer.Deserialize(fileStream);
                     
-                    _logger.Info($"LoadTags: Successfully loaded {tags.Count} tags");
+                    _logger.Info($"LoadTags: Успешно загружено {tags.Count} тегов");
                     return tags;
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error($"LoadTags: Error loading tags: {ex.Message}");
+                _logger.Error($"LoadTags: Ошибка загрузки тегов: {ex.Message}");
                 return new List<TagDefinition>();
             }
         }
 
         /// <summary>
-        /// Save tags to XML file
+        /// Сохранение тегов в XML файл
         /// </summary>
-        /// <param name="tags">List of tags to save</param>
-        /// <returns>True if save is successful</returns>
+        /// <param name="tags">Список тегов для сохранения</param>
+        /// <returns>True если сохранение успешно</returns>
         public bool SaveTags(List<TagDefinition> tags)
         {
             try
             {
-                _logger.Info($"SaveTags: Saving {tags.Count} tags to file {_tagsFilePath}");
+                _logger.Info($"SaveTags: Сохранение {tags.Count} тегов в файл {_tagsFilePath}");
                 
                 using (var fileStream = new FileStream(_tagsFilePath, FileMode.Create, FileAccess.Write))
                 {
@@ -87,37 +87,37 @@ namespace SiemensTrend.Storage.TagManagement
                     serializer.Serialize(fileStream, tags);
                 }
                 
-                _logger.Info("SaveTags: Tags saved successfully");
+                _logger.Info("SaveTags: Теги сохранены успешно");
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.Error($"SaveTags: Error saving tags: {ex.Message}");
+                _logger.Error($"SaveTags: Ошибка сохранения тегов: {ex.Message}");
                 return false;
             }
         }
 
         /// <summary>
-        /// Import tags from CSV file
+        /// Импорт тегов из CSV файла
         /// </summary>
-        /// <param name="filePath">Path to CSV file</param>
-        /// <returns>List of imported tags</returns>
+        /// <param name="filePath">Путь к CSV файлу</param>
+        /// <returns>Список импортированных тегов</returns>
         public List<TagDefinition> ImportTagsFromCsv(string filePath)
         {
             try
             {
-                _logger.Info($"ImportTagsFromCsv: Importing tags from file {filePath}");
+                _logger.Info($"ImportTagsFromCsv: Импорт тегов из файла {filePath}");
                 
                 if (!File.Exists(filePath))
                 {
-                    _logger.Error($"ImportTagsFromCsv: File doesn't exist: {filePath}");
+                    _logger.Error($"ImportTagsFromCsv: Файл не существует: {filePath}");
                     return new List<TagDefinition>();
                 }
                 
                 var tags = new List<TagDefinition>();
                 var lines = File.ReadAllLines(filePath);
                 
-                // Skip header if exists
+                // Пропускаем заголовок, если он есть
                 bool hasHeader = lines.Length > 0 && 
                     (lines[0].Contains("Name") || lines[0].Contains("Address") || 
                      lines[0].Contains("DataType") || lines[0].Contains("Group"));
@@ -132,7 +132,7 @@ namespace SiemensTrend.Storage.TagManagement
                     
                     string[] parts = line.Split(',');
                     if (parts.Length < 3)
-                        continue; // Not enough data
+                        continue; // Недостаточно данных
                     
                     string name = parts[0].Trim();
                     string address = parts[1].Trim();
@@ -140,7 +140,7 @@ namespace SiemensTrend.Storage.TagManagement
                     string groupName = parts.Length > 3 ? parts[3].Trim() : string.Empty;
                     string comment = parts.Length > 4 ? parts[4].Trim() : string.Empty;
                     
-                    // Determine data type
+                    // Определяем тип данных
                     TagDataType dataType;
                     switch (dataTypeStr.ToLower())
                     {
@@ -161,7 +161,7 @@ namespace SiemensTrend.Storage.TagManagement
                             break;
                     }
                     
-                    // Create new tag
+                    // Создаем новый тег
                     var tag = new TagDefinition
                     {
                         Id = Guid.NewGuid(),
@@ -176,38 +176,38 @@ namespace SiemensTrend.Storage.TagManagement
                     tags.Add(tag);
                 }
                 
-                _logger.Info($"ImportTagsFromCsv: Successfully imported {tags.Count} tags");
+                _logger.Info($"ImportTagsFromCsv: Успешно импортировано {tags.Count} тегов");
                 return tags;
             }
             catch (Exception ex)
             {
-                _logger.Error($"ImportTagsFromCsv: Error importing tags: {ex.Message}");
+                _logger.Error($"ImportTagsFromCsv: Ошибка импорта тегов: {ex.Message}");
                 return new List<TagDefinition>();
             }
         }
 
         /// <summary>
-        /// Export tags to CSV file
+        /// Экспорт тегов в CSV файл
         /// </summary>
-        /// <param name="tags">List of tags</param>
-        /// <param name="filePath">Path to file</param>
-        /// <returns>True if export is successful</returns>
+        /// <param name="tags">Список тегов</param>
+        /// <param name="filePath">Путь к файлу</param>
+        /// <returns>True если экспорт успешен</returns>
         public bool ExportTagsToCsv(List<TagDefinition> tags, string filePath)
         {
             try
             {
-                _logger.Info($"ExportTagsToCsv: Exporting {tags.Count} tags to file {filePath}");
+                _logger.Info($"ExportTagsToCsv: Экспорт {tags.Count} тегов в файл {filePath}");
                 
-                // Create header
+                // Создаем заголовок
                 var lines = new List<string>
                 {
                     "Name,Address,DataType,Group,Comment"
                 };
                 
-                // Add data
+                // Добавляем данные
                 foreach (var tag in tags)
                 {
-                    // Escape fields with commas
+                    // Экранируем поля с запятыми
                     string name = EscapeCsvField(tag.Name);
                     string address = EscapeCsvField(tag.Address);
                     string dataType = tag.DataType.ToString();
@@ -218,33 +218,33 @@ namespace SiemensTrend.Storage.TagManagement
                     lines.Add(line);
                 }
                 
-                // Save file
+                // Сохраняем файл
                 File.WriteAllLines(filePath, lines);
                 
-                _logger.Info("ExportTagsToCsv: Tags exported successfully");
+                _logger.Info("ExportTagsToCsv: Теги экспортированы успешно");
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.Error($"ExportTagsToCsv: Error exporting tags: {ex.Message}");
+                _logger.Error($"ExportTagsToCsv: Ошибка экспорта тегов: {ex.Message}");
                 return false;
             }
         }
         
         /// <summary>
-        /// Escape CSV field
+        /// Экранирование поля CSV
         /// </summary>
         private string EscapeCsvField(string field)
         {
             if (string.IsNullOrEmpty(field))
                 return string.Empty;
                 
-            // If the field contains a comma or a quote, wrap it in quotes
+            // Если поле содержит запятую или кавычку, оборачиваем его в кавычки
             if (field.Contains(",") || field.Contains("\""))
             {
-                // Escape internal quotes
+                // Экранируем внутренние кавычки
                 field = field.Replace("\"", "\"\"");
-                return $"{field}";
+                return $"\"{field}\"";
             }
             
             return field;

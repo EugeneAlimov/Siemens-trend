@@ -27,10 +27,9 @@ namespace SiemensTrend.Core.Models
         /// Конструктор по умолчанию для сериализации
         /// </summary>
         public TagDefinition()
-        {
-            Id = Guid.NewGuid();
-        }
     {
+        Id = Guid.NewGuid();
+    }
         /// <summary>
         /// Уникальный идентификатор тега
         /// </summary>
@@ -183,3 +182,4 @@ namespace SiemensTrend.Core.Models
         }
     }
 }
+

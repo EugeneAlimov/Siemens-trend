@@ -53,49 +53,6 @@ namespace SiemensTrend.Views
         }
 
         /// <summary>
-        /// Обработчик нажатия кнопки "Экспорт тегов"
-        /// </summary>
-        private async void BtnExportTags_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Создаем диалог сохранения файла
-                SaveFileDialog saveFileDialog = new SaveFileDialog
-                {
-                    Filter = "CSV файлы (*.csv)|*.csv",
-                    Title = "Экспорт тегов",
-                    DefaultExt = ".csv",
-                    AddExtension = true
-                };
-
-                // Если пользователь выбрал файл
-                if (saveFileDialog.ShowDialog() == true)
-                {
-                    string filePath = saveFileDialog.FileName;
-                    _logger.Info($"Экспорт тегов в файл: {filePath}");
-
-                    // Здесь будет вызов соответствующего метода ViewModel
-                    // Например: await _viewModel.ExportTagsAsync(filePath);
-
-                    // Пока просто выводим сообщение
-                    _viewModel.StatusMessage = "Экспорт тегов...";
-                    await Task.Delay(1000); // Имитация работы
-                    _viewModel.StatusMessage = "Теги экспортированы";
-
-                    _logger.Info("Теги успешно экспортированы");
-                    MessageBox.Show("Теги успешно экспортированы",
-                        "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при экспорте тегов: {ex.Message}");
-                MessageBox.Show($"Ошибка при экспорте тегов: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        /// <summary>
         /// Обработчик для кнопки "Сохранить в кэш"
         /// </summary>
         private void BtnSaveToCache_Click(object sender, RoutedEventArgs e)
