@@ -173,45 +173,65 @@ namespace SiemensTrend.ViewModels
                 _logger.Warn($"ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð½Ñ‹Ðµ Ñ‚ÐµÐ³Ð¸: {ex.Message}");
             }
         }
-        
+
+        /// <summary>
+        /// Инициализация приложения
+        /// </summary>
+        public void Initialize()
+        {
+            try
+            {
+                _logger.Info("Initialize: Инициализация приложения");
+
+                // Загружаем теги из хранилища
+                LoadTagsFromStorage();
+
+                _logger.Info("Initialize: Инициализация завершена");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Initialize: Ошибка при инициализации: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Загружает теги из хранилища
         /// </summary>
         private void LoadTagsFromStorage()
+        {
+            try
+            {
+                _logger.Info("LoadTagsFromStorage: Загрузка тегов из хранилища");
+
+                var tags = _tagManager.LoadTags();
+
+                // Очищаем текущие коллекции
+                PlcTags.Clear();
+                DbTags.Clear();
+                AvailableTags.Clear();
+
+                // Распределяем теги по коллекциям
+                foreach (var tag in tags)
                 {
-                    try
+                    AvailableTags.Add(tag);
+
+                    if (tag.IsDbTag)
                     {
-                        _logger.Info("LoadTagsFromStorage: Загрузка тегов из хранилища");
-
-                        var tags = _tagManager.LoadTags();
-
-                        // Очищаем текущие коллекции
-                        PlcTags.Clear();
-                        DbTags.Clear();
-                        AvailableTags.Clear();
-
-                        // Распределяем теги по коллекциям
-                        foreach (var tag in tags)
-                        {
-                            AvailableTags.Add(tag);
-
-                            if (tag.IsDbTag)
-                            {
-                                DbTags.Add(tag);
-                            }
-                            else
-                            {
-                                PlcTags.Add(tag);
-                            }
-                        }
-
-                        _logger.Info($"LoadTagsFromStorage: Загружено {PlcTags.Count} тегов PLC и {DbTags.Count} тегов DB");
+                        DbTags.Add(tag);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.Error($"LoadTagsFromStorage: Ошибка загрузки тегов: {ex.Message}");
+                        PlcTags.Add(tag);
                     }
                 }
+
+                _logger.Info($"LoadTagsFromStorage: Загружено {PlcTags.Count} тегов PLC и {DbTags.Count} тегов DB");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"LoadTagsFromStorage: Ошибка загрузки тегов: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Сохраняет теги в хранилище
@@ -286,6 +306,45 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
+        /// Редактирует тег
+        /// </summary>
+        /// <param name="originalTag">Исходный тег</param>
+        /// <param name="updatedTag">Обновленный тег</param>
+        public void EditTag(TagDefinition originalTag, TagDefinition updatedTag)
+        {
+            if (originalTag == null || updatedTag == null)
+                return;
+
+            try
+            {
+                _logger.Info($"EditTag: Редактирование тега: {originalTag.Name} -> {updatedTag.Name}");
+
+                // Проверяем, существует ли тег с новым именем, если оно отличается
+                if (!originalTag.Name.Equals(updatedTag.Name, StringComparison.OrdinalIgnoreCase) &&
+                    TagExists(updatedTag.Name))
+                {
+                    _logger.Warn($"EditTag: Тег с именем {updatedTag.Name} уже существует");
+                    StatusMessage = $"Тег с именем {updatedTag.Name} уже существует";
+                    return;
+                }
+
+                // Удаляем старый тег
+                RemoveTag(originalTag);
+
+                // Добавляем обновленный тег
+                AddNewTag(updatedTag);
+
+                _logger.Info($"EditTag: Тег отредактирован успешно");
+                StatusMessage = $"Тег {updatedTag.Name} отредактирован";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"EditTag: Ошибка при редактировании тега: {ex.Message}");
+                StatusMessage = "Ошибка при редактировании тега";
+            }
+        }
+
+        /// <summary>
         /// Удаляет тег
         /// </summary>
         /// <param name="tag">Тег для удаления</param>
@@ -330,45 +389,6 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Редактирует тег
-        /// </summary>
-        /// <param name="originalTag">Исходный тег</param>
-        /// <param name="updatedTag">Обновленный тег</param>
-        public void EditTag(TagDefinition originalTag, TagDefinition updatedTag)
-        {
-            if (originalTag == null || updatedTag == null)
-                return;
-
-            try
-            {
-                _logger.Info($"EditTag: Редактирование тега: {originalTag.Name} -> {updatedTag.Name}");
-
-                // Проверяем, существует ли тег с новым именем, если оно отличается
-                if (!originalTag.Name.Equals(updatedTag.Name, StringComparison.OrdinalIgnoreCase) &&
-                    TagExists(updatedTag.Name))
-                {
-                    _logger.Warn($"EditTag: Тег с именем {updatedTag.Name} уже существует");
-                    StatusMessage = $"Тег с именем {updatedTag.Name} уже существует";
-                    return;
-                }
-
-                // Удаляем старый тег
-                RemoveTag(originalTag);
-
-                // Добавляем обновленный тег
-                AddNewTag(updatedTag);
-
-                _logger.Info($"EditTag: Тег отредактирован успешно");
-                StatusMessage = $"Тег {updatedTag.Name} отредактирован";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"EditTag: Ошибка при редактировании тега: {ex.Message}");
-                StatusMessage = "Ошибка при редактировании тега";
-            }
-        }
-
-        /// <summary>
         /// Проверяет, существует ли тег с указанным именем
         /// </summary>
         private bool TagExists(string tagName)
@@ -385,42 +405,6 @@ namespace SiemensTrend.ViewModels
                 return true;
 
             return false;
-        }
-
-        /// <summary>
-        /// Создает тестовые теги
-        /// </summary>
-        public void CreateTestTags()
-        {
-            try
-            {
-                _logger.Info("CreateTestTags: Создание тестовых тегов");
-
-                // Очищаем текущие коллекции
-                PlcTags.Clear();
-                DbTags.Clear();
-                AvailableTags.Clear();
-
-                // Создаем тестовые теги PLC
-                AddNewTag(new TagDefinition { Name = "Motor1_Start", Address = "M0.0", DataType = TagDataType.Bool, GroupName = "Motors", Comment = "Start motor 1" });
-                AddNewTag(new TagDefinition { Name = "Motor1_Stop", Address = "M0.1", DataType = TagDataType.Bool, GroupName = "Motors", Comment = "Stop motor 1" });
-                AddNewTag(new TagDefinition { Name = "Temperature", Address = "MW10", DataType = TagDataType.Int, GroupName = "Sensors", Comment = "Temperature sensor" });
-                AddNewTag(new TagDefinition { Name = "Pressure", Address = "MD20", DataType = TagDataType.Real, GroupName = "Sensors", Comment = "Pressure sensor" });
-
-                // Создаем тестовые теги DB
-                AddNewTag(new TagDefinition { Name = "DB1.Start", Address = "DB1.DBX0.0", DataType = TagDataType.Bool, GroupName = "DB1", Comment = "Start command", IsDbTag = true });
-                AddNewTag(new TagDefinition { Name = "DB1.Speed", Address = "DB1.DBD2", DataType = TagDataType.Real, GroupName = "DB1", Comment = "Speed setpoint", IsDbTag = true });
-                AddNewTag(new TagDefinition { Name = "DB2.Level", Address = "DB2.DBW4", DataType = TagDataType.Int, GroupName = "DB2", Comment = "Tank level", IsDbTag = true });
-                AddNewTag(new TagDefinition { Name = "DB2.Status", Address = "DB2.DBX6.0", DataType = TagDataType.Bool, GroupName = "DB2", Comment = "Tank status", IsDbTag = true });
-
-                _logger.Info("CreateTestTags: Тестовые теги созданы успешно");
-                StatusMessage = "Тестовые теги созданы";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"CreateTestTags: Ошибка при создании тестовых тегов: {ex.Message}");
-                StatusMessage = "Ошибка при создании тестовых тегов";
-            }
         }
 
         /// <summary>

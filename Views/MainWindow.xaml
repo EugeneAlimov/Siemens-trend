@@ -31,14 +31,12 @@
                 <Button x:Name="btnEditTag" Content="Редактировать тег" Margin="3" Padding="5,3" Click="BtnEditTag_Click"/>
                 <Button x:Name="btnRemoveTag" Content="Удалить тег" Margin="3" Padding="5,3" Click="BtnRemoveTag_Click"/>
                 <Separator/>
-                <Button x:Name="btnImportTags" Content="Импорт тегов" Margin="3" Padding="5,3" Click="BtnImportTags_Click"/>
-                <Button x:Name="btnExportTags" Content="Экспорт тегов" Margin="3" Padding="5,3" Click="BtnExportTags_Click"/>
+                <Button x:Name="btnSaveToXml" Content="Сохранить в XML" Margin="3" Padding="5,3" Click="BtnSaveToXml_Click"/>
+                <Button x:Name="btnLoadFromXml" Content="Загрузить из XML" Margin="3" Padding="5,3" Click="BtnLoadFromXml_Click"/>
                 <Button x:Name="btnSaveTags" Content="Сохранить теги" Margin="3" Padding="5,3" Click="BtnSaveTags_Click"/>
                 <Separator/>
                 <Button x:Name="btnStartMonitoring" Content="Запустить мониторинг" Margin="3" Padding="5,3" Click="BtnStartMonitoring_Click"/>
                 <Button x:Name="btnStopMonitoring" Content="Остановить мониторинг" Margin="3" Padding="5,3" Click="BtnStopMonitoring_Click"/>
-                <Separator/>
-                <Button x:Name="btnCreateTestTags" Content="Создать тестовые теги" Margin="3" Padding="5,3" Click="BtnCreateTestTags_Click"/>
             </ToolBar>
         </ToolBarTray>
 

@@ -29,69 +29,37 @@ namespace SiemensTrend.Views
         private readonly Logger _logger;
 
         /// <summary>
+        /// Initializes the UI components and sets up any required configurations.
+        /// </summary>
+        private void InitializeUI()
+        {
+            // Add your UI initialization logic here.
+            // For example, setting up default values, binding data, or configuring controls.
+            _logger.Info("UI initialized successfully.");
+        }
+
+        /// <summary>
         /// иии?? ии?? и?
         /// </summary>
         public MainWindow()
         {
             InitializeComponent();
 
-            // ии? и??
+            // Инициализируем логгер
             _logger = new Logger();
 
-            // ии? ? ииии? ии ииии?
+            // Создаем и инициализируем ViewModel
             _viewModel = new MainViewModel(_logger);
             DataContext = _viewModel;
 
-            // ии?? иии ии и ииии? иии? UI-иии
+            // Инициализируем интерфейс
             InitializeUI();
 
-            // ииии?? иии иии
+            // Загружаем теги при запуске
+            _viewModel.Initialize();
+
+            // Обновляем состояние интерфейса
             UpdateConnectionState();
-        }
-        private void InitializeUI()
-        {
-            try
-            {
-                // иии ии?? ии и ии?
-                AddTestButton();
-
-                _logger.Info("MainWindow: UI иииии ? иии?? иии? и ии ? DB");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"InitializeUI: ии и ииии? иии? иии UI: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Обработчик нажатия кнопки "Создать тестовые теги"
-        /// </summary>
-        private void BtnCreateTestTags_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("BtnCreateTestTags_Click: Создание тестовых тегов");
-
-                // Запрос подтверждения
-                var result = MessageBox.Show("Это заменит все существующие теги на тестовые. Продолжить?",
-                    "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    // Создаем тестовые теги
-                    _viewModel.CreateTestTags();
-
-                    _logger.Info("BtnCreateTestTags_Click: Тестовые теги созданы");
-                    MessageBox.Show("Тестовые теги созданы успешно",
-                        "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"BtnCreateTestTags_Click: Ошибка: {ex.Message}");
-                MessageBox.Show($"Ошибка при создании тестовых тегов: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
 
         /// <summary>
@@ -151,57 +119,6 @@ namespace SiemensTrend.Views
                 _logger.Error($"ии и ии? и?: {ex.Message}");
                 MessageBox.Show($"ии и ии? и?: {ex.Message}",
                     "ии", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void AddTestButton()
-        {
-            try
-            {
-                ToolBarTray toolbarTray = null;
-
-                // и?? ?? и??
-                toolbarTray = FindName("toolBarTray") as ToolBarTray;
-
-                // и? ?? и?? ?? и??, ?? ии ?? и? ? иии? ии
-                if (toolbarTray == null)
-                {
-                    var toolbarTrays = FindVisualChildren<ToolBarTray>(this);
-                    if (toolbarTrays.Count > 0)
-                    {
-                        toolbarTray = toolbarTrays[0];
-                    }
-                }
-
-                if (toolbarTray != null && toolbarTray.ToolBars.Count > 0)
-                {
-                    var toolbar = toolbarTray.ToolBars[0];
-
-                    // ии? ии?? ии
-                    var btnTest = new Button
-                    {
-                        Content = "и? DB (ии?)",
-                        Margin = new Thickness(3),
-                        Padding = new Thickness(5, 3, 5, 3),
-                        Background = Brushes.LightYellow
-                    };
-
-                    btnTest.Click += (s, e) => TestDbTagsLoading();
-
-                    // иии иии?? ? ии
-                    toolbar.Items.Add(new Separator());
-                    toolbar.Items.Add(btnTest);
-
-                    _logger.Info("AddTestButton: ии?? ии иии");
-                }
-                else
-                {
-                    _logger.Warn("AddTestButton: ии ииии ?? ии?");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"AddTestButton: ии и иии? ии?? ии: {ex.Message}");
             }
         }
 
@@ -362,42 +279,6 @@ namespace SiemensTrend.Views
             finally
             {
                 _viewModel.IsLoading = false;
-            }
-        }
-
-        /// <summary>
-        /// Создает тестовые теги
-        /// </summary>
-        public void CreateTestTags()
-        {
-            try
-            {
-                _logger.Info("CreateTestTags: Создание тестовых тегов");
-
-                // Очищаем текущие коллекции
-                PlcTags.Clear();
-                DbTags.Clear();
-                AvailableTags.Clear();
-
-                // Создаем тестовые теги PLC
-                AddNewTag(new TagDefinition { Name = "Motor1_Start", Address = "M0.0", DataType = TagDataType.Bool, GroupName = "Motors", Comment = "Start motor 1" });
-                AddNewTag(new TagDefinition { Name = "Motor1_Stop", Address = "M0.1", DataType = TagDataType.Bool, GroupName = "Motors", Comment = "Stop motor 1" });
-                AddNewTag(new TagDefinition { Name = "Temperature", Address = "MW10", DataType = TagDataType.Int, GroupName = "Sensors", Comment = "Temperature sensor" });
-                AddNewTag(new TagDefinition { Name = "Pressure", Address = "MD20", DataType = TagDataType.Real, GroupName = "Sensors", Comment = "Pressure sensor" });
-
-                // Создаем тестовые теги DB
-                AddNewTag(new TagDefinition { Name = "DB1.Start", Address = "DB1.DBX0.0", DataType = TagDataType.Bool, GroupName = "DB1", Comment = "Start command", IsDbTag = true });
-                AddNewTag(new TagDefinition { Name = "DB1.Speed", Address = "DB1.DBD2", DataType = TagDataType.Real, GroupName = "DB1", Comment = "Speed setpoint", IsDbTag = true });
-                AddNewTag(new TagDefinition { Name = "DB2.Level", Address = "DB2.DBW4", DataType = TagDataType.Int, GroupName = "DB2", Comment = "Tank level", IsDbTag = true });
-                AddNewTag(new TagDefinition { Name = "DB2.Status", Address = "DB2.DBX6.0", DataType = TagDataType.Bool, GroupName = "DB2", Comment = "Tank status", IsDbTag = true });
-
-                _logger.Info("CreateTestTags: Тестовые теги созданы успешно");
-                StatusMessage = "Тестовые теги созданы";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"CreateTestTags: Ошибка при создании тестовых тегов: {ex.Message}");
-                StatusMessage = "Ошибка при создании тестовых тегов";
             }
         }
 
@@ -581,7 +462,7 @@ namespace SiemensTrend.Views
 
                     // Импортируем теги
                     var tagManager = new Storage.TagManagement.TagManager(_logger);
-                    var importedTags = tagManager.ImportTagsFromCsv(filePath);
+                    var importedTags = tagManager.LoadTagsFromXml(filePath);
 
                     // Спрашиваем, что делать с существующими тегами
                     var result = MessageBox.Show(
@@ -692,7 +573,7 @@ namespace SiemensTrend.Views
 
                     // Экспортируем теги
                     var tagManager = new Storage.TagManagement.TagManager(_logger);
-                    bool success = tagManager.ExportTagsToCsv(allTags, filePath);
+                    bool success = tagManager.SaveTagsToXml(allTags, filePath);
 
                     _viewModel.ProgressValue = 100;
 

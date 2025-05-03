@@ -173,7 +173,7 @@ namespace SiemensTrend.Views.Dialogs
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка при сохранении тега: {ex.Message}", 
+                MessageBox.Show($"Ошибка при сохранении тега: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

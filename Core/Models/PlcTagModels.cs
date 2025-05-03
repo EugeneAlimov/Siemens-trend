@@ -78,9 +78,6 @@ namespace SiemensTrend.Core.Models
         /// <summary>
         /// Является ли тег тегом блока данных
         /// </summary>
-        public bool IsDbTag => GroupName?.StartsWith("DB") == true || Name?.Contains(".") == true;/// <summary>
-        /// Является ли тег тегом блока данных
-        /// </summary>
         public bool IsDbTag => GroupName?.StartsWith("DB") == true || Name?.Contains(".") == true;
 
         /// <summary>
