@@ -165,30 +165,6 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Добавление тега в мониторинг (обработчик команды)
-        /// </summary>
-        private void OnAddTagToMonitoring(TagDefinition tag)
-        {
-            if (tag == null || MonitoredTags.Contains(tag))
-                return;
-
-            MonitoredTags.Add(tag);
-            _logger.Info($"Тег {tag.Name} добавлен в мониторинг");
-        }
-
-        /// <summary>
-        /// Удаление тега из мониторинга (обработчик команды)
-        /// </summary>
-        private void OnRemoveTagFromMonitoring(TagDefinition tag)
-        {
-            if (tag == null || !MonitoredTags.Contains(tag))
-                return;
-
-            MonitoredTags.Remove(tag);
-            _logger.Info($"Тег {tag.Name} удален из мониторинга");
-        }
-
-        /// <summary>
         /// Инициализация приложения
         /// </summary>
         public void Initialize()
