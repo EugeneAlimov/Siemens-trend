@@ -1,9 +1,0 @@
-﻿Name,Address,DataType,Group,Comment
-Motor1_Start,M0.0,Bool,Motors,Start motor 1
-Motor1_Stop,M0.1,Bool,Motors,Stop motor 1
-Temperature,MW10,Int,Sensors,Temperature sensor
-Pressure,MD20,Real,Sensors,Pressure sensor
-DB1.Start,DB1.DBX0.0,Bool,DB1,Start command
-DB1.Speed,DB1.DBD2,Real,DB1,Speed setpoint
-DB2.Level,DB2.DBW4,Int,DB2,Tank level
-DB2.Status,DB2.DBX6.0,Bool,DB2,Tank status
