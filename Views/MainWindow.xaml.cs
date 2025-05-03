@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,126 +10,744 @@ using SiemensTrend.ViewModels;
 namespace SiemensTrend.Views
 {
     /// <summary>
-    /// Логика взаимодействия для MainWindow.xaml
+    /// ?????? ?????????????? ??? MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
         /// <summary>
-        /// Модель представления
+        /// ?????? ?????????????
         /// </summary>
         private readonly MainViewModel _viewModel;
 
         /// <summary>
-        /// Логгер для записи событий
+        /// ?????? ??? ?????? ???????
         /// </summary>
         private readonly Logger _logger;
 
         /// <summary>
-        /// Конструктор главного окна
+        /// ??????????? ???????? ????
         /// </summary>
         public MainWindow()
         {
             InitializeComponent();
 
-            // Создаем логер
+            // ??????? ?????
             _logger = new Logger();
 
-            // Создаем и устанавливаем модель представления
+            // ??????? ? ????????????? ?????? ?????????????
             _viewModel = new MainViewModel(_logger);
             DataContext = _viewModel;
 
-            // Инициализируем TagBrowserViewModel
+            // ?????????????? TagBrowserViewModel
             _viewModel.InitializeTagBrowser();
 
-            // Устанавливаем DataContext для TagBrowserView
+            // ????????????? DataContext ??? TagBrowserView
             tagBrowser.DataContext = _viewModel.TagBrowserViewModel;
 
-            // Добавьте следующую строку для инициализации улучшенных UI-элементов
+            // ???????? ????????? ?????? ??? ????????????? ?????????? UI-?????????
             InitializeUI();
 
-            // Инициализируем начальное состояние
+            // ?????????????? ????????? ?????????
             UpdateConnectionState();
         }
         private void InitializeUI()
         {
             try
             {
-                // Инициализируем улучшенные элементы для работы с тегами DB
+                // ?????????????? ?????????? ???????? ??? ?????? ? ?????? DB
                 InitializeEnhancedTagReading();
 
-                // Переопределяем метод получения тегов DB на улучшенный
+                // ?????????????? ????? ????????? ????? DB ?? ??????????
                 OverrideGetDbTagsButton();
 
-                // Добавляем кнопку для экспорта с улучшенным подходом
+                // ????????? ?????? ??? ???????? ? ?????????? ????????
                 AddEnhancedExportButton();
 
-                // Добавляем тестовую кнопку для отладки
+                // ????????? ???????? ?????? ??? ???????
                 AddTestButton();
 
-                _logger.Info("MainWindow: UI инициализирован с улучшенными элементами для работы с DB");
+                _logger.Info("MainWindow: UI ??????????????? ? ??????????? ?????????? ??? ?????? ? DB");
             }
             catch (Exception ex)
             {
-                _logger.Error($"InitializeUI: Ошибка при инициализации улучшенных элементов UI: {ex.Message}");
+                _logger.Error($"InitializeUI: ?????? ??? ????????????? ?????????? ????????? UI: {ex.Message}");
+            
+        /// <summary>
+        /// Add tag button click handler
+        /// </summary>
+        private void BtnAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnAddTag_Click: Calling tag add dialog");
+                
+                // Create dialog for adding tag
+                var dialog = new Dialogs.TagEditorDialog();
+                dialog.Owner = this;
+                
+                // Show dialog
+                if (dialog.ShowDialog() == true)
+                {
+                    // Get created tag
+                    var newTag = dialog.Tag;
+                    
+                    // Add tag to model
+                    _viewModel.AddNewTag(newTag);
+                    
+                    _logger.Info($"BtnAddTag_Click: Added new tag: {newTag.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnAddTag_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error adding tag: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            
+        /// <summary>
+        /// Add tag button click handler
+        /// </summary>
+        private void BtnAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnAddTag_Click: Calling tag add dialog");
+                
+                // Create dialog for adding tag
+                var dialog = new Dialogs.TagEditorDialog();
+                dialog.Owner = this;
+                
+                // Show dialog
+                if (dialog.ShowDialog() == true)
+                {
+                    // Get created tag
+                    var newTag = dialog.Tag;
+                    
+                    // Add tag to model
+                    _viewModel.AddNewTag(newTag);
+                    
+                    _logger.Info($"BtnAddTag_Click: Added new tag: {newTag.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnAddTag_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error adding tag: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        
         /// <summary>
-        /// Обработчик нажатия кнопки "Сохранить лог"
+        /// Edit tag button click handler
+        /// </summary>
+        private void BtnEditTag_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnEditTag_Click: Calling tag edit dialog");
+                
+                // Get selected tag from PLC or DB table
+                TagDefinition selectedTag = null;
+                
+                // Check if there's a selected tag in PLC table
+                var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
+                if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
+                {
+                    selectedTag = plcDataGrid.SelectedItem as TagDefinition;
+                }
+                
+                // If nothing selected in PLC table, check DB table
+                if (selectedTag == null)
+                {
+                    var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
+                    if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
+                    {
+                        selectedTag = dbDataGrid.SelectedItem as TagDefinition;
+                    }
+                }
+                
+                if (selectedTag == null)
+                {
+                    _logger.Warn("BtnEditTag_Click: No tag selected for editing");
+                    MessageBox.Show("Please select a tag to edit",
+                        "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Create dialog for editing tag
+                var dialog = new Dialogs.TagEditorDialog(selectedTag);
+                dialog.Owner = this;
+                
+                // Show dialog
+                if (dialog.ShowDialog() == true)
+                {
+                    // Get edited tag
+                    var updatedTag = dialog.Tag;
+                    
+                    // Update tag in model
+                    _viewModel.EditTag(selectedTag, updatedTag);
+                    
+                    _logger.Info($"BtnEditTag_Click: Edited tag: {updatedTag.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnEditTag_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error editing tag: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Delete tag button click handler
+        /// </summary>
+        private void BtnRemoveTag_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnRemoveTag_Click: Deleting tag");
+                
+                // Get selected tag from PLC or DB table
+                TagDefinition selectedTag = null;
+                
+                // Check if there's a selected tag in PLC table
+                var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
+                if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
+                {
+                    selectedTag = plcDataGrid.SelectedItem as TagDefinition;
+                }
+                
+                // If nothing selected in PLC table, check DB table
+                if (selectedTag == null)
+                {
+                    var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
+                    if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
+                    {
+                        selectedTag = dbDataGrid.SelectedItem as TagDefinition;
+                    }
+                }
+                
+                if (selectedTag == null)
+                {
+                    _logger.Warn("BtnRemoveTag_Click: No tag selected for deletion");
+                    MessageBox.Show("Please select a tag to delete",
+                        "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Ask for confirmation
+                var result = MessageBox.Show($"Are you sure you want to delete tag {selectedTag.Name}?",
+                    "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Remove tag from model
+                    _viewModel.RemoveTag(selectedTag);
+                    
+                    _logger.Info($"BtnRemoveTag_Click: Deleted tag: {selectedTag.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnRemoveTag_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error deleting tag: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Import tags button click handler
+        /// </summary>
+        private void BtnImportTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnImportTags_Click: Importing tags from CSV");
+                
+                // Create file selection dialog
+                var openFileDialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    Title = "Select file with tags to import"
+                };
+                
+                // Show dialog
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    string filePath = openFileDialog.FileName;
+                    _logger.Info($"BtnImportTags_Click: Selected file: {filePath}");
+                    
+                    // Import tags
+                    var tagManager = new Storage.TagManagement.TagManager(_logger);
+                    var importedTags = tagManager.ImportTagsFromCsv(filePath);
+                    
+                    // Ask what to do with existing tags
+                    var result = MessageBox.Show(
+                        "Do you want to replace existing tags with imported ones? " + 
+                        "Click 'Yes' to replace, 'No' to add to existing.",
+                        "Import tags", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                        
+                    if (result == MessageBoxResult.Cancel)
+                    {
+                        _logger.Info("BtnImportTags_Click: Import canceled by user");
+                        return;
+                    }
+                    
+                    // If replacement selected, clear existing tags
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        _viewModel.PlcTags.Clear();
+                        _viewModel.DbTags.Clear();
+                        _viewModel.AvailableTags.Clear();
+                        _logger.Info("BtnImportTags_Click: Existing tags cleared");
+                    }
+                    
+                    // Add imported tags
+                    foreach (var tag in importedTags)
+                    {
+                        _viewModel.AddNewTag(tag);
+                    }
+                    
+                    // Save changes
+                    _viewModel.SaveTagsToStorage();
+                    
+                    _logger.Info($"BtnImportTags_Click: Imported {importedTags.Count} tags");
+                    MessageBox.Show($"Imported {importedTags.Count} tags",
+                        "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnImportTags_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error importing tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Export tags button click handler
+        /// </summary>
+        private void BtnExportTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnExportTags_Click: Exporting tags to CSV");
+                
+                // Check if there are tags to export
+                int tagCount = _viewModel.PlcTags.Count + _viewModel.DbTags.Count;
+                if (tagCount == 0)
+                {
+                    _logger.Warn("BtnExportTags_Click: No tags to export");
+                    MessageBox.Show("No tags to export",
+                        "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Create file save dialog
+                var saveFileDialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    Title = "Export tags",
+                    DefaultExt = ".csv",
+                    AddExtension = true
+                };
+                
+                // Show dialog
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    string filePath = saveFileDialog.FileName;
+                    _logger.Info($"BtnExportTags_Click: Selected file: {filePath}");
+                    
+                    // Collect all tags for export
+                    var tags = new List<TagDefinition>();
+                    tags.AddRange(_viewModel.PlcTags);
+                    tags.AddRange(_viewModel.DbTags);
+                    
+                    // Export tags
+                    var tagManager = new Storage.TagManagement.TagManager(_logger);
+                    bool success = tagManager.ExportTagsToCsv(tags, filePath);
+                    
+                    if (success)
+                    {
+                        _logger.Info($"BtnExportTags_Click: Exported {tags.Count} tags");
+                        MessageBox.Show($"Exported {tags.Count} tags",
+                            "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        _logger.Error("BtnExportTags_Click: Error exporting tags");
+                        MessageBox.Show("Error exporting tags",
+                            "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnExportTags_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error exporting tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Save tags button click handler
+        /// </summary>
+        private void BtnSaveTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnSaveTags_Click: Saving tags");
+                
+                // Save tags
+                _viewModel.SaveTagsToStorage();
+                
+                _logger.Info("BtnSaveTags_Click: Tags saved successfully");
+                MessageBox.Show("Tags saved successfully",
+                    "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnSaveTags_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error saving tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+}
+        }
+        
+        /// <summary>
+        /// Edit tag button click handler
+        /// </summary>
+        private void BtnEditTag_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnEditTag_Click: Calling tag edit dialog");
+                
+                // Get selected tag from PLC or DB table
+                TagDefinition selectedTag = null;
+                
+                // Check if there's a selected tag in PLC table
+                var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
+                if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
+                {
+                    selectedTag = plcDataGrid.SelectedItem as TagDefinition;
+                }
+                
+                // If nothing selected in PLC table, check DB table
+                if (selectedTag == null)
+                {
+                    var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
+                    if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
+                    {
+                        selectedTag = dbDataGrid.SelectedItem as TagDefinition;
+                    }
+                }
+                
+                if (selectedTag == null)
+                {
+                    _logger.Warn("BtnEditTag_Click: No tag selected for editing");
+                    MessageBox.Show("Please select a tag to edit",
+                        "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Create dialog for editing tag
+                var dialog = new Dialogs.TagEditorDialog(selectedTag);
+                dialog.Owner = this;
+                
+                // Show dialog
+                if (dialog.ShowDialog() == true)
+                {
+                    // Get edited tag
+                    var updatedTag = dialog.Tag;
+                    
+                    // Update tag in model
+                    _viewModel.EditTag(selectedTag, updatedTag);
+                    
+                    _logger.Info($"BtnEditTag_Click: Edited tag: {updatedTag.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnEditTag_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error editing tag: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Delete tag button click handler
+        /// </summary>
+        private void BtnRemoveTag_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnRemoveTag_Click: Deleting tag");
+                
+                // Get selected tag from PLC or DB table
+                TagDefinition selectedTag = null;
+                
+                // Check if there's a selected tag in PLC table
+                var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
+                if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
+                {
+                    selectedTag = plcDataGrid.SelectedItem as TagDefinition;
+                }
+                
+                // If nothing selected in PLC table, check DB table
+                if (selectedTag == null)
+                {
+                    var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
+                    if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
+                    {
+                        selectedTag = dbDataGrid.SelectedItem as TagDefinition;
+                    }
+                }
+                
+                if (selectedTag == null)
+                {
+                    _logger.Warn("BtnRemoveTag_Click: No tag selected for deletion");
+                    MessageBox.Show("Please select a tag to delete",
+                        "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Ask for confirmation
+                var result = MessageBox.Show($"Are you sure you want to delete tag {selectedTag.Name}?",
+                    "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Remove tag from model
+                    _viewModel.RemoveTag(selectedTag);
+                    
+                    _logger.Info($"BtnRemoveTag_Click: Deleted tag: {selectedTag.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnRemoveTag_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error deleting tag: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Import tags button click handler
+        /// </summary>
+        private void BtnImportTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnImportTags_Click: Importing tags from CSV");
+                
+                // Create file selection dialog
+                var openFileDialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    Title = "Select file with tags to import"
+                };
+                
+                // Show dialog
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    string filePath = openFileDialog.FileName;
+                    _logger.Info($"BtnImportTags_Click: Selected file: {filePath}");
+                    
+                    // Import tags
+                    var tagManager = new Storage.TagManagement.TagManager(_logger);
+                    var importedTags = tagManager.ImportTagsFromCsv(filePath);
+                    
+                    // Ask what to do with existing tags
+                    var result = MessageBox.Show(
+                        "Do you want to replace existing tags with imported ones? " + 
+                        "Click 'Yes' to replace, 'No' to add to existing.",
+                        "Import tags", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                        
+                    if (result == MessageBoxResult.Cancel)
+                    {
+                        _logger.Info("BtnImportTags_Click: Import canceled by user");
+                        return;
+                    }
+                    
+                    // If replacement selected, clear existing tags
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        _viewModel.PlcTags.Clear();
+                        _viewModel.DbTags.Clear();
+                        _viewModel.AvailableTags.Clear();
+                        _logger.Info("BtnImportTags_Click: Existing tags cleared");
+                    }
+                    
+                    // Add imported tags
+                    foreach (var tag in importedTags)
+                    {
+                        _viewModel.AddNewTag(tag);
+                    }
+                    
+                    // Save changes
+                    _viewModel.SaveTagsToStorage();
+                    
+                    _logger.Info($"BtnImportTags_Click: Imported {importedTags.Count} tags");
+                    MessageBox.Show($"Imported {importedTags.Count} tags",
+                        "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnImportTags_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error importing tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Export tags button click handler
+        /// </summary>
+        private void BtnExportTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnExportTags_Click: Exporting tags to CSV");
+                
+                // Check if there are tags to export
+                int tagCount = _viewModel.PlcTags.Count + _viewModel.DbTags.Count;
+                if (tagCount == 0)
+                {
+                    _logger.Warn("BtnExportTags_Click: No tags to export");
+                    MessageBox.Show("No tags to export",
+                        "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                
+                // Create file save dialog
+                var saveFileDialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    Title = "Export tags",
+                    DefaultExt = ".csv",
+                    AddExtension = true
+                };
+                
+                // Show dialog
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    string filePath = saveFileDialog.FileName;
+                    _logger.Info($"BtnExportTags_Click: Selected file: {filePath}");
+                    
+                    // Collect all tags for export
+                    var tags = new List<TagDefinition>();
+                    tags.AddRange(_viewModel.PlcTags);
+                    tags.AddRange(_viewModel.DbTags);
+                    
+                    // Export tags
+                    var tagManager = new Storage.TagManagement.TagManager(_logger);
+                    bool success = tagManager.ExportTagsToCsv(tags, filePath);
+                    
+                    if (success)
+                    {
+                        _logger.Info($"BtnExportTags_Click: Exported {tags.Count} tags");
+                        MessageBox.Show($"Exported {tags.Count} tags",
+                            "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        _logger.Error("BtnExportTags_Click: Error exporting tags");
+                        MessageBox.Show("Error exporting tags",
+                            "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnExportTags_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error exporting tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Save tags button click handler
+        /// </summary>
+        private void BtnSaveTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnSaveTags_Click: Saving tags");
+                
+                // Save tags
+                _viewModel.SaveTagsToStorage();
+                
+                _logger.Info("BtnSaveTags_Click: Tags saved successfully");
+                MessageBox.Show("Tags saved successfully",
+                    "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"BtnSaveTags_Click: Error: {ex.Message}");
+                MessageBox.Show($"Error saving tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+}
+        }
+        /// <summary>
+        /// ?????????? ??????? ?????? "????????? ???"
         /// </summary>
         private void BtnSaveLog_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Создаем диалог сохранения файла
+                // ??????? ?????? ?????????? ?????
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
                 {
-                    Filter = "Текстовые файлы (*.txt)|*.txt",
-                    Title = "Сохранение лога",
+                    Filter = "????????? ????? (*.txt)|*.txt",
+                    Title = "?????????? ????",
                     DefaultExt = ".txt",
                     AddExtension = true
                 };
 
-                // Если пользователь выбрал файл
+                // ???? ???????????? ?????? ????
                 if (saveFileDialog.ShowDialog() == true)
                 {
                     string filePath = saveFileDialog.FileName;
-                    _logger.Info($"Сохранение лога в файл: {filePath}");
+                    _logger.Info($"?????????? ???? ? ????: {filePath}");
 
-                    // Сохраняем содержимое лога в файл
+                    // ????????? ?????????? ???? ? ????
                     System.IO.File.WriteAllText(filePath, txtLog.Text);
 
-                    _logger.Info("Лог успешно сохранен");
-                    MessageBox.Show("Лог успешно сохранен",
-                        "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _logger.Info("??? ??????? ????????");
+                    MessageBox.Show("??? ??????? ????????",
+                        "??????????", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error($"Ошибка при сохранении лога: {ex.Message}");
-                MessageBox.Show($"Ошибка при сохранении лога: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.Error($"?????? ??? ?????????? ????: {ex.Message}");
+                MessageBox.Show($"?????? ??? ?????????? ????: {ex.Message}",
+                    "??????", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// Обработчик нажатия кнопки "Очистить лог"
+        /// ?????????? ??????? ?????? "???????? ???"
         /// </summary>
         private void BtnClearLog_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                _logger.Info("Очистка лога");
+                _logger.Info("??????? ????");
 
-                // Очищаем содержимое лога
+                // ??????? ?????????? ????
                 txtLog.Clear();
 
-                _logger.Info("Лог очищен");
+                _logger.Info("??? ??????");
             }
             catch (Exception ex)
             {
-                _logger.Error($"Ошибка при очистке лога: {ex.Message}");
-                MessageBox.Show($"Ошибка при очистке лога: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.Error($"?????? ??? ??????? ????: {ex.Message}");
+                MessageBox.Show($"?????? ??? ??????? ????: {ex.Message}",
+                    "??????", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -139,10 +757,10 @@ namespace SiemensTrend.Views
             {
                 ToolBarTray toolbarTray = null;
 
-                // Поиск по имени
+                // ????? ?? ?????
                 toolbarTray = FindName("toolBarTray") as ToolBarTray;
 
-                // Если не нашли по имени, то поищем по типу в визуальном дереве
+                // ???? ?? ????? ?? ?????, ?? ?????? ?? ???? ? ?????????? ??????
                 if (toolbarTray == null)
                 {
                     var toolbarTrays = FindVisualChildren<ToolBarTray>(this);
@@ -156,10 +774,10 @@ namespace SiemensTrend.Views
                 {
                     var toolbar = toolbarTray.ToolBars[0];
 
-                    // Создаем тестовую кнопку
+                    // ??????? ???????? ??????
                     var btnTest = new Button
                     {
-                        Content = "Тест DB (отладка)",
+                        Content = "???? DB (???????)",
                         Margin = new Thickness(3),
                         Padding = new Thickness(5, 3, 5, 3),
                         Background = Brushes.LightYellow
@@ -167,38 +785,38 @@ namespace SiemensTrend.Views
 
                     btnTest.Click += (s, e) => TestDbTagsLoading();
 
-                    // Добавляем разделитель и кнопку
+                    // ????????? ??????????? ? ??????
                     toolbar.Items.Add(new Separator());
                     toolbar.Items.Add(btnTest);
 
-                    _logger.Info("AddTestButton: Тестовая кнопка добавлена");
+                    _logger.Info("AddTestButton: ???????? ?????? ?????????");
                 }
                 else
                 {
-                    _logger.Warn("AddTestButton: Панель инструментов не найдена");
+                    _logger.Warn("AddTestButton: ?????? ???????????? ?? ???????");
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error($"AddTestButton: Ошибка при добавлении тестовой кнопки: {ex.Message}");
+                _logger.Error($"AddTestButton: ?????? ??? ?????????? ???????? ??????: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Создание тестовых тегов DB для отладки
+        /// ???????? ???????? ????? DB ??? ???????
         /// </summary>
         private List<TagDefinition> CreateTestDbTags()
         {
             var tags = new List<TagDefinition>();
 
-            // Создаем несколько тестовых тегов
+            // ??????? ????????? ???????? ?????
             tags.Add(new TagDefinition
             {
                 Id = Guid.NewGuid(),
                 Name = "DB1",
                 Address = "Standard",
                 DataType = TagDataType.UDT,
-                Comment = "Тестовый блок данных",
+                Comment = "???????? ???? ??????",
                 GroupName = "DB",
                 IsOptimized = false,
                 IsUDT = true
@@ -210,7 +828,7 @@ namespace SiemensTrend.Views
                 Name = "DB2",
                 Address = "Optimized",
                 DataType = TagDataType.UDT,
-                Comment = "Тестовый оптимизированный блок данных",
+                Comment = "???????? ???????????????? ???? ??????",
                 GroupName = "DB",
                 IsOptimized = true,
                 IsUDT = true
@@ -222,20 +840,20 @@ namespace SiemensTrend.Views
                 Name = "DB_Motor",
                 Address = "Standard",
                 DataType = TagDataType.UDT,
-                Comment = "Тестовый блок данных для управления двигателем",
+                Comment = "???????? ???? ?????? ??? ?????????? ??????????",
                 GroupName = "DB",
                 IsOptimized = false,
                 IsUDT = true
             });
 
-            // Добавляем переменные для блоков данных
+            // ????????? ?????????? ??? ?????? ??????
             tags.Add(new TagDefinition
             {
                 Id = Guid.NewGuid(),
                 Name = "DB1.Value",
                 Address = "DB1.DBD0",
                 DataType = TagDataType.Real,
-                Comment = "Значение",
+                Comment = "????????",
                 GroupName = "DB1",
                 IsOptimized = false
             });
@@ -246,7 +864,7 @@ namespace SiemensTrend.Views
                 Name = "DB1.Status",
                 Address = "DB1.DBW4",
                 DataType = TagDataType.Int,
-                Comment = "Статус",
+                Comment = "??????",
                 GroupName = "DB1",
                 IsOptimized = false
             });
@@ -257,7 +875,7 @@ namespace SiemensTrend.Views
                 Name = "DB2.Value",
                 Address = "DB2.Value",
                 DataType = TagDataType.Real,
-                Comment = "Значение (оптимизированный блок)",
+                Comment = "???????? (???????????????? ????)",
                 GroupName = "DB2",
                 IsOptimized = true
             });
@@ -268,7 +886,7 @@ namespace SiemensTrend.Views
                 Name = "DB_Motor.Speed",
                 Address = "DB_Motor.DBD0",
                 DataType = TagDataType.Real,
-                Comment = "Скорость двигателя",
+                Comment = "???????? ?????????",
                 GroupName = "DB_Motor",
                 IsOptimized = false
             });
@@ -279,7 +897,7 @@ namespace SiemensTrend.Views
                 Name = "DB_Motor.Start",
                 Address = "DB_Motor.DBX4.0",
                 DataType = TagDataType.Bool,
-                Comment = "Запуск двигателя",
+                Comment = "?????? ?????????",
                 GroupName = "DB_Motor",
                 IsOptimized = false
             });
@@ -290,7 +908,7 @@ namespace SiemensTrend.Views
                 Name = "DB_Motor.Stop",
                 Address = "DB_Motor.DBX4.1",
                 DataType = TagDataType.Bool,
-                Comment = "Останов двигателя",
+                Comment = "??????? ?????????",
                 GroupName = "DB_Motor",
                 IsOptimized = false
             });
@@ -299,44 +917,44 @@ namespace SiemensTrend.Views
         }
 
         /// <summary>
-        /// Отладочный метод для тестирования чтения тегов DB
+        /// ?????????? ????? ??? ???????????? ?????? ????? DB
         /// </summary>
         private async void TestDbTagsLoading()
         {
             try
             {
-                _logger.Info("TestDbTagsLoading: Запуск тестирования загрузки тегов DB");
-                _viewModel.StatusMessage = "Тестирование загрузки тегов DB...";
+                _logger.Info("TestDbTagsLoading: ?????? ???????????? ???????? ????? DB");
+                _viewModel.StatusMessage = "???????????? ???????? ????? DB...";
                 _viewModel.IsLoading = true;
 
-                // Проверяем подключение к TIA Portal
+                // ????????? ??????????? ? TIA Portal
                 if (!_viewModel.IsConnected)
                 {
-                    _logger.Warn("TestDbTagsLoading: Нет подключения к TIA Portal");
-                    MessageBox.Show("Необходимо сначала подключиться к TIA Portal.",
-                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _logger.Warn("TestDbTagsLoading: ??? ??????????? ? TIA Portal");
+                    MessageBox.Show("?????????? ??????? ???????????? ? TIA Portal.",
+                        "??????????????", MessageBoxButton.OK, MessageBoxImage.Warning);
                     _viewModel.IsLoading = false;
                     return;
                 }
 
-                // Создаем тестовые теги DB для отображения
+                // ??????? ???????? ???? DB ??? ???????????
                 var testTags = CreateTestDbTags();
-                _logger.Info($"TestDbTagsLoading: Создано {testTags.Count} тестовых тегов DB");
+                _logger.Info($"TestDbTagsLoading: ??????? {testTags.Count} ???????? ????? DB");
 
-                // Очищаем и заполняем коллекцию
+                // ??????? ? ????????? ?????????
                 _viewModel.DbTags.Clear();
                 foreach (var tag in testTags)
                 {
                     _viewModel.DbTags.Add(tag);
                 }
 
-                _logger.Info("TestDbTagsLoading: Тестовые теги DB загружены успешно");
-                _viewModel.StatusMessage = $"Загружено {testTags.Count} тестовых тегов DB";
+                _logger.Info("TestDbTagsLoading: ???????? ???? DB ????????? ???????");
+                _viewModel.StatusMessage = $"????????? {testTags.Count} ???????? ????? DB";
             }
             catch (Exception ex)
             {
-                _logger.Error($"TestDbTagsLoading: Ошибка: {ex.Message}");
-                _viewModel.StatusMessage = "Ошибка при тестировании загрузки тегов DB";
+                _logger.Error($"TestDbTagsLoading: ??????: {ex.Message}");
+                _viewModel.StatusMessage = "?????? ??? ???????????? ???????? ????? DB";
             }
             finally
             {
@@ -345,3 +963,4 @@ namespace SiemensTrend.Views
         }
     }
 }
+

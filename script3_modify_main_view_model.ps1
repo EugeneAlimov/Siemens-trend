@@ -1,3 +1,14 @@
+# script3_modify_main_view_model.ps1
+# Script to modify MainViewModel.cs
+
+# Project path
+$projectPath = Get-Location
+
+# Path to MainViewModel.cs
+$mainViewModelPath = Join-Path -Path $projectPath -ChildPath "ViewModels\MainViewModel.cs"
+
+# Content of the new MainViewModel.cs file
+$mainViewModelContent = @"
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -172,11 +183,11 @@ namespace SiemensTrend.ViewModels
                     }
                 }
                 
-                _logger.Info($"Loaded {PlcTags.Count} PLC tags and {DbTags.Count} DB tags");
+                _logger.Info(\$"Loaded {PlcTags.Count} PLC tags and {DbTags.Count} DB tags");
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error loading tags from storage: {ex.Message}");
+                _logger.Error(\$"Error loading tags from storage: {ex.Message}");
             }
         }
 
@@ -195,12 +206,12 @@ namespace SiemensTrend.ViewModels
                 
                 _tagManager.SaveTags(allTags);
                 
-                _logger.Info($"Saved {allTags.Count} tags");
+                _logger.Info(\$"Saved {allTags.Count} tags");
                 StatusMessage = "Tags saved";
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error saving tags: {ex.Message}");
+                _logger.Error(\$"Error saving tags: {ex.Message}");
                 StatusMessage = "Error saving tags";
             }
         }
@@ -215,12 +226,12 @@ namespace SiemensTrend.ViewModels
                 
             try
             {
-                _logger.Info($"Adding new tag: {tag.Name}");
+                _logger.Info(\$"Adding new tag: {tag.Name}");
                 
                 // Check if tag already exists
                 if (AvailableTags.Any(t => t.Name == tag.Name))
                 {
-                    _logger.Warn($"Tag with name {tag.Name} already exists");
+                    _logger.Warn(\$"Tag with name {tag.Name} already exists");
                     return;
                 }
                 
@@ -239,12 +250,12 @@ namespace SiemensTrend.ViewModels
                 // Save changes
                 SaveTagsToStorage();
                 
-                _logger.Info($"Tag {tag.Name} added successfully");
-                StatusMessage = $"Tag {tag.Name} added";
+                _logger.Info(\$"Tag {tag.Name} added successfully");
+                StatusMessage = \$"Tag {tag.Name} added";
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error adding tag: {ex.Message}");
+                _logger.Error(\$"Error adding tag: {ex.Message}");
                 StatusMessage = "Error adding tag";
             }
         }
@@ -259,7 +270,7 @@ namespace SiemensTrend.ViewModels
                 
             try
             {
-                _logger.Info($"Removing tag: {tag.Name}");
+                _logger.Info(\$"Removing tag: {tag.Name}");
                 
                 // Remove from all collections
                 AvailableTags.Remove(tag);
@@ -282,12 +293,12 @@ namespace SiemensTrend.ViewModels
                 // Save changes
                 SaveTagsToStorage();
                 
-                _logger.Info($"Tag {tag.Name} removed successfully");
-                StatusMessage = $"Tag {tag.Name} removed";
+                _logger.Info(\$"Tag {tag.Name} removed successfully");
+                StatusMessage = \$"Tag {tag.Name} removed";
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error removing tag: {ex.Message}");
+                _logger.Error(\$"Error removing tag: {ex.Message}");
                 StatusMessage = "Error removing tag";
             }
         }
@@ -302,7 +313,7 @@ namespace SiemensTrend.ViewModels
                 
             try
             {
-                _logger.Info($"Editing tag: {originalTag.Name}");
+                _logger.Info(\$"Editing tag: {originalTag.Name}");
                 
                 // Remove old tag
                 RemoveTag(originalTag);
@@ -310,12 +321,12 @@ namespace SiemensTrend.ViewModels
                 // Add updated tag
                 AddNewTag(updatedTag);
                 
-                _logger.Info($"Tag {updatedTag.Name} edited successfully");
-                StatusMessage = $"Tag {updatedTag.Name} edited";
+                _logger.Info(\$"Tag {updatedTag.Name} edited successfully");
+                StatusMessage = \$"Tag {updatedTag.Name} edited";
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error editing tag: {ex.Message}");
+                _logger.Error(\$"Error editing tag: {ex.Message}");
                 StatusMessage = "Error editing tag";
             }
         }
@@ -339,3 +350,7 @@ namespace SiemensTrend.ViewModels
         public int MaxMonitoredTags => 10;
     }
 }
+"@
+Set-Content -Path $mainViewModelPath -Value $mainViewModelContent
+
+Write-Host "Script 3 completed successfully. MainViewModel class modified."
