@@ -24,6 +24,14 @@ namespace SiemensTrend.Core.Models
     public class TagDefinition
     {
         /// <summary>
+        /// Конструктор по умолчанию для сериализации
+        /// </summary>
+        public TagDefinition()
+        {
+            Id = Guid.NewGuid();
+        }
+    {
+        /// <summary>
         /// Уникальный идентификатор тега
         /// </summary>
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -69,6 +77,9 @@ namespace SiemensTrend.Core.Models
         public bool IsSafety { get; set; }
 
         /// <summary>
+        /// Является ли тег тегом блока данных
+        /// </summary>
+        public bool IsDbTag => GroupName?.StartsWith("DB") == true || Name?.Contains(".") == true;/// <summary>
         /// Является ли тег тегом блока данных
         /// </summary>
         public bool IsDbTag => GroupName?.StartsWith("DB") == true || Name?.Contains(".") == true;

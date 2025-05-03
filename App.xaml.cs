@@ -6,6 +6,7 @@ using System.Windows;
 using Siemens.Collaboration.Net;
 using SiemensTrend.Core.Logging;
 
+using SiemensTrend.Storage.TagManagement;
 namespace SiemensTrend
 {
     /// <summary>

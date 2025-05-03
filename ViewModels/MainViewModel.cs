@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -9,6 +9,10 @@ using SiemensTrend.Core.Models;
 using SiemensTrend.Helpers;
 using SiemensTrend.Storage.TagManagement;
 
+using SiemensTrend.Storage.TagManagement;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Input;
 namespace SiemensTrend.ViewModels
 {
     /// <summary>
@@ -35,6 +39,15 @@ namespace SiemensTrend.ViewModels
         private bool _isLoading;
         private string _statusMessage;
         private int _progressValue;
+        /// <summary>
+        /// Команда для добавления тега в мониторинг
+        /// </summary>
+        public ICommand AddTagToMonitoringCommand { get; private set; }
+
+        /// <summary>
+        /// Команда для удаления тега из мониторинга
+        /// </summary>
+        public ICommand RemoveTagFromMonitoringCommand { get; private set; }
 
         private ObservableCollection<TagDefinition> _availableTags;
         private ObservableCollection<TagDefinition> _monitoredTags;
@@ -138,6 +151,10 @@ namespace SiemensTrend.ViewModels
             _tagManager = new TagManager(_logger);
             LoadTagsFromStorage();
 
+            
+            // Инициализация команд
+            AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(AddTagToMonitoring);
+            RemoveTagFromMonitoringCommand = new RelayCommand<TagDefinition>(RemoveTagFromMonitoring);
             _logger.Info("MainViewModel initialized successfully");
         }
 
@@ -337,5 +354,55 @@ namespace SiemensTrend.ViewModels
         /// Maximum number of tags for monitoring
         /// </summary>
         public int MaxMonitoredTags => 10;
+    }
+
+    /// <summary>
+    /// Команда с параметром
+    /// </summary>
+    public class RelayCommand<T> : ICommand
+    {
+        private readonly Action<T> _execute;
+        private readonly Predicate<T> _canExecute;
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public RelayCommand(Action<T> execute, Predicate<T> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter) => _canExecute?.Invoke((T)parameter) ?? true;
+
+        public void Execute(object parameter) => _execute((T)parameter);
+    }
+
+    /// <summary>
+    /// Команда без параметров
+    /// </summary>
+    public class RelayCommand : ICommand
+    {
+        private readonly Action _execute;
+        private readonly Func<bool> _canExecute;
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public RelayCommand(Action execute, Func<bool> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter) => _canExecute?.Invoke() ?? true;
+
+        public void Execute(object parameter) => _execute();
     }
 }

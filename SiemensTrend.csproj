@@ -15,7 +15,7 @@
     <Compile Remove="Communication\OpcUa\**" />
     <Compile Remove="Core\Extensions\**" />
     <Compile Remove="Core\Interfaces\**" />
-    <Compile Remove="TagManagement\**" />
+    <!-- <Compile Remove="TagManagement\**" /> -->
     <EmbeddedResource Remove="Alerts\**" />
     <EmbeddedResource Remove="Communication\OpcUa\**" />
     <EmbeddedResource Remove="Core\Extensions\**" />

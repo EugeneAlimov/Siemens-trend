@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,6 +7,9 @@ using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using SiemensTrend.ViewModels;
 
+using SiemensTrend.Core.Models;
+using SiemensTrend.Storage.TagManagement;
+using System.Collections.Generic;
 namespace SiemensTrend.Views
 {
     /// <summary>
@@ -71,7 +74,7 @@ namespace SiemensTrend.Views
             catch (Exception ex)
             {
                 _logger.Error($"InitializeUI: ?????? ??? ????????????? ?????????? ????????? UI: {ex.Message}");
-            
+
         /// <summary>
         /// Add tag button click handler
         /// </summary>
@@ -80,20 +83,20 @@ namespace SiemensTrend.Views
             try
             {
                 _logger.Info("BtnAddTag_Click: Calling tag add dialog");
-                
+
                 // Create dialog for adding tag
                 var dialog = new Dialogs.TagEditorDialog();
                 dialog.Owner = this;
-                
+
                 // Show dialog
                 if (dialog.ShowDialog() == true)
                 {
                     // Get created tag
                     var newTag = dialog.Tag;
-                    
+
                     // Add tag to model
                     _viewModel.AddNewTag(newTag);
-                    
+
                     _logger.Info($"BtnAddTag_Click: Added new tag: {newTag.Name}");
                 }
             }
@@ -102,6 +105,8 @@ namespace SiemensTrend.Views
                 _logger.Error($"BtnAddTag_Click: Error: {ex.Message}");
                 MessageBox.Show($"Error adding tag: {ex.Message}",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            } 
+        }
             
         /// <summary>
         /// Add tag button click handler
@@ -404,6 +409,37 @@ namespace SiemensTrend.Views
                 MessageBox.Show("Tags saved successfully",
                     "Information", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+
+        /// <summary>
+        /// Create test tags button click handler
+        /// </summary>
+        private void BtnCreateTestTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnCreateTestTags_Click: Creating test tags");
+                
+                // Ask for confirmation
+                var result = MessageBox.Show("This will replace all existing tags with test tags. Continue?",
+                    "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Create test tags
+                    _viewModel.CreateTestTags();
+                    
+                    _logger.Info("BtnCreateTestTags_Click: Test tags created");
+                    MessageBox.Show("Test tags created successfully",
+                        "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(\$"BtnCreateTestTags_Click: Error: {ex.Message}");
+                MessageBox.Show(\$"Error creating test tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
             catch (Exception ex)
             {
                 _logger.Error($"BtnSaveTags_Click: Error: {ex.Message}");
@@ -682,6 +718,37 @@ namespace SiemensTrend.Views
                 MessageBox.Show("Tags saved successfully",
                     "Information", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+
+        /// <summary>
+        /// Create test tags button click handler
+        /// </summary>
+        private void BtnCreateTestTags_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _logger.Info("BtnCreateTestTags_Click: Creating test tags");
+                
+                // Ask for confirmation
+                var result = MessageBox.Show("This will replace all existing tags with test tags. Continue?",
+                    "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Create test tags
+                    _viewModel.CreateTestTags();
+                    
+                    _logger.Info("BtnCreateTestTags_Click: Test tags created");
+                    MessageBox.Show("Test tags created successfully",
+                        "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(\$"BtnCreateTestTags_Click: Error: {ex.Message}");
+                MessageBox.Show(\$"Error creating test tags: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
             catch (Exception ex)
             {
                 _logger.Error($"BtnSaveTags_Click: Error: {ex.Message}");
@@ -963,4 +1030,6 @@ namespace SiemensTrend.Views
         }
     }
 }
+
+
 
