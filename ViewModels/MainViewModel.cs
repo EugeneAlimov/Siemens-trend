@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.TIA;
+using SiemensTrend.Core.Commands;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using SiemensTrend.Storage.TagManagement;
@@ -145,6 +144,10 @@ namespace SiemensTrend.ViewModels
             MonitoredTags = new ObservableCollection<TagDefinition>();
             PlcTags = new ObservableCollection<TagDefinition>();
             DbTags = new ObservableCollection<TagDefinition>();
+
+            // Инициализируем команды
+            AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(AddTagToMonitoring);
+            RemoveTagFromMonitoringCommand = new RelayCommand<TagDefinition>(RemoveTagFromMonitoring);
 
             // Инициализируем начальные значения
             IsConnected = false;
@@ -395,6 +398,72 @@ namespace SiemensTrend.ViewModels
                 return true;
 
             return false;
+        }
+
+        /// <summary>
+        /// Добавляет тег в список мониторинга
+        /// </summary>
+        private void AddTagToMonitoring(TagDefinition tag)
+        {
+            if (tag == null)
+                return;
+
+            try
+            {
+                // Проверяем лимит тегов для мониторинга
+                if (MonitoredTags.Count >= MaxMonitoredTags)
+                {
+                    _logger.Warn($"AddTagToMonitoring: Достигнут лимит тегов для мониторинга ({MaxMonitoredTags})");
+                    StatusMessage = $"Достигнут лимит тегов для мониторинга ({MaxMonitoredTags})";
+                    return;
+                }
+
+                // Проверяем, не добавлен ли тег уже
+                if (MonitoredTags.Any(t => t.Id == tag.Id))
+                {
+                    _logger.Warn($"AddTagToMonitoring: Тег {tag.Name} уже добавлен в мониторинг");
+                    StatusMessage = $"Тег {tag.Name} уже добавлен в мониторинг";
+                    return;
+                }
+
+                // Добавляем тег в мониторинг
+                MonitoredTags.Add(tag);
+                _logger.Info($"AddTagToMonitoring: Тег {tag.Name} добавлен в мониторинг");
+                StatusMessage = $"Тег {tag.Name} добавлен в мониторинг";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"AddTagToMonitoring: Ошибка при добавлении тега в мониторинг: {ex.Message}");
+                StatusMessage = "Ошибка при добавлении тега в мониторинг";
+            }
+        }
+
+        /// <summary>
+        /// Удаляет тег из списка мониторинга
+        /// </summary>
+        private void RemoveTagFromMonitoring(TagDefinition tag)
+        {
+            if (tag == null)
+                return;
+
+            try
+            {
+                if (MonitoredTags.Remove(tag))
+                {
+                    _logger.Info($"RemoveTagFromMonitoring: Тег {tag.Name} удален из мониторинга");
+                    StatusMessage = $"Тег {tag.Name} удален из мониторинга";
+                }
+                else
+                {
+                    _logger.Warn($"RemoveTagFromMonitoring: Тег {tag.Name} не найден в списке мониторинга");
+                    StatusMessage = $"Тег {tag.Name} не найден в списке мониторинга";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"RemoveTagFromMonitoring: Ошибка при удалении тега из мониторинга: {ex.Message}");
+                StatusMessage = "Ошибка при удалении тега из мониторинга";
+            }
         }
 
         /// <summary>
