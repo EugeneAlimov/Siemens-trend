@@ -55,6 +55,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Storage\Data\" />
     <Folder Include="Visualization\Controls\" />
   </ItemGroup>
 

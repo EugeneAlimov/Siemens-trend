@@ -158,10 +158,6 @@ namespace SiemensTrend.ViewModels
             // Загружаем теги из хранилища
             LoadTagsFromStorage();
 
-            // Команды - создаем новые внутренние методы без конфликта имен
-            AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(OnAddTagToMonitoring);
-            RemoveTagFromMonitoringCommand = new RelayCommand<TagDefinition>(OnRemoveTagFromMonitoring);
-
             _logger.Info("MainViewModel инициализирован успешно");
 
             // Инициализируем приложение

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using Siemens.Engineering;
-using SiemensTrend.Core.Logging;
 
 namespace SiemensTrend.Communication.TIA
 {
@@ -183,19 +182,6 @@ namespace SiemensTrend.Communication.TIA
                     return false;
                 }
 
-                // Создаем читатель тегов только после успешной проверки проекта
-                try
-                {
-                    //_tagReader = new TiaPortalTagReader(_logger, this);
-                    _logger.Info("ConnectToProject: TiaPortalTagReader создан успешно");
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"ConnectToProject: Ошибка при создании TiaPortalTagReader: {ex.Message}");
-                    Disconnect(); // Отключаемся при ошибке
-                    return false;
-                }
-
                 // Устанавливаем флаг подключения
                 _isConnected = true;
                 _logger.Info($"ConnectToProject: Успешное подключение к проекту: {_project.Name}");
@@ -329,31 +315,7 @@ namespace SiemensTrend.Communication.TIA
                     return false;
                 }
 
-                if (openResult)
-                {
-                    // Создаем читатель тегов после успешного открытия проекта
-                    try
-                    {
-                        //_tagReader = new TiaPortalTagReader(_logger, this);
-                        _logger.Info("OpenProjectSync: TiaPortalTagReader создан успешно");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error($"OpenProjectSync: Ошибка при создании TiaPortalTagReader: {ex.Message}");
-                        return false;
-                    }
-
-                    _isConnected = true;
-                    _logger.Info($"OpenProjectSync: Проект успешно открыт: {_project.Name}");
-                    return true;
-                }
-                else
-                {
-                    _isConnected = false;
-                    _tiaPortal = null;
-                    _project = null;
-                    return false;
-                }
+                return openResult;
             }
             catch (Exception ex)
             {

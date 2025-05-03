@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
 using SiemensTrend.Communication.TIA;
 
 namespace SiemensTrend.ViewModels
@@ -11,9 +9,6 @@ namespace SiemensTrend.ViewModels
     /// </summary>
     public partial class MainViewModel
     {
-        // Объект для работы с TIA Portal
-        //private TiaPortalCommunicationService _tiaPortalService;
-
         /// <summary>
         /// Список проектов TIA Portal для выбора
         /// </summary>
@@ -129,9 +124,6 @@ namespace SiemensTrend.ViewModels
                     ProgressValue = 100;
                     IsConnected = true;
 
-                    // Инициализируем обозреватель тегов после успешного подключения
-                    //InitializeTagBrowser();
-
                     return true;
                 }
                 else
@@ -216,8 +208,6 @@ namespace SiemensTrend.ViewModels
                         ProgressValue = 100;
                         IsConnected = true;  // Важно: явно устанавливаем этот флаг!
 
-                        // Инициализируем обозреватель тегов после успешного подключения
-                        //InitializeTagBrowser();
                     }
                     else
                     {

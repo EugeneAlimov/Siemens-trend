@@ -41,11 +41,7 @@ namespace SiemensTrend.Views
                 // Обновляем состояние интерфейса
                 UpdateConnectionState();
 
-                // ВАЖНО: НЕ запускаем автоматическую загрузку тегов!
-                // _viewModel.GetPlcTagsAsync();  // Раньше здесь могло быть такое
-                // _viewModel.GetDbTagsAsync();   // Или такое
-
-                // Инициализируем модель после подключения (без загрузки тегов)
+                 // Инициализируем модель после подключения (без загрузки тегов)
                 if (_viewModel.IsConnected)
                 {
                     //_viewModel.InitializeAfterConnection();

@@ -10,10 +10,6 @@
         Title="Siemens Trend Monitor" Height="700" Width="1000"
         WindowStartupLocation="CenterScreen">
 
-    <Window.Resources>
-        <!--   <converters:BoolToVisibilityConverter x:Key="BoolToVisConverter"/> -->
-    </Window.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -31,8 +27,6 @@
                 <Button x:Name="btnEditTag" Content="Редактировать тег" Margin="3" Padding="5,3" Click="BtnEditTag_Click"/>
                 <Button x:Name="btnRemoveTag" Content="Удалить тег" Margin="3" Padding="5,3" Click="BtnRemoveTag_Click"/>
                 <Separator/>
-                <!--        <Button x:Name="btnSaveToXml" Content="Сохранить в XML" Margin="3" Padding="5,3" Click="BtnSaveToXml_Click"/> -->
-                <!--    <Button x:Name="btnLoadFromXml" Content="Загрузить из XML" Margin="3" Padding="5,3" Click="BtnLoadFromXml_Click"/> -->
                 <Button x:Name="btnSaveTags" Content="Сохранить теги" Margin="3" Padding="5,3" Click="BtnSaveTags_Click"/>
                 <Separator/>
                 <Button x:Name="btnStartMonitoring" Content="Запустить мониторинг" Margin="3" Padding="5,3" Click="BtnStartMonitoring_Click"/>
