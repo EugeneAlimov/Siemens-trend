@@ -52,7 +52,16 @@ namespace SiemensTrend.ViewModels
 
             try
             {
+                // Останавливаем мониторинг, если он уже запущен
+                await StopMonitoringAsync();
+
                 StatusMessage = "Запуск мониторинга...";
+
+                // Устанавливаем интервал опроса в миллисекундах
+                // (можно добавить настройку в UI)
+                _communicationService.PollingIntervalMs = 1000;
+
+                // Запускаем мониторинг
                 await _communicationService.StartMonitoringAsync(MonitoredTags);
                 StatusMessage = $"Мониторинг запущен для {MonitoredTags.Count} тегов";
             }

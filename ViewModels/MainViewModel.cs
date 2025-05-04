@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.TIA;
@@ -27,7 +28,7 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Service for communication with PLC
         /// </summary>
-        protected ICommunicationService _communicationService;
+        public ICommunicationService _communicationService;
 
         /// <summary>
         /// Tag manager for manual tag management
@@ -47,6 +48,16 @@ namespace SiemensTrend.ViewModels
         /// Команда для добавления тега в мониторинг
         /// </summary>
         public ICommand AddTagToMonitoringCommand { get; private set; }
+
+        /// <summary>
+        /// Событие добавления тега на график
+        /// </summary>
+        public event EventHandler<TagDefinition> TagAddedToMonitoring;
+
+        /// <summary>
+        /// Событие удаления тега с графика
+        /// </summary>
+        public event EventHandler<TagDefinition> TagRemovedFromMonitoring;
 
         /// <summary>
         /// Команда для удаления тега из мониторинга
@@ -275,6 +286,7 @@ namespace SiemensTrend.ViewModels
                 // Добавляем тег в соответствующие коллекции
                 AvailableTags.Add(tag);
 
+                // Используем явно установленное свойство IsDbTag, а не вычисленное
                 if (tag.IsDbTag)
                 {
                     DbTags.Add(tag);
@@ -430,6 +442,9 @@ namespace SiemensTrend.ViewModels
                 MonitoredTags.Add(tag);
                 _logger.Info($"AddTagToMonitoring: Тег {tag.Name} добавлен в мониторинг");
                 StatusMessage = $"Тег {tag.Name} добавлен в мониторинг";
+
+                // Вызываем событие для обновления графика
+                TagAddedToMonitoring?.Invoke(this, tag);
             }
             catch (Exception ex)
             {
@@ -452,6 +467,9 @@ namespace SiemensTrend.ViewModels
                 {
                     _logger.Info($"RemoveTagFromMonitoring: Тег {tag.Name} удален из мониторинга");
                     StatusMessage = $"Тег {tag.Name} удален из мониторинга";
+
+                    // Вызываем событие для обновления графика
+                    TagRemovedFromMonitoring?.Invoke(this, tag);
                 }
                 else
                 {

@@ -23,13 +23,16 @@ namespace SiemensTrend.Core.Models
     /// </summary>
     public class TagDefinition
     {
+        private bool _isDbTag;
+
         /// <summary>
         /// Конструктор по умолчанию для сериализации
         /// </summary>
         public TagDefinition()
-    {
-        Id = Guid.NewGuid();
-    }
+        {
+            Id = Guid.NewGuid();
+        }
+
         /// <summary>
         /// Уникальный идентификатор тега
         /// </summary>
@@ -78,7 +81,19 @@ namespace SiemensTrend.Core.Models
         /// <summary>
         /// Является ли тег тегом блока данных
         /// </summary>
-        public bool IsDbTag => GroupName?.StartsWith("DB") == true || Name?.Contains(".") == true;
+        public bool IsDbTag
+        {
+            get
+            {
+                // Если свойство уже установлено явно, используем это значение
+                if (_isDbTag)
+                    return true;
+
+                // Иначе определяем на основе имени и группы
+                return GroupName?.StartsWith("DB") == true || Name?.Contains(".") == true;
+            }
+            set { _isDbTag = value; }
+        }
 
         /// <summary>
         /// Полное имя тега, включая группу
@@ -179,4 +194,3 @@ namespace SiemensTrend.Core.Models
         }
     }
 }
-

@@ -150,8 +150,7 @@
                         </DataGrid>
                     </TabItem>
                     <TabItem Header="График">
-                        <!--    <local:ChartView x:Name="chartView"/> -->
-                        <!--    Закомментировал область графиков -->
+                        <local:ChartView x:Name="chartView" DataContext="{Binding ChartViewModel}"/>
                     </TabItem>
                 </TabControl>
             </Grid>

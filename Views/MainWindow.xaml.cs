@@ -11,6 +11,7 @@ using SiemensTrend.Core.Models;
 using SiemensTrend.Storage.TagManagement;
 using System.Collections.Generic;
 using SiemensTrend.Communication.TIA;
+using SiemensTrend.Communication;
 namespace SiemensTrend.Views
 {
     /// <summary>
@@ -234,6 +235,93 @@ namespace SiemensTrend.Views
                 _logger.Error($"BtnSaveTags_Click: Ошибка: {ex.Message}");
                 MessageBox.Show($"Ошибка при сохранении тегов: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Обработчик события получения новых данных
+        /// </summary>
+        private void CommunicationService_DataReceived(object sender, TagDataReceivedEventArgs e)
+        {
+            try
+            {
+                // Добавляем данные на график
+                Dispatcher.Invoke(() =>
+                {
+                    // Проверяем, что компонент графика существует
+                    if (chartView != null)
+                    {
+                        chartView.AddDataPoints(e.DataPoints);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при обработке новых данных: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Метод инициализации графика
+        /// </summary>
+        private void InitializeChart()
+        {
+            try
+            {
+                // Подписываемся на событие изменения временного интервала
+                chartView.TimeRangeChanged += (s, interval) =>
+                {
+                    _logger.Info($"Изменен интервал графика: {interval} сек");
+                };
+
+                // Подписываемся на событие получения данных от коммуникационного сервиса
+                if (_viewModel._communicationService != null)
+                {
+                    _viewModel._communicationService.DataReceived += CommunicationService_DataReceived;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при инициализации графика: {ex.Message}");
+            }
+
+            _viewModel.TagAddedToMonitoring += (s, tag) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    chartView.AddTagToChart(tag);
+                });
+            };
+
+            _viewModel.TagRemovedFromMonitoring += (s, tag) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    chartView.RemoveTagFromChart(tag);
+                });
+            };
+        }
+
+        /// <summary>
+        /// Переопределяем OnLoaded для вызова InitializeChart после загрузки UI
+        /// </summary>
+        protected override void OnContentRendered(EventArgs e)
+        {
+            base.OnContentRendered(e);
+            InitializeChart();
+        }
+
+        /// <summary>
+        /// Переопределяем OnClosing для отписки от событий
+        /// </summary>
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            base.OnClosing(e);
+
+            // Отписываемся от событий
+            if (_viewModel._communicationService != null)
+            {
+                _viewModel._communicationService.DataReceived -= CommunicationService_DataReceived;
             }
         }
     }

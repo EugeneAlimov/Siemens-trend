@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SiemensTrend.Views"
+             xmlns:charts="clr-namespace:SiemensTrend.Visualization.Charts"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
@@ -15,46 +16,44 @@
 
         <!-- Панель инструментов графика -->
         <ToolBar Grid.Row="0">
-            <Button Content="Запуск" Margin="3" Padding="5,3"/>
-            <Button Content="Пауза" Margin="3" Padding="5,3"/>
+            <Button x:Name="btnStart" Content="Запуск" Margin="3" Padding="5,3" Click="BtnStart_Click"/>
+            <Button x:Name="btnPause" Content="Пауза" Margin="3" Padding="5,3" Click="BtnPause_Click"/>
             <Separator/>
-            <Button Content="Очистить" Margin="3" Padding="5,3"/>
+            <Button x:Name="btnClear" Content="Очистить" Margin="3" Padding="5,3" Click="BtnClear_Click"/>
             <Separator/>
             <TextBlock Text="Интервал:" VerticalAlignment="Center" Margin="3"/>
-            <ComboBox Width="80" Margin="3" SelectedIndex="1">
-                <ComboBoxItem Content="10 сек"/>
-                <ComboBoxItem Content="1 мин"/>
-                <ComboBoxItem Content="5 мин"/>
-                <ComboBoxItem Content="10 мин"/>
-                <ComboBoxItem Content="30 мин"/>
-                <ComboBoxItem Content="1 час"/>
+            <ComboBox x:Name="cmbTimeRange" Width="80" Margin="3" SelectedIndex="1" SelectionChanged="CmbTimeRange_SelectionChanged">
+                <ComboBoxItem Content="10 сек" Tag="10"/>
+                <ComboBoxItem Content="1 мин" Tag="60"/>
+                <ComboBoxItem Content="5 мин" Tag="300"/>
+                <ComboBoxItem Content="10 мин" Tag="600"/>
+                <ComboBoxItem Content="30 мин" Tag="1800"/>
+                <ComboBoxItem Content="1 час" Tag="3600"/>
             </ComboBox>
+            <Separator/>
+            <Button x:Name="btnResetZoom" Content="Сбросить масштаб" Margin="3" Padding="5,3" Click="BtnResetZoom_Click"/>
+            <CheckBox x:Name="chkAutoScale" Content="Автомасштаб" Margin="5,0" IsChecked="True" Click="ChkAutoScale_Click"/>
         </ToolBar>
 
         <!-- Область графика -->
         <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="5">
-            <!-- Здесь будет размещен элемент управления графиком -->
-            <Grid Background="WhiteSmoke">
-                <TextBlock Text="Данные графика" 
-                           HorizontalAlignment="Center" 
-                           VerticalAlignment="Center"
-                           FontStyle="Italic"
-                           Foreground="Gray"/>
+            <Grid x:Name="chartContainer" Background="WhiteSmoke">
+                <!-- Здесь будет размещен компонент RealTimeChart -->
             </Grid>
         </Border>
 
         <!-- Панель статуса графика -->
         <StatusBar Grid.Row="2">
             <StatusBarItem>
-                <TextBlock Text="Время начала: 12:30:45"/>
+                <TextBlock x:Name="txtStartTime" Text="Время начала: --:--:--"/>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
-                <TextBlock Text="Длительность: 00:05:30"/>
+                <TextBlock x:Name="txtDuration" Text="Длительность: 00:00:00"/>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
-                <TextBlock Text="Статус: Активен"/>
+                <TextBlock x:Name="txtStatus" Text="Статус: Готов"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>

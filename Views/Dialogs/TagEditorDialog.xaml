@@ -55,8 +55,10 @@
             <!-- Tag type -->
             <TextBlock Grid.Row="4" Grid.Column="0" Text="Tag Type:" VerticalAlignment="Center" Margin="0,5"/>
             <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,5">
-                <RadioButton x:Name="rbPlcTag" Content="PLC Tag" Margin="0,0,10,0" IsChecked="True"/>
-                <RadioButton x:Name="rbDbTag" Content="DB Tag"/>
+                <RadioButton x:Name="rbPlcTag" Content="PLC Tag" Margin="0,0,10,0" IsChecked="True" 
+                             Checked="RbTagType_Checked"/>
+                <RadioButton x:Name="rbDbTag" Content="DB Tag" 
+                             Checked="RbTagType_Checked"/>
             </StackPanel>
 
             <!-- Comment -->
