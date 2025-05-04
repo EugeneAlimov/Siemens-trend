@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using Siemens.Engineering;
 using SiemensTrend.Core.Logging;
+using SiemensTrend.Core.Models;
 
 
 namespace SiemensTrend.Communication.TIA
@@ -94,6 +96,38 @@ namespace SiemensTrend.Communication.TIA
             else
             {
                 _logger.Warn("SetCurrentProjectInXmlManager: Нет активного проекта");
+            }
+        }
+
+        /// <summary>
+        /// Метод для поиска тегов по их именам
+        /// </summary>
+        public List<TagDefinition> FindTagsByNames(List<string> tagNames)
+        {
+            try
+            {
+                _logger.Info($"Поиск тегов по именам ({tagNames.Count} тегов)");
+
+                if (!_isConnected || _tiaPortal == null)
+                {
+                    _logger.Error("Попытка поиска тегов без подключения к TIA Portal");
+                    return new List<TagDefinition>();
+                }
+
+                // Создаем объект для поиска тегов
+                var tagFinder = new TiaPortalTagFinder(_logger, _tiaPortal);
+
+                // Выполняем поиск
+                var foundTags = tagFinder.FindTags(tagNames);
+
+                _logger.Info($"Найдено {foundTags.Count} тегов");
+
+                return foundTags;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
+                return new List<TagDefinition>();
             }
         }
     }

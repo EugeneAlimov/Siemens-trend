@@ -121,6 +121,15 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
+        /// Метод для запуска отображения графика
+        /// </summary>
+        public void Start()
+        {
+            IsPaused = false;
+            _logger.Info("График запущен");
+        }
+
+        /// <summary>
         /// Добавление новых точек данных
         /// </summary>
         public void AddDataPoints(IEnumerable<TagDataPoint> dataPoints)

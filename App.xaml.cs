@@ -3,10 +3,14 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using Siemens.Collaboration.Net;
 using SiemensTrend.Core.Logging;
-
 using SiemensTrend.Storage.TagManagement;
+using SiemensTrend.Communication;
+using SiemensTrend.ViewModels;
+using SiemensTrend.Views;
+
 namespace SiemensTrend
 {
     /// <summary>
@@ -15,6 +19,7 @@ namespace SiemensTrend
     public partial class App : Application
     {
         private static Logger _logger;
+        private ServiceProvider _serviceProvider;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -40,12 +45,48 @@ namespace SiemensTrend
 
                 // Инициализация Assembly Resolver для Siemens.Engineering.dll
                 InitializeAssemblyResolver();
+
+                // Настраиваем сервисы
+                ConfigureServices();
+
+                // Создаем и показываем главное окно
+                var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+                mainWindow.Show();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Ошибка при запуске приложения: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void ConfigureServices()
+        {
+            var services = new ServiceCollection();
+
+            // Регистрируем сервисы
+            services.AddSingleton<Logger>(_logger);
+            services.AddSingleton<TagManager>();
+
+            // Создаем экземпляр TiaPortalCommunicationService
+            var tiaService = new Communication.TIA.TiaPortalCommunicationService(_logger);
+            // Регистрируем сервис по интерфейсу (исправленная версия)
+            services.AddSingleton(typeof(ICommunicationService), tiaService);
+
+            // Регистрируем ChartViewModel перед MainViewModel
+            services.AddSingleton<ChartViewModel>();
+
+            // Теперь можем зарегистрировать TagsViewModel (если нужно)
+            services.AddSingleton<TagsViewModel>();
+
+            // Регистрируем MainViewModel после зависимостей
+            services.AddSingleton<MainViewModel>();
+
+            // Регистрируем окна и представления
+            services.AddSingleton<MainWindow>();
+
+            // Создаем провайдер сервисов
+            _serviceProvider = services.BuildServiceProvider();
         }
 
         private void InitializeAssemblyResolver()
@@ -106,6 +147,13 @@ namespace SiemensTrend
         {
             base.OnExit(e);
             _logger.Info("Приложение завершено");
+
+            // Если используете Microsoft.Extensions.DependencyInjection, 
+            // нужно освободить ресурсы при выходе
+            if (_serviceProvider != null)
+            {
+                ((IDisposable)_serviceProvider).Dispose();
+            }
         }
     }
 }

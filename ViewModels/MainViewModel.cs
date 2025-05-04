@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using SiemensTrend.Communication;
+using SiemensTrend.Communication.S7;
 using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Commands;
 using SiemensTrend.Core.Logging;
@@ -145,7 +146,7 @@ namespace SiemensTrend.ViewModels
         /// Constructor
         /// </summary>
         /// <param name="logger">Logger</param>
-        public MainViewModel(Logger logger)
+        public MainViewModel(Logger logger, ICommunicationService communicationService, TagManager tagManager, ChartViewModel chartViewModel)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _logger.Info("Initializing MainViewModel");
@@ -173,6 +174,19 @@ namespace SiemensTrend.ViewModels
             LoadTagsFromStorage();
 
             _logger.Info("MainViewModel инициализирован успешно");
+
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _communicationService = communicationService ?? throw new ArgumentNullException(nameof(communicationService));
+            _tagManager = tagManager ?? throw new ArgumentNullException(nameof(tagManager));
+
+            // Инициализация свойства ChartViewModel
+            ChartViewModel = chartViewModel ?? throw new ArgumentNullException(nameof(chartViewModel));
+
+            // Инициализация свойства TagsViewModel
+            TagsViewModel = new TagsViewModel(logger, communicationService, tagManager);
+
+            // Подписка на события
+            SubscribeToTagsEvents();
 
             // Инициализируем приложение
             Initialize();
