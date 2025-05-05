@@ -186,44 +186,101 @@ namespace SiemensTrend.Views.Dialogs
         /// <summary>
         /// Обработчик клика по кнопке "Добавить"
         /// </summary>
-/// <summary>
-/// Обработчик нажатия кнопки "Добавить тег"
-/// </summary>
-private void BtnAddTag_Click(object sender, RoutedEventArgs e)
-{
-    try
-    {
-        _logger.Info("Вызов диалога добавления тегов");
-
-        // Создаем диалог для добавления тегов
-        var dialog = new Dialogs.AddTagsDialog(_logger, _viewModel._communicationService);
-        dialog.Owner = this;
-
-        // Показываем диалог
-        if (dialog.ShowDialog() == true)
+        private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
-            // Получаем найденные теги
-            var foundTags = dialog.FoundTags;
+            // Получаем все введенные имена тегов
+            List<string> tagNames = _tagInputs
+                .Select(tb => tb.Text.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .ToList();
 
-            if (foundTags != null && foundTags.Count > 0)
+            if (tagNames.Count == 0)
             {
-                // Добавляем теги в модель
-                foreach (var tag in foundTags)
-                {
-                    _viewModel.AddNewTag(tag);
-                }
+                MessageBox.Show("Пожалуйста, введите хотя бы один тег",
+                    "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
-                _logger.Info($"Добавлено {foundTags.Count} тегов");
+            // Запускаем поиск тегов
+            try
+            {
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                // Показываем индикатор прогресса
+                var progressWindow = new ProgressWindow("Поиск тегов", "Выполняется поиск тегов...");
+                progressWindow.Owner = this;
+                progressWindow.Show();
+
+                // Запускаем поиск в отдельном потоке
+                var dispatcher = Dispatcher.CurrentDispatcher;
+
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        // Вызываем метод поиска тегов
+                        var foundTags = SearchTags(tagNames);
+
+                        // Возвращаемся в UI поток
+                        dispatcher.Invoke(() =>
+                        {
+                            // Закрываем окно прогресса
+                            progressWindow.Close();
+
+                            // Сохраняем найденные теги
+                            FoundTags = foundTags;
+
+                            // Проверяем результаты
+                            if (FoundTags.Count == 0)
+                            {
+                                MessageBox.Show("Не удалось найти ни один из введенных тегов",
+                                    "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
+                                return;
+                            }
+
+                            // Если найдены не все теги, показываем предупреждение
+                            if (FoundTags.Count < tagNames.Count)
+                            {
+                                MessageBox.Show($"Найдено {FoundTags.Count} из {tagNames.Count} тегов",
+                                    "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
+                            }
+
+                            // Закрываем диалог с успешным результатом
+                            DialogResult = true;
+                            Close();
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        dispatcher.Invoke(() =>
+                        {
+                            // Закрываем окно прогресса
+                            progressWindow.Close();
+
+                            // Показываем ошибку
+                            _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
+                            MessageBox.Show($"Ошибка при поиске тегов: {ex.Message}",
+                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        });
+                    }
+                    finally
+                    {
+                        dispatcher.Invoke(() =>
+                        {
+                            Mouse.OverrideCursor = null;
+                        });
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Mouse.OverrideCursor = null;
+                _logger.Error($"Ошибка при запуске поиска тегов: {ex.Message}");
+                MessageBox.Show($"Ошибка при запуске поиска тегов: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-    }
-    catch (Exception ex)
-    {
-        _logger.Error($"Ошибка при добавлении тегов: {ex.Message}");
-        MessageBox.Show($"Ошибка при добавлении тегов: {ex.Message}",
-            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-    }
-}
+
         /// <summary>
         /// Метод поиска тегов
         /// </summary>
@@ -236,18 +293,33 @@ private void BtnAddTag_Click(object sender, RoutedEventArgs e)
                 // Проверяем доступность API для поиска тегов
                 if (_communicationService is TiaPortalCommunicationService tiaService)
                 {
-                    // Создаем объект для поиска тегов
-                    var tagFinder = new TiaPortalTagFinder(_logger, tiaService.CurrentProject.TiaPortalInstance);
-                    
-                    // Ищем теги с оптимизацией запросов
-                    results = tagFinder.FindTags(tagNames);
+                    // В данной реализации мы используем демонстрационные данные
+                    // В реальном приложении здесь будет вызов метода поиска тегов через API TIA Portal
+
+                    _logger.Info($"Поиск тегов в TIA Portal: {tagNames.Count} тегов");
+
+                    // Создаем демонстрационные теги для тестирования интерфейса
+                    foreach (var tagName in tagNames)
+                    {
+                        bool isDbTag = tagName.Contains("\"") && tagName.Contains(".");
+                        results.Add(new TagDefinition
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = tagName,
+                            Address = isDbTag ? "" : $"I0.{results.Count}", // Пример адреса для PLC тега
+                            DataType = GetDemoDataType(tagName),
+                            GroupName = GetGroupName(tagName),
+                            IsDbTag = isDbTag,
+                            IsOptimized = isDbTag && tagName.Contains("S1"), // Демонстрационный признак оптимизации
+                            Comment = $"Демо-тег для {tagName}"
+                        });
+                    }
                 }
                 else
                 {
                     // Этот код будет использоваться только как заглушка
-                    // в реальном приложении здесь будет другая логика
-                    _logger.Warn("Коммуникационный сервис не поддерживает поиск тегов по символьным именам");
-                    
+                    _logger.Warn("Коммуникационный сервис не поддерживает поиск тегов");
+
                     // Создаем демонстрационные теги для тестирования интерфейса
                     foreach (var tagName in tagNames)
                     {
@@ -275,21 +347,21 @@ private void BtnAddTag_Click(object sender, RoutedEventArgs e)
         }
 
         // Вспомогательные методы для демонстрационных тегов
-        
+
         private TagDataType GetDemoDataType(string tagName)
         {
             if (tagName.ToLower().Contains("bool")) return TagDataType.Bool;
             if (tagName.ToLower().Contains("int")) return TagDataType.Int;
             if (tagName.ToLower().Contains("real")) return TagDataType.Real;
             if (tagName.ToLower().Contains("string")) return TagDataType.String;
-            
+
             // По умолчанию для демонстрации
             return tagName.Length % 4 == 0 ? TagDataType.Bool :
                    tagName.Length % 4 == 1 ? TagDataType.Int :
                    tagName.Length % 4 == 2 ? TagDataType.DInt :
                    TagDataType.Real;
         }
-        
+
         private string GetGroupName(string tagName)
         {
             if (tagName.Contains("\""))
@@ -301,11 +373,11 @@ private void BtnAddTag_Click(object sender, RoutedEventArgs e)
                     return tagName.Substring(startQuote + 1, endQuote - startQuote - 1);
                 }
             }
-            
+
             return "DefaultGroup";
         }
     }
-    
+
     /// <summary>
     /// Окно прогресса для отображения статуса операции
     /// </summary>
