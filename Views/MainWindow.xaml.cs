@@ -72,186 +72,186 @@ namespace SiemensTrend.Views
             UpdateConnectionState();
         }
 
-        /// <summary>
-        /// Обработчик нажатия кнопки "Добавить тег"
-        /// </summary>
-        private void BtnAddTag_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("Вызов диалога добавления тегов");
+        ///// <summary>
+        ///// Обработчик нажатия кнопки "Добавить тег"
+        ///// </summary>
+        //private void BtnAddTag_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("Вызов диалога добавления тегов");
 
-                // Создаем диалог для добавления тегов
-                var dialog = new Dialogs.AddTagsDialog(_logger, _communicationService);
-                dialog.Owner = this;
+        //        // Создаем диалог для добавления тегов
+        //        var dialog = new Dialogs.AddTagsDialog(_logger, _communicationService);
+        //        dialog.Owner = this;
 
-                // Показываем диалог
-                if (dialog.ShowDialog() == true)
-                {
-                    // Получаем найденные теги
-                    var foundTags = dialog.FoundTags;
+        //        // Показываем диалог
+        //        if (dialog.ShowDialog() == true)
+        //        {
+        //            // Получаем найденные теги
+        //            var foundTags = dialog.FoundTags;
 
-                    if (foundTags != null && foundTags.Count > 0)
-                    {
-                        // Добавляем теги в модель
-                        foreach (var tag in foundTags)
-                        {
-                            _viewModel.AddNewTag(tag);
-                        }
+        //            if (foundTags != null && foundTags.Count > 0)
+        //            {
+        //                // Добавляем теги в модель
+        //                foreach (var tag in foundTags)
+        //                {
+        //                    _viewModel.AddNewTag(tag);
+        //                }
 
-                        _logger.Info($"Добавлено {foundTags.Count} тегов");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при добавлении тегов: {ex.Message}");
-                MessageBox.Show($"Ошибка при добавлении тегов: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //                _logger.Info($"Добавлено {foundTags.Count} тегов");
+        //            }
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при добавлении тегов: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при добавлении тегов: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
-        /// <summary>
-        /// Обработчик нажатия кнопки "Редактировать тег"
-        /// </summary>
-        private void BtnEditTag_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("BtnEditTag_Click: Вызов диалога редактирования тега");
+        ///// <summary>
+        ///// Обработчик нажатия кнопки "Редактировать тег"
+        ///// </summary>
+        //private void BtnEditTag_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("BtnEditTag_Click: Вызов диалога редактирования тега");
 
-                // Получаем выбранный тег из таблицы PLC или DB
-                TagDefinition selectedTag = null;
+        //        // Получаем выбранный тег из таблицы PLC или DB
+        //        TagDefinition selectedTag = null;
 
-                // Проверяем, есть ли выбранный тег в таблице PLC
-                var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
-                if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
-                {
-                    selectedTag = plcDataGrid.SelectedItem as TagDefinition;
-                }
+        //        // Проверяем, есть ли выбранный тег в таблице PLC
+        //        var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
+        //        if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
+        //        {
+        //            selectedTag = plcDataGrid.SelectedItem as TagDefinition;
+        //        }
 
-                // Если в таблице PLC ничего не выбрано, проверяем таблицу DB
-                if (selectedTag == null)
-                {
-                    var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
-                    if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
-                    {
-                        selectedTag = dbDataGrid.SelectedItem as TagDefinition;
-                    }
-                }
+        //        // Если в таблице PLC ничего не выбрано, проверяем таблицу DB
+        //        if (selectedTag == null)
+        //        {
+        //            var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
+        //            if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
+        //            {
+        //                selectedTag = dbDataGrid.SelectedItem as TagDefinition;
+        //            }
+        //        }
 
-                if (selectedTag == null)
-                {
-                    _logger.Warn("BtnEditTag_Click: Не выбран тег для редактирования");
-                    MessageBox.Show("Пожалуйста, выберите тег для редактирования",
-                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+        //        if (selectedTag == null)
+        //        {
+        //            _logger.Warn("BtnEditTag_Click: Не выбран тег для редактирования");
+        //            MessageBox.Show("Пожалуйста, выберите тег для редактирования",
+        //                "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+        //            return;
+        //        }
 
-                // Создаем диалог для редактирования тега
-                var dialog = new Dialogs.TagEditorDialog(selectedTag);
-                dialog.Owner = this;
+        //        // Создаем диалог для редактирования тега
+        //        var dialog = new Dialogs.TagEditorDialog(selectedTag);
+        //        dialog.Owner = this;
 
-                // Показываем диалог
-                if (dialog.ShowDialog() == true)
-                {
-                    // Получаем отредактированный тег
-                    var updatedTag = dialog.Tag;
+        //        // Показываем диалог
+        //        if (dialog.ShowDialog() == true)
+        //        {
+        //            // Получаем отредактированный тег
+        //            var updatedTag = dialog.Tag;
 
-                    // Обновляем тег в модели
-                    _viewModel.EditTag(selectedTag, updatedTag);
+        //            // Обновляем тег в модели
+        //            _viewModel.EditTag(selectedTag, updatedTag);
 
-                    _logger.Info($"BtnEditTag_Click: Отредактирован тег: {updatedTag.Name}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"BtnEditTag_Click: Ошибка: {ex.Message}");
-                MessageBox.Show($"Ошибка при редактировании тега: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //            _logger.Info($"BtnEditTag_Click: Отредактирован тег: {updatedTag.Name}");
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"BtnEditTag_Click: Ошибка: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при редактировании тега: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
-        /// <summary>
-        /// Обработчик нажатия кнопки "Удалить тег"
-        /// </summary>
-        private void BtnRemoveTag_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("BtnRemoveTag_Click: Удаление тега");
+        ///// <summary>
+        ///// Обработчик нажатия кнопки "Удалить тег"
+        ///// </summary>
+        //private void BtnRemoveTag_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("BtnRemoveTag_Click: Удаление тега");
 
-                // Получаем выбранный тег из таблицы PLC или DB
-                TagDefinition selectedTag = null;
+        //        // Получаем выбранный тег из таблицы PLC или DB
+        //        TagDefinition selectedTag = null;
 
-                // Проверяем, есть ли выбранный тег в таблице PLC
-                var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
-                if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
-                {
-                    selectedTag = plcDataGrid.SelectedItem as TagDefinition;
-                }
+        //        // Проверяем, есть ли выбранный тег в таблице PLC
+        //        var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
+        //        if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
+        //        {
+        //            selectedTag = plcDataGrid.SelectedItem as TagDefinition;
+        //        }
 
-                // Если в таблице PLC ничего не выбрано, проверяем таблицу DB
-                if (selectedTag == null)
-                {
-                    var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
-                    if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
-                    {
-                        selectedTag = dbDataGrid.SelectedItem as TagDefinition;
-                    }
-                }
+        //        // Если в таблице PLC ничего не выбрано, проверяем таблицу DB
+        //        if (selectedTag == null)
+        //        {
+        //            var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
+        //            if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
+        //            {
+        //                selectedTag = dbDataGrid.SelectedItem as TagDefinition;
+        //            }
+        //        }
 
-                if (selectedTag == null)
-                {
-                    _logger.Warn("BtnRemoveTag_Click: Не выбран тег для удаления");
-                    MessageBox.Show("Пожалуйста, выберите тег для удаления",
-                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+        //        if (selectedTag == null)
+        //        {
+        //            _logger.Warn("BtnRemoveTag_Click: Не выбран тег для удаления");
+        //            MessageBox.Show("Пожалуйста, выберите тег для удаления",
+        //                "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+        //            return;
+        //        }
 
-                // Запрос подтверждения
-                var result = MessageBox.Show($"Вы уверены, что хотите удалить тег {selectedTag.Name}?",
-                    "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        //        // Запрос подтверждения
+        //        var result = MessageBox.Show($"Вы уверены, что хотите удалить тег {selectedTag.Name}?",
+        //            "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
-                if (result == MessageBoxResult.Yes)
-                {
-                    // Удаляем тег из модели
-                    _viewModel.RemoveTag(selectedTag);
+        //        if (result == MessageBoxResult.Yes)
+        //        {
+        //            // Удаляем тег из модели
+        //            _viewModel.RemoveTag(selectedTag);
 
-                    _logger.Info($"BtnRemoveTag_Click: Удален тег: {selectedTag.Name}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"BtnRemoveTag_Click: Ошибка: {ex.Message}");
-                MessageBox.Show($"Ошибка при удалении тега: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //            _logger.Info($"BtnRemoveTag_Click: Удален тег: {selectedTag.Name}");
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"BtnRemoveTag_Click: Ошибка: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при удалении тега: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
-        /// <summary>
-        /// Обработчик нажатия кнопки "Сохранить теги"
-        /// </summary>
-        private void BtnSaveTags_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _logger.Info("BtnSaveTags_Click: Сохранение тегов");
+        ///// <summary>
+        ///// Обработчик нажатия кнопки "Сохранить теги"
+        ///// </summary>
+        //private void BtnSaveTags_Click(object sender, RoutedEventArgs e)
+        //{
+        //    try
+        //    {
+        //        _logger.Info("BtnSaveTags_Click: Сохранение тегов");
 
-                // Сохраняем теги
-                _viewModel.SaveTagsToStorage();
+        //        // Сохраняем теги
+        //        _viewModel.SaveTagsToStorage();
 
-                _logger.Info("BtnSaveTags_Click: Теги сохранены успешно");
-                MessageBox.Show("Теги сохранены успешно",
-                    "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"BtnSaveTags_Click: Ошибка: {ex.Message}");
-                MessageBox.Show($"Ошибка при сохранении тегов: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //        _logger.Info("BtnSaveTags_Click: Теги сохранены успешно");
+        //        MessageBox.Show("Теги сохранены успешно",
+        //            "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"BtnSaveTags_Click: Ошибка: {ex.Message}");
+        //        MessageBox.Show($"Ошибка при сохранении тегов: {ex.Message}",
+        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
         /// <summary>
         /// Обработчик события получения новых данных

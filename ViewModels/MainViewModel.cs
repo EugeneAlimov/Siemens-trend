@@ -38,7 +38,8 @@ namespace SiemensTrend.ViewModels
         private ObservableCollection<TagDefinition> _allTags;
 
         // Поле для работы с TIA Portal - оставляем только в этом файле,
-        // в других частичных классах его нужно удалить
+        public TiaPortalCommunicationService TiaPortalService => _tiaPortalService;
+
         private TiaPortalCommunicationService _tiaPortalService;
 
         private bool _isConnected;
@@ -199,364 +200,364 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Метод для обновления списка всех тегов
         /// </summary>
-        private void UpdateAllTags()
-        {
-            if (AllTags == null)
-            {
-                AllTags = new ObservableCollection<TagDefinition>();
-            }
+        //private void UpdateAllTags()
+        //{
+        //    if (AllTags == null)
+        //    {
+        //        AllTags = new ObservableCollection<TagDefinition>();
+        //    }
             
-            AllTags.Clear();
+        //    AllTags.Clear();
             
-            // Добавляем PLC теги
-            foreach (var tag in PlcTags)
-            {
-                AllTags.Add(tag);
-            }
+        //    // Добавляем PLC теги
+        //    foreach (var tag in PlcTags)
+        //    {
+        //        AllTags.Add(tag);
+        //    }
             
-            // Добавляем DB теги
-            foreach (var tag in DbTags)
-            {
-                AllTags.Add(tag);
-            }
+        //    // Добавляем DB теги
+        //    foreach (var tag in DbTags)
+        //    {
+        //        AllTags.Add(tag);
+        //    }
             
-            // Уведомляем представление об изменении
-            OnPropertyChanged(nameof(AllTags));
-        }
+        //    // Уведомляем представление об изменении
+        //    OnPropertyChanged(nameof(AllTags));
+        //}
 
         /// <summary>
         /// Инициализация приложения
         /// </summary>
-        public void Initialize()
-        {
-            try
-            {
-                _logger.Info("Initialize: Инициализация приложения");
+        //public void Initialize()
+        //{
+        //    try
+        //    {
+        //        _logger.Info("Initialize: Инициализация приложения");
 
-                // Загружаем теги из хранилища
-                LoadTagsFromStorage();
+        //        // Загружаем теги из хранилища
+        //        LoadTagsFromStorage();
 
-                _logger.Info("Initialize: Инициализация завершена");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Initialize: Ошибка при инициализации: {ex.Message}");
-            }
-        }
+        //        _logger.Info("Initialize: Инициализация завершена");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Initialize: Ошибка при инициализации: {ex.Message}");
+        //    }
+        //}
 
-        /// <summary>
-        /// Загружает теги из хранилища
-        /// </summary>
-        private void LoadTagsFromStorage()
-        {
-            try
-            {
-                _logger.Info("LoadTagsFromStorage: Загрузка тегов из хранилища");
+        ///// <summary>
+        ///// Загружает теги из хранилища
+        ///// </summary>
+        //private void LoadTagsFromStorage()
+        //{
+        //    try
+        //    {
+        //        _logger.Info("LoadTagsFromStorage: Загрузка тегов из хранилища");
 
-                var tags = _tagManager.LoadTags();
+        //        var tags = _tagManager.LoadTags();
 
-                // Очищаем текущие коллекции
-                PlcTags.Clear();
-                DbTags.Clear();
-                AvailableTags.Clear();
+        //        // Очищаем текущие коллекции
+        //        PlcTags.Clear();
+        //        DbTags.Clear();
+        //        AvailableTags.Clear();
 
-                // Распределяем теги по коллекциям
-                foreach (var tag in tags)
-                {
-                    AvailableTags.Add(tag);
+        //        // Распределяем теги по коллекциям
+        //        foreach (var tag in tags)
+        //        {
+        //            AvailableTags.Add(tag);
 
-                    if (tag.IsDbTag)
-                    {
-                        DbTags.Add(tag);
-                    }
-                    else
-                    {
-                        PlcTags.Add(tag);
-                    }
-                }
+        //            if (tag.IsDbTag)
+        //            {
+        //                DbTags.Add(tag);
+        //            }
+        //            else
+        //            {
+        //                PlcTags.Add(tag);
+        //            }
+        //        }
                 
-                // Обновляем объединенный список тегов
-                UpdateAllTags();
+        //        // Обновляем объединенный список тегов
+        //        UpdateAllTags();
 
-                _logger.Info($"LoadTagsFromStorage: Загружено {PlcTags.Count} тегов PLC и {DbTags.Count} тегов DB");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"LoadTagsFromStorage: Ошибка загрузки тегов: {ex.Message}");
-            }
-        }
+        //        _logger.Info($"LoadTagsFromStorage: Загружено {PlcTags.Count} тегов PLC и {DbTags.Count} тегов DB");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"LoadTagsFromStorage: Ошибка загрузки тегов: {ex.Message}");
+        //    }
+        //}
 
-        /// <summary>
-        /// Сохраняет теги в хранилище
-        /// </summary>
-        public void SaveTagsToStorage()
-        {
-            try
-            {
-                _logger.Info("SaveTagsToStorage: Сохранение тегов в хранилище");
+        ///// <summary>
+        ///// Сохраняет теги в хранилище
+        ///// </summary>
+        //public void SaveTagsToStorage()
+        //{
+        //    try
+        //    {
+        //        _logger.Info("SaveTagsToStorage: Сохранение тегов в хранилище");
 
-                var allTags = new List<TagDefinition>();
-                allTags.AddRange(PlcTags);
-                allTags.AddRange(DbTags);
+        //        var allTags = new List<TagDefinition>();
+        //        allTags.AddRange(PlcTags);
+        //        allTags.AddRange(DbTags);
 
-                _tagManager.SaveTags(allTags);
+        //        _tagManager.SaveTags(allTags);
 
-                _logger.Info($"SaveTagsToStorage: Сохранено {allTags.Count} тегов");
-                StatusMessage = "Теги сохранены";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"SaveTagsToStorage: Ошибка сохранения тегов: {ex.Message}");
-                StatusMessage = "Ошибка сохранения тегов";
-            }
-        }
+        //        _logger.Info($"SaveTagsToStorage: Сохранено {allTags.Count} тегов");
+        //        StatusMessage = "Теги сохранены";
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"SaveTagsToStorage: Ошибка сохранения тегов: {ex.Message}");
+        //        StatusMessage = "Ошибка сохранения тегов";
+        //    }
+        //}
 
         /// <summary>
         /// Добавляет новый тег
         /// </summary>
         /// <param name="tag">Тег для добавления</param>
         /// 
-        public void AddNewTag(TagDefinition tag)
-        {
-            if (tag == null)
-                return;
+        //public void AddNewTag(TagDefinition tag)
+        //{
+        //    if (tag == null)
+        //        return;
 
-            try
-            {
-                _logger.Info($"AddNewTag: Добавление нового тега: {tag.Name}");
+        //    try
+        //    {
+        //        _logger.Info($"AddNewTag: Добавление нового тега: {tag.Name}");
 
-                // Проверяем, существует ли уже тег с таким именем
-                if (TagExists(tag.Name))
-                {
-                    _logger.Warn($"AddNewTag: Тег с именем {tag.Name} уже существует");
-                    StatusMessage = $"Тег с именем {tag.Name} уже существует";
-                    return;
-                }
+        //        // Проверяем, существует ли уже тег с таким именем
+        //        if (TagExists(tag.Name))
+        //        {
+        //            _logger.Warn($"AddNewTag: Тег с именем {tag.Name} уже существует");
+        //            StatusMessage = $"Тег с именем {tag.Name} уже существует";
+        //            return;
+        //        }
 
-                // Добавляем тег в соответствующие коллекции
-                AvailableTags.Add(tag);
+        //        // Добавляем тег в соответствующие коллекции
+        //        AvailableTags.Add(tag);
 
-                // Используем явно установленное свойство IsDbTag, а не вычисленное
-                if (tag.IsDbTag)
-                {
-                    DbTags.Add(tag);
-                    _logger.Info($"AddNewTag: Добавлен DB тег: {tag.Name}");
-                }
-                else
-                {
-                    PlcTags.Add(tag);
-                    _logger.Info($"AddNewTag: Добавлен PLC тег: {tag.Name}");
-                }
+        //        // Используем явно установленное свойство IsDbTag, а не вычисленное
+        //        if (tag.IsDbTag)
+        //        {
+        //            DbTags.Add(tag);
+        //            _logger.Info($"AddNewTag: Добавлен DB тег: {tag.Name}");
+        //        }
+        //        else
+        //        {
+        //            PlcTags.Add(tag);
+        //            _logger.Info($"AddNewTag: Добавлен PLC тег: {tag.Name}");
+        //        }
 
-                // Обновляем объединенный список тегов
-                UpdateAllTags();
+        //        // Обновляем объединенный список тегов
+        //        UpdateAllTags();
 
-                // Сохраняем изменения
-                SaveTagsToStorage();
+        //        // Сохраняем изменения
+        //        SaveTagsToStorage();
 
-                StatusMessage = $"Тег {tag.Name} добавлен";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"AddNewTag: Ошибка при добавлении тега: {ex.Message}");
-                StatusMessage = "Ошибка при добавлении тега";
-            }
-        }
+        //        StatusMessage = $"Тег {tag.Name} добавлен";
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"AddNewTag: Ошибка при добавлении тега: {ex.Message}");
+        //        StatusMessage = "Ошибка при добавлении тега";
+        //    }
+        //}
         
 
         /// <summary>
         /// Инициализация метода в конструкторе
         /// </summary>
-        private void InitializeTags()
-        {
-            // Инициализируем коллекции
-            AvailableTags = new ObservableCollection<TagDefinition>();
-            MonitoredTags = new ObservableCollection<TagDefinition>();
-            PlcTags = new ObservableCollection<TagDefinition>();
-            DbTags = new ObservableCollection<TagDefinition>();
-            AllTags = new ObservableCollection<TagDefinition>();
+        //private void InitializeTags()
+        //{
+        //    // Инициализируем коллекции
+        //    AvailableTags = new ObservableCollection<TagDefinition>();
+        //    MonitoredTags = new ObservableCollection<TagDefinition>();
+        //    PlcTags = new ObservableCollection<TagDefinition>();
+        //    DbTags = new ObservableCollection<TagDefinition>();
+        //    AllTags = new ObservableCollection<TagDefinition>();
             
-            // Загружаем теги из хранилища
-            LoadTagsFromStorage();
-        }
+        //    // Загружаем теги из хранилища
+        //    LoadTagsFromStorage();
+        //}
 
         /// <summary>
         /// Редактирует тег
         /// </summary>
         /// <param name="originalTag">Исходный тег</param>
         /// <param name="updatedTag">Обновленный тег</param>
-        public void EditTag(TagDefinition originalTag, TagDefinition updatedTag)
-        {
-            if (originalTag == null || updatedTag == null)
-                return;
+        //public void EditTag(TagDefinition originalTag, TagDefinition updatedTag)
+        //{
+        //    if (originalTag == null || updatedTag == null)
+        //        return;
 
-            try
-            {
-                _logger.Info($"EditTag: Редактирование тега: {originalTag.Name} -> {updatedTag.Name}");
+        //    try
+        //    {
+        //        _logger.Info($"EditTag: Редактирование тега: {originalTag.Name} -> {updatedTag.Name}");
 
-                // Проверяем, существует ли тег с новым именем, если оно отличается
-                if (!originalTag.Name.Equals(updatedTag.Name, StringComparison.OrdinalIgnoreCase) &&
-                    TagExists(updatedTag.Name))
-                {
-                    _logger.Warn($"EditTag: Тег с именем {updatedTag.Name} уже существует");
-                    StatusMessage = $"Тег с именем {updatedTag.Name} уже существует";
-                    return;
-                }
+        //        // Проверяем, существует ли тег с новым именем, если оно отличается
+        //        if (!originalTag.Name.Equals(updatedTag.Name, StringComparison.OrdinalIgnoreCase) &&
+        //            TagExists(updatedTag.Name))
+        //        {
+        //            _logger.Warn($"EditTag: Тег с именем {updatedTag.Name} уже существует");
+        //            StatusMessage = $"Тег с именем {updatedTag.Name} уже существует";
+        //            return;
+        //        }
 
-                // Удаляем старый тег
-                RemoveTag(originalTag);
+        //        // Удаляем старый тег
+        //        RemoveTag(originalTag);
 
-                // Добавляем обновленный тег
-                AddNewTag(updatedTag);
+        //        // Добавляем обновленный тег
+        //        AddNewTag(updatedTag);
 
-                _logger.Info($"EditTag: Тег отредактирован успешно");
-                StatusMessage = $"Тег {updatedTag.Name} отредактирован";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"EditTag: Ошибка при редактировании тега: {ex.Message}");
-                StatusMessage = "Ошибка при редактировании тега";
-            }
-        }
+        //        _logger.Info($"EditTag: Тег отредактирован успешно");
+        //        StatusMessage = $"Тег {updatedTag.Name} отредактирован";
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"EditTag: Ошибка при редактировании тега: {ex.Message}");
+        //        StatusMessage = "Ошибка при редактировании тега";
+        //    }
+        //}
 
         /// <summary>
         /// Удаляет тег
         /// </summary>
         /// <param name="tag">Тег для удаления</param>
         /// 
-        public void RemoveTag(TagDefinition tag)
-        {
-            if (tag == null)
-                return;
+        //public void RemoveTag(TagDefinition tag)
+        //{
+        //    if (tag == null)
+        //        return;
 
-            try
-            {
-                _logger.Info($"RemoveTag: Удаление тега: {tag.Name}");
+        //    try
+        //    {
+        //        _logger.Info($"RemoveTag: Удаление тега: {tag.Name}");
 
-                // Удаляем тег из всех коллекций
-                AvailableTags.Remove(tag);
+        //        // Удаляем тег из всех коллекций
+        //        AvailableTags.Remove(tag);
 
-                if (tag.IsDbTag)
-                {
-                    DbTags.Remove(tag);
-                }
-                else
-                {
-                    PlcTags.Remove(tag);
-                }
+        //        if (tag.IsDbTag)
+        //        {
+        //            DbTags.Remove(tag);
+        //        }
+        //        else
+        //        {
+        //            PlcTags.Remove(tag);
+        //        }
 
-                // Удаляем из мониторинга, если присутствует
-                if (MonitoredTags.Contains(tag))
-                {
-                    MonitoredTags.Remove(tag);
-                }
+        //        // Удаляем из мониторинга, если присутствует
+        //        if (MonitoredTags.Contains(tag))
+        //        {
+        //            MonitoredTags.Remove(tag);
+        //        }
 
-                // Обновляем объединенный список тегов
-                UpdateAllTags();
+        //        // Обновляем объединенный список тегов
+        //        UpdateAllTags();
 
-                // Сохраняем изменения
-                SaveTagsToStorage();
+        //        // Сохраняем изменения
+        //        SaveTagsToStorage();
 
-                _logger.Info($"RemoveTag: Тег {tag.Name} удален");
-                StatusMessage = $"Тег {tag.Name} удален";
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"RemoveTag: Ошибка при удалении тега: {ex.Message}");
-                StatusMessage = "Ошибка при удалении тега";
-            }
-        }
+        //        _logger.Info($"RemoveTag: Тег {tag.Name} удален");
+        //        StatusMessage = $"Тег {tag.Name} удален";
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"RemoveTag: Ошибка при удалении тега: {ex.Message}");
+        //        StatusMessage = "Ошибка при удалении тега";
+        //    }
+        //}
 
         /// <summary>
         /// Проверяет, существует ли тег с указанным именем
         /// </summary>
-        private bool TagExists(string tagName)
-        {
-            if (string.IsNullOrEmpty(tagName))
-                return false;
+        //private bool TagExists(string tagName)
+        //{
+        //    if (string.IsNullOrEmpty(tagName))
+        //        return false;
 
-            // Проверяем в PLC тегах
-            if (PlcTags.Any(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase)))
-                return true;
+        //    // Проверяем в PLC тегах
+        //    if (PlcTags.Any(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase)))
+        //        return true;
 
-            // Проверяем в DB тегах
-            if (DbTags.Any(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase)))
-                return true;
+        //    // Проверяем в DB тегах
+        //    if (DbTags.Any(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase)))
+        //        return true;
 
-            return false;
-        }
+        //    return false;
+        //}
 
-        /// <summary>
-        /// Добавляет тег в список мониторинга
-        /// </summary>
-        private void AddTagToMonitoring(TagDefinition tag)
-        {
-            if (tag == null)
-                return;
+        ///// <summary>
+        ///// Добавляет тег в список мониторинга
+        ///// </summary>
+        //private void AddTagToMonitoring(TagDefinition tag)
+        //{
+        //    if (tag == null)
+        //        return;
 
-            try
-            {
-                // Проверяем лимит тегов для мониторинга
-                if (MonitoredTags.Count >= MaxMonitoredTags)
-                {
-                    _logger.Warn($"AddTagToMonitoring: Достигнут лимит тегов для мониторинга ({MaxMonitoredTags})");
-                    StatusMessage = $"Достигнут лимит тегов для мониторинга ({MaxMonitoredTags})";
-                    return;
-                }
+        //    try
+        //    {
+        //        // Проверяем лимит тегов для мониторинга
+        //        if (MonitoredTags.Count >= MaxMonitoredTags)
+        //        {
+        //            _logger.Warn($"AddTagToMonitoring: Достигнут лимит тегов для мониторинга ({MaxMonitoredTags})");
+        //            StatusMessage = $"Достигнут лимит тегов для мониторинга ({MaxMonitoredTags})";
+        //            return;
+        //        }
 
-                // Проверяем, не добавлен ли тег уже
-                if (MonitoredTags.Any(t => t.Id == tag.Id))
-                {
-                    _logger.Warn($"AddTagToMonitoring: Тег {tag.Name} уже добавлен в мониторинг");
-                    StatusMessage = $"Тег {tag.Name} уже добавлен в мониторинг";
-                    return;
-                }
+        //        // Проверяем, не добавлен ли тег уже
+        //        if (MonitoredTags.Any(t => t.Id == tag.Id))
+        //        {
+        //            _logger.Warn($"AddTagToMonitoring: Тег {tag.Name} уже добавлен в мониторинг");
+        //            StatusMessage = $"Тег {tag.Name} уже добавлен в мониторинг";
+        //            return;
+        //        }
 
-                // Добавляем тег в мониторинг
-                MonitoredTags.Add(tag);
-                _logger.Info($"AddTagToMonitoring: Тег {tag.Name} добавлен в мониторинг");
-                StatusMessage = $"Тег {tag.Name} добавлен в мониторинг";
+        //        // Добавляем тег в мониторинг
+        //        MonitoredTags.Add(tag);
+        //        _logger.Info($"AddTagToMonitoring: Тег {tag.Name} добавлен в мониторинг");
+        //        StatusMessage = $"Тег {tag.Name} добавлен в мониторинг";
 
-                // Вызываем событие для обновления графика
-                TagAddedToMonitoring?.Invoke(this, tag);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"AddTagToMonitoring: Ошибка при добавлении тега в мониторинг: {ex.Message}");
-                StatusMessage = "Ошибка при добавлении тега в мониторинг";
-            }
-        }
+        //        // Вызываем событие для обновления графика
+        //        TagAddedToMonitoring?.Invoke(this, tag);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"AddTagToMonitoring: Ошибка при добавлении тега в мониторинг: {ex.Message}");
+        //        StatusMessage = "Ошибка при добавлении тега в мониторинг";
+        //    }
+        //}
 
-        /// <summary>
-        /// Удаляет тег из списка мониторинга
-        /// </summary>
-        private void RemoveTagFromMonitoring(TagDefinition tag)
-        {
-            if (tag == null)
-                return;
+        ///// <summary>
+        ///// Удаляет тег из списка мониторинга
+        ///// </summary>
+        //private void RemoveTagFromMonitoring(TagDefinition tag)
+        //{
+        //    if (tag == null)
+        //        return;
 
-            try
-            {
-                if (MonitoredTags.Remove(tag))
-                {
-                    _logger.Info($"RemoveTagFromMonitoring: Тег {tag.Name} удален из мониторинга");
-                    StatusMessage = $"Тег {tag.Name} удален из мониторинга";
+        //    try
+        //    {
+        //        if (MonitoredTags.Remove(tag))
+        //        {
+        //            _logger.Info($"RemoveTagFromMonitoring: Тег {tag.Name} удален из мониторинга");
+        //            StatusMessage = $"Тег {tag.Name} удален из мониторинга";
 
-                    // Вызываем событие для обновления графика
-                    TagRemovedFromMonitoring?.Invoke(this, tag);
-                }
-                else
-                {
-                    _logger.Warn($"RemoveTagFromMonitoring: Тег {tag.Name} не найден в списке мониторинга");
-                    StatusMessage = $"Тег {tag.Name} не найден в списке мониторинга";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"RemoveTagFromMonitoring: Ошибка при удалении тега из мониторинга: {ex.Message}");
-                StatusMessage = "Ошибка при удалении тега из мониторинга";
-            }
-        }
+        //            // Вызываем событие для обновления графика
+        //            TagRemovedFromMonitoring?.Invoke(this, tag);
+        //        }
+        //        else
+        //        {
+        //            _logger.Warn($"RemoveTagFromMonitoring: Тег {tag.Name} не найден в списке мониторинга");
+        //            StatusMessage = $"Тег {tag.Name} не найден в списке мониторинга";
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"RemoveTagFromMonitoring: Ошибка при удалении тега из мониторинга: {ex.Message}");
+        //        StatusMessage = "Ошибка при удалении тега из мониторинга";
+        //    }
+        //}
 
         /// <summary>
         /// Current project name

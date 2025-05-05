@@ -12,7 +12,7 @@
 
         <!-- Заголовок и инструкции -->
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
-            <TextBlock Text="Добавление тегов" FontSize="16" FontWeight="Bold"/>
+            <TextBlock Text="Добавление тегов" FontSize="16" FontWeight="Bold" Margin="0,0,0,5"/>
             <TextBlock Text="Введите полные имена тегов для поиска и добавления" 
                        TextWrapping="Wrap" Margin="0,5,0,0"/>
             <TextBlock Text="Примеры форматов:" FontWeight="SemiBold" Margin="0,5,0,0"/>
@@ -24,7 +24,7 @@
 
         <!-- Область для ввода тегов -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="InputsPanel" Margin="0,0,10,0">
+            <StackPanel x:Name="InputsPanel" Margin="0,0,0,0">
                 <!-- Первое поле ввода -->
                 <Grid Margin="0,0,0,5">
                     <Grid.ColumnDefinitions>
@@ -32,8 +32,8 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="txtTag1" Grid.Column="0" Margin="0,0,5,0" 
-                             VerticalContentAlignment="Center" Padding="5"
-                             TextChanged="TagInput_TextChanged"/>
+                            Height="25" VerticalContentAlignment="Center" Padding="5"
+                            TextChanged="TagInput_TextChanged"/>
                     <Button Grid.Column="1" Content="×" Width="25" Height="25"
                             Visibility="Collapsed"
                             Click="RemoveInput_Click"/>

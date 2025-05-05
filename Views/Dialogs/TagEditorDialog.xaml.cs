@@ -105,18 +105,11 @@ namespace SiemensTrend.Views.Dialogs
                     return;
                 }
 
-                if (string.IsNullOrWhiteSpace(txtAddress.Text))
-                {
-                    MessageBox.Show("Пожалуйста, введите адрес тега", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    txtAddress.Focus();
-                    return;
-                }
-
                 // Получаем значения из полей
                 string name = txtName.Text.Trim();
-                string address = txtAddress.Text.Trim();
-                string group = txtGroup.Text.Trim();
-                string comment = txtComment.Text.Trim();
+                string address = txtAddress.Text?.Trim() ?? "";
+                string group = txtGroup.Text?.Trim() ?? "";
+                string comment = txtComment.Text?.Trim() ?? "";
                 bool isDbTag = rbDbTag.IsChecked ?? false;
 
                 // Получаем выбранный тип данных
@@ -164,7 +157,8 @@ namespace SiemensTrend.Views.Dialogs
                         DataType = dataType,
                         GroupName = group,
                         Comment = comment,
-                        IsDbTag = isDbTag  // Явно устанавливаем значение
+                        IsDbTag = isDbTag,  // Явно устанавливаем значение
+                        IsOptimized = _originalTag.IsOptimized // Сохраняем свойство оптимизации
                     };
                 }
 
@@ -184,11 +178,10 @@ namespace SiemensTrend.Views.Dialogs
         private void RbTagType_Checked(object sender, RoutedEventArgs e)
         {
             // Если выбран DB тег, то автоматически добавляем префикс "DB" в GroupName
-            if (rbDbTag != null && rbDbTag.IsChecked == true && !string.IsNullOrEmpty(txtGroup.Text) && !txtGroup.Text.StartsWith("DB"))
+            if (rbDbTag.IsChecked == true && !string.IsNullOrEmpty(txtGroup.Text) && !txtGroup.Text.StartsWith("DB"))
             {
                 txtGroup.Text = "DB" + txtGroup.Text;
             }
-
 
             // Если выбран PLC тег и текущая группа начинается с "DB", 
             // то предлагаем пользователю изменить группу

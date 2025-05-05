@@ -1,5 +1,4 @@
-﻿// Файл: Views/Dialogs/AddTagsDialog.xaml.cs
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -219,8 +218,31 @@ namespace SiemensTrend.Views.Dialogs
                 {
                     try
                     {
-                        // Вызываем метод поиска тегов
-                        var foundTags = SearchTags(tagNames);
+                        // Группируем теги по контейнерам для оптимизации поиска
+                        var groupedTags = GroupTagsByContainer(tagNames);
+
+                        // Вызываем метод поиска тегов для каждой группы
+                        var foundTags = new List<TagDefinition>();
+                        foreach (var group in groupedTags)
+                        {
+                            string containerName = group.Key;
+                            var tagsInContainer = group.Value;
+
+                            // Обновляем статус в прогресс-окне
+                            dispatcher.Invoke(() =>
+                                progressWindow.SetStatus($"Поиск тегов в контейнере {containerName}..."));
+
+                            // Определяем, PLC это или DB
+                            bool isDbContainer = IsDbContainer(containerName);
+
+                            // Выполняем поиск тегов в контейнере
+                            var tagsFound = SearchTagsInContainer(containerName, tagsInContainer, isDbContainer);
+                            foundTags.AddRange(tagsFound);
+
+                            // Обновляем прогресс
+                            dispatcher.Invoke(() =>
+                                progressWindow.SetProgress(foundTags.Count, tagNames.Count));
+                        }
 
                         // Возвращаемся в UI поток
                         dispatcher.Invoke(() =>
@@ -283,7 +305,168 @@ namespace SiemensTrend.Views.Dialogs
         }
 
         /// <summary>
-        /// Метод поиска тегов
+        /// Группировка тегов по контейнерам
+        /// </summary>
+        private Dictionary<string, List<string>> GroupTagsByContainer(List<string> tagNames)
+        {
+            var result = new Dictionary<string, List<string>>();
+
+            foreach (var fullTagName in tagNames)
+            {
+                var parsedTag = ParseTagName(fullTagName);
+
+                if (!string.IsNullOrEmpty(parsedTag.Container))
+                {
+                    if (!result.ContainsKey(parsedTag.Container))
+                    {
+                        result[parsedTag.Container] = new List<string>();
+                    }
+
+                    // Для тегов DB добавляем относительный путь, для PLC - полное имя
+                    result[parsedTag.Container].Add(
+                        parsedTag.IsDB ? parsedTag.TagName : fullTagName);
+                }
+                else
+                {
+                    // Если не удалось определить контейнер, добавляем тег как есть
+                    _logger.Warn($"Не удалось определить контейнер для тега {fullTagName}");
+
+                    // Добавляем в дефолтный контейнер
+                    if (!result.ContainsKey("Default"))
+                    {
+                        result["Default"] = new List<string>();
+                    }
+
+                    result["Default"].Add(fullTagName);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Определение типа контейнера
+        /// </summary>
+        private bool IsDbContainer(string containerName)
+        {
+            // Проверяем, является ли контейнер блоком данных
+            return containerName.StartsWith("DB", StringComparison.OrdinalIgnoreCase) ||
+                   containerName.Contains("_DB", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Структура для разобранного имени тега
+        /// </summary>
+        private struct ParsedTag
+        {
+            public string Container;
+            public string TagName;
+            public bool IsDB;
+        }
+
+        /// <summary>
+        /// Разбор полного имени тега на части
+        /// </summary>
+        private ParsedTag ParseTagName(string fullTagName)
+        {
+            // Результат по умолчанию
+            ParsedTag result = new ParsedTag
+            {
+                Container = string.Empty,
+                TagName = fullTagName,
+                IsDB = false
+            };
+
+            try
+            {
+                // Проверяем наличие кавычек
+                if (fullTagName.Contains("\""))
+                {
+                    // Ищем закрывающую кавычку
+                    int endQuoteIndex = fullTagName.IndexOf("\"", 1);
+
+                    if (endQuoteIndex > 0)
+                    {
+                        // Извлекаем контейнер (часть в кавычках)
+                        result.Container = fullTagName.Substring(1, endQuoteIndex - 1);
+
+                        // Проверяем, есть ли точка после закрывающей кавычки
+                        if (fullTagName.Length > endQuoteIndex + 1 && fullTagName[endQuoteIndex + 1] == '.')
+                        {
+                            // Это тег DB, так как есть часть после точки
+                            result.IsDB = true;
+                            result.TagName = fullTagName.Substring(endQuoteIndex + 2); // Пропускаем кавычку и точку
+                        }
+                        else
+                        {
+                            // Это тег PLC, так как нет части после точки
+                            result.IsDB = false;
+                            // TagName остается полным именем, так как мы не можем определить только имя тега
+                        }
+                    }
+                }
+                else if (fullTagName.Contains("."))
+                {
+                    // Формат без кавычек, но с точкой
+                    var parts = fullTagName.Split(new[] { '.' }, 2);
+
+                    if (parts.Length >= 2)
+                    {
+                        result.Container = parts[0];
+                        result.TagName = parts[1];
+                        // Предполагаем, что это DB, если есть точка
+                        result.IsDB = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при разборе имени тега {fullTagName}: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Метод поиска тегов в контейнере
+        /// </summary>
+        private List<TagDefinition> SearchTagsInContainer(string containerName, List<string> tagNames, bool isDb)
+        {
+            List<TagDefinition> results = new List<TagDefinition>();
+
+            try
+            {
+                // В реальной реализации здесь будет вызов TIA Portal API
+                // Сейчас для демонстрации используем мок-данные
+
+                foreach (var tagName in tagNames)
+                {
+                    // Создаем тег с соответствующим типом и данными
+                    var tag = new TagDefinition
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = isDb ? tagName : tagName, // Для DB - относительное имя, для PLC - полное имя
+                        GroupName = containerName,
+                        IsDbTag = isDb,
+                        DataType = GetTagDataType(tagName),
+                        IsOptimized = isDb && containerName.Contains("S1"), // Демо-признак оптимизации
+                        Comment = $"Тег из {(isDb ? "DB" : "PLC")} {containerName}"
+                    };
+
+                    results.Add(tag);
+                    _logger.Info($"Найден тег: {tag.Name}, тип: {(isDb ? "DB" : "PLC")}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при поиске тегов в контейнере {containerName}: {ex.Message}");
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Метод для поиска тегов
         /// </summary>
         private List<TagDefinition> SearchTags(List<string> tagNames)
         {
@@ -295,7 +478,7 @@ namespace SiemensTrend.Views.Dialogs
                 foreach (var tagName in tagNames)
                 {
                     // Определяем тип тега (PLC или DB) по формату имени
-                    bool isDbTag = tagName.Contains("\"") && tagName.Contains(".");
+                    bool isDbTag = DetermineTagType(tagName);
 
                     // Получаем имя контейнера (группы/DB)
                     string groupName = GetGroupName(tagName);
@@ -306,7 +489,7 @@ namespace SiemensTrend.Views.Dialogs
                         Id = Guid.NewGuid(),
                         Name = tagName,
                         Address = isDbTag ? "" : $"I0.{results.Count}", // Пример адреса для PLC тега
-                        DataType = GetDemoDataType(tagName),
+                        DataType = GetTagDataType(tagName),
                         GroupName = groupName,
                         IsDbTag = isDbTag,
                         IsOptimized = isDbTag && tagName.Contains("S1"), // Демонстрационный признак оптимизации
@@ -325,14 +508,34 @@ namespace SiemensTrend.Views.Dialogs
             return results;
         }
 
-        // Вспомогательные методы для демонстрационных тегов
+        /// <summary>
+        /// Определение типа тега по имени
+        /// </summary>
+        private bool DetermineTagType(string tagName)
+        {
+            // Если тег содержит кавычки и после кавычек есть точка, то это DB тег
+            if (tagName.Contains("\""))
+            {
+                int endQuotePos = tagName.IndexOf("\"", 1);
+                if (endQuotePos > 0 && endQuotePos < tagName.Length - 1)
+                {
+                    return tagName[endQuotePos + 1] == '.';
+                }
+            }
 
-        private TagDataType GetDemoDataType(string tagName)
+            // Если в имени есть точка, то, скорее всего, это DB тег
+            return tagName.Contains(".");
+        }
+
+        /// <summary>
+        /// Определение типа данных тега
+        /// </summary>
+        private TagDataType GetTagDataType(string tagName)
         {
             if (tagName.ToLower().Contains("bool")) return TagDataType.Bool;
-            if (tagName.ToLower().Contains("int")) return TagDataType.Int;
+            if (tagName.ToLower().Contains("int") && !tagName.ToLower().Contains("dint")) return TagDataType.Int;
+            if (tagName.ToLower().Contains("dint")) return TagDataType.DInt;
             if (tagName.ToLower().Contains("real")) return TagDataType.Real;
-            if (tagName.ToLower().Contains("string")) return TagDataType.String;
 
             // По умолчанию для демонстрации
             return tagName.Length % 4 == 0 ? TagDataType.Bool :
@@ -341,6 +544,9 @@ namespace SiemensTrend.Views.Dialogs
                    TagDataType.Real;
         }
 
+        /// <summary>
+        /// Получение имени группы/блока данных из имени тега
+        /// </summary>
         private string GetGroupName(string tagName)
         {
             if (tagName.Contains("\""))
@@ -351,6 +557,10 @@ namespace SiemensTrend.Views.Dialogs
                 {
                     return tagName.Substring(startQuote + 1, endQuote - startQuote - 1);
                 }
+            }
+            else if (tagName.Contains("."))
+            {
+                return tagName.Split('.')[0];
             }
 
             return "DefaultGroup";

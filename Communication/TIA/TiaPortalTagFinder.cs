@@ -107,6 +107,7 @@ namespace SiemensTrend.Communication.TIA
 
             return result;
         }
+
         /// <summary>
         /// Определение типа контейнера
         /// </summary>
@@ -480,9 +481,77 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         private Member FindTagMemberInDataBlock(PlcBlock db, string tagPath)
         {
-            // Этот метод будет зависеть от конкретной реализации и API TIA Portal
-            // В текущем виде он является заглушкой
-            return null;
+            try
+            {
+                // Получаем список членов блока данных
+                var members = db.GetAttribute("Members") as IEnumerable<Member>;
+                if (members == null)
+                    return null;
+
+                // Разбиваем путь на части
+                string[] pathParts = tagPath.Split('.');
+
+                // Начинаем поиск с корневого элемента
+                Member currentMember = null;
+
+                // Проходим по каждой части пути
+                foreach (string part in pathParts)
+                {
+                    // Ищем член с указанным именем
+                    currentMember = members.FirstOrDefault(m =>
+                        string.Equals(m.Name, part, StringComparison.OrdinalIgnoreCase));
+
+                    // Если часть пути не найдена, возвращаем null
+                    if (currentMember == null)
+                        return null;
+
+                    // Переходим к дочерним элементам для следующей итерации
+                    members = GetChildMembers(currentMember);
+                }
+
+                return currentMember;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при поиске тега {tagPath} в блоке данных: {ex.Message}");
+                return null;
+            }
+        }
+
+
+        /// <summary>
+        /// Вспомогательный метод для получения дочерних элементов Member
+        /// </summary>
+        /// <param name="member">Элемент, для которого нужно получить дочерние элементы</param>
+        private IEnumerable<Member> GetChildMembers(Member member)
+        {
+            try
+            {
+                // Since 'IMemberHierarchy' does not exist and 'GetService' is not available,
+                // we will use the 'GetAttribute' method to retrieve child members if applicable.
+                var childMembers = new List<Member>();
+
+                // Example: If the API provides a way to retrieve child members via attributes
+                var childCountAttribute = member.GetAttribute("ChildCount");
+                if (childCountAttribute is int childCount && childCount > 0)
+                {
+                    for (int i = 0; i < childCount; i++)
+                    {
+                        var childMember = member.GetAttribute($"Child_{i}") as Member;
+                        if (childMember != null)
+                        {
+                            childMembers.Add(childMember);
+                        }
+                    }
+                }
+
+                return childMembers;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при получении дочерних элементов Member: {ex.Message}");
+                return new List<Member>();
+            }
         }
 
         /// <summary>
