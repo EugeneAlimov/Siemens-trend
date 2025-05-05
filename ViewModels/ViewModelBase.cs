@@ -17,7 +17,7 @@ namespace SiemensTrend.ViewModels
         /// Метод вызова события PropertyChanged
         /// </summary>
         /// <param name="propertyName">Имя свойства (подставляется автоматически)</param>
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
@@ -30,7 +30,7 @@ namespace SiemensTrend.ViewModels
         /// <param name="value">Новое значение</param>
         /// <param name="propertyName">Имя свойства (подставляется автоматически)</param>
         /// <returns>True, если значение изменилось</returns>
-        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             // Если значение не изменилось, возвращаем false
             if (Equals(field, value))

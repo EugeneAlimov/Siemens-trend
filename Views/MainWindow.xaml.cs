@@ -6,10 +6,7 @@ using System.Windows.Media;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
 using SiemensTrend.ViewModels;
-
-using SiemensTrend.Core.Models;
 using SiemensTrend.Storage.TagManagement;
-using System.Collections.Generic;
 using SiemensTrend.Communication.TIA;
 using SiemensTrend.Communication;
 namespace SiemensTrend.Views
@@ -42,15 +39,23 @@ namespace SiemensTrend.Views
         /// <summary>
         /// иии?? ии?? и?
         /// </summary>
-        public MainWindow()
+        public MainWindow(Logger logger, MainViewModel viewModel)
         {
             InitializeComponent();
+
+            // Используем инжектированные зависимости
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+
+            // Устанавливаем контекст данных
+            DataContext = _viewModel;
+
+            // Обновляем состояние интерфейса
+            UpdateConnectionState();
 
             // Инициализируем логгер
             _logger = new Logger();
 
-            // Создаем и инициализируем ViewModel
-            _viewModel = new MainViewModel(_logger);
             DataContext = _viewModel;
 
             // Инициализируем интерфейс

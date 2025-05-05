@@ -75,7 +75,9 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Метод для запуска мониторинга
         /// </summary>
-        private async Task StartMonitoringAsync()
+        // Изменяем имя метода, чтобы избежать конфликта
+        // Файл: ViewModels/MainViewModel.Tags.cs
+        private async Task StartTagsMonitoringAsync() // Было: StartMonitoringAsync
         {
             try
             {

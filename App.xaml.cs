@@ -55,7 +55,7 @@ namespace SiemensTrend
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка при запуске приложения: {ex.Message}",
+                MessageBox.Show($"Ошибка при запуске приложения: {ex.Message}\n\nStack trace: {ex.StackTrace}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -66,20 +66,27 @@ namespace SiemensTrend
 
             // Регистрируем сервисы
             services.AddSingleton<Logger>(_logger);
-            services.AddSingleton<TagManager>();
+
+            // Регистрируем TagManager
+            var tagManager = new TagManager(_logger);
+            services.AddSingleton<TagManager>(tagManager);
+
+            // Создаем и регистрируем ICommunicationService
+            var communicationService = new Communication.S7.S7CommunicationService(
+                _logger,
+                new Communication.S7.S7ConnectionParameters
+                {
+                    IpAddress = "127.0.0.1" // Значение по умолчанию
+                });
+            services.AddSingleton<ICommunicationService>(communicationService);
 
             // Создаем экземпляр TiaPortalCommunicationService
             var tiaService = new Communication.TIA.TiaPortalCommunicationService(_logger);
-            // Регистрируем сервис по интерфейсу (исправленная версия)
-            services.AddSingleton(typeof(ICommunicationService), tiaService);
 
-            // Регистрируем ChartViewModel перед MainViewModel
+            // Регистрируем ChartViewModel
             services.AddSingleton<ChartViewModel>();
 
-            // Теперь можем зарегистрировать TagsViewModel (если нужно)
-            services.AddSingleton<TagsViewModel>();
-
-            // Регистрируем MainViewModel после зависимостей
+            // Регистрируем MainViewModel после всех зависимостей
             services.AddSingleton<MainViewModel>();
 
             // Регистрируем окна и представления

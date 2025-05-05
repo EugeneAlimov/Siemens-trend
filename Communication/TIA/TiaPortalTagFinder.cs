@@ -192,6 +192,24 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
+        /// Retrieves the data type name of a Member object.
+        /// </summary>
+        private string GetMemberDataTypeName(Member member)
+        {
+            try
+            {
+                // Attempt to retrieve the "DataType" attribute from the Member object
+                var dataTypeAttribute = member.GetAttribute("DataType");
+                return dataTypeAttribute?.ToString() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error retrieving DataType for member {member.Name}: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// Поиск тегов в блоке данных
         /// </summary>
         private List<TagDefinition> FindTagsInDbContainer(string dbName, List<string> tagPaths)
@@ -230,8 +248,8 @@ namespace SiemensTrend.Communication.TIA
                                 GroupName = dbName,
                                 IsDbTag = true,
                                 IsOptimized = isOptimized,
-                                DataType = GetTagDataType(tagMember.DataTypeName),
-                                Comment = tagMember.Comment
+                                DataType = GetTagDataType(GetMemberDataTypeName(tagMember)),
+                                Comment = tagMember.GetAttribute("Comment")?.ToString()
                             };
 
                             // Добавляем тег в результаты
@@ -294,7 +312,7 @@ namespace SiemensTrend.Communication.TIA
                                 GroupName = tableName,
                                 IsDbTag = false,
                                 DataType = GetTagDataType(plcTag.DataTypeName),
-                                Comment = plcTag.Comment
+                                Comment = plcTag.Comment?.ToString()
                             };
 
                             // Добавляем тег в результаты
@@ -329,7 +347,7 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Ищем во всех PLC устройствах проекта
-                foreach (var device in _tiaPortal.Project.Devices)
+                foreach (var device in _tiaPortal.Projects.First().Devices)
                 {
                     // Проверяем только устройства PLC
                     foreach (var deviceItem in device.DeviceItems)
@@ -370,7 +388,7 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 // Ищем во всех PLC устройствах проекта
-                foreach (var device in _tiaPortal.Project.Devices)
+                foreach (var device in _tiaPortal.Projects.First().Devices)
                 {
                     // Проверяем только устройства PLC
                     foreach (var deviceItem in device.DeviceItems)
@@ -415,10 +433,11 @@ namespace SiemensTrend.Communication.TIA
 
                 if (optimizedAccessProperty != null)
                 {
+                    // Use the attribute directly as a boolean
                     var attribute = db.GetAttribute("Optimized block access");
-                    if (attribute != null)
+                    if (attribute is bool isOptimized)
                     {
-                        return (bool)attribute.GetValue();
+                        return isOptimized;
                     }
                 }
             }

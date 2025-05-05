@@ -24,7 +24,7 @@ namespace SiemensTrend.Views.Dialogs
         /// <summary>
         /// Результирующий тег
         /// </summary>
-        public TagDefinition Tag { get; private set; }
+        public new TagDefinition Tag { get; private set; }
 
         /// <summary>
         /// Конструктор для создания нового тега

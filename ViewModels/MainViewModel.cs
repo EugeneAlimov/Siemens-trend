@@ -146,16 +146,20 @@ namespace SiemensTrend.ViewModels
         /// Constructor
         /// </summary>
         /// <param name="logger">Logger</param>
-        public MainViewModel(Logger logger, ICommunicationService communicationService, TagManager tagManager, ChartViewModel chartViewModel)
+        public MainViewModel(Logger logger, ICommunicationService communicationService,
+                           TagManager tagManager, ChartViewModel chartViewModel)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _logger.Info("Initializing MainViewModel");
+            _communicationService = communicationService ?? throw new ArgumentNullException(nameof(communicationService));
+            _tagManager = tagManager ?? throw new ArgumentNullException(nameof(tagManager));
+            ChartViewModel = chartViewModel ?? throw new ArgumentNullException(nameof(chartViewModel));
 
             // Инициализируем коллекции
             AvailableTags = new ObservableCollection<TagDefinition>();
             MonitoredTags = new ObservableCollection<TagDefinition>();
             PlcTags = new ObservableCollection<TagDefinition>();
             DbTags = new ObservableCollection<TagDefinition>();
+            TiaProjects = new List<TiaProjectInfo>();
 
             // Инициализируем команды
             AddTagToMonitoringCommand = new RelayCommand<TagDefinition>(AddTagToMonitoring);
@@ -164,34 +168,23 @@ namespace SiemensTrend.ViewModels
             // Инициализируем начальные значения
             IsConnected = false;
             IsLoading = false;
-            StatusMessage = "Ready to work";
+            StatusMessage = "Готов к работе";
             ProgressValue = 0;
 
-            // Инициализируем менеджер тегов
-            _tagManager = new TagManager(_logger);
+            // Получаем сервис TIA Portal, если он доступен
+            if (communicationService is Communication.TIA.TiaPortalCommunicationService tiaService)
+            {
+                _tiaPortalService = tiaService;
+            }
 
-            // Загружаем теги из хранилища
-            LoadTagsFromStorage();
-
-            _logger.Info("MainViewModel инициализирован успешно");
-
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _communicationService = communicationService ?? throw new ArgumentNullException(nameof(communicationService));
-            _tagManager = tagManager ?? throw new ArgumentNullException(nameof(tagManager));
-
-            // Инициализация свойства ChartViewModel
-            ChartViewModel = chartViewModel ?? throw new ArgumentNullException(nameof(chartViewModel));
-
-            // Инициализация свойства TagsViewModel
-            TagsViewModel = new TagsViewModel(logger, communicationService, tagManager);
+            // Инициализируем TagsViewModel
+            TagsViewModel = new TagsViewModel(_logger, communicationService, tagManager);
 
             // Подписка на события
             SubscribeToTagsEvents();
 
-            // Инициализируем приложение
-            Initialize();
+            _logger.Info("MainViewModel инициализирован успешно");
         }
-
         /// <summary>
         /// Инициализация приложения
         /// </summary>
