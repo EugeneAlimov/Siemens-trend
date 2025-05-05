@@ -1,4 +1,5 @@
-﻿using System;
+﻿// Файл: Views/Dialogs/AddTagsDialog.xaml.cs
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -290,52 +291,30 @@ namespace SiemensTrend.Views.Dialogs
 
             try
             {
-                // Проверяем доступность API для поиска тегов
-                if (_communicationService is TiaPortalCommunicationService tiaService)
+                // Для демонстрационных целей, создаем тестовые теги
+                foreach (var tagName in tagNames)
                 {
-                    // В данной реализации мы используем демонстрационные данные
-                    // В реальном приложении здесь будет вызов метода поиска тегов через API TIA Portal
+                    // Определяем тип тега (PLC или DB) по формату имени
+                    bool isDbTag = tagName.Contains("\"") && tagName.Contains(".");
 
-                    _logger.Info($"Поиск тегов в TIA Portal: {tagNames.Count} тегов");
+                    // Получаем имя контейнера (группы/DB)
+                    string groupName = GetGroupName(tagName);
 
-                    // Создаем демонстрационные теги для тестирования интерфейса
-                    foreach (var tagName in tagNames)
+                    // Создаем объект тега
+                    var tag = new TagDefinition
                     {
-                        bool isDbTag = tagName.Contains("\"") && tagName.Contains(".");
-                        results.Add(new TagDefinition
-                        {
-                            Id = Guid.NewGuid(),
-                            Name = tagName,
-                            Address = isDbTag ? "" : $"I0.{results.Count}", // Пример адреса для PLC тега
-                            DataType = GetDemoDataType(tagName),
-                            GroupName = GetGroupName(tagName),
-                            IsDbTag = isDbTag,
-                            IsOptimized = isDbTag && tagName.Contains("S1"), // Демонстрационный признак оптимизации
-                            Comment = $"Демо-тег для {tagName}"
-                        });
-                    }
-                }
-                else
-                {
-                    // Этот код будет использоваться только как заглушка
-                    _logger.Warn("Коммуникационный сервис не поддерживает поиск тегов");
+                        Id = Guid.NewGuid(),
+                        Name = tagName,
+                        Address = isDbTag ? "" : $"I0.{results.Count}", // Пример адреса для PLC тега
+                        DataType = GetDemoDataType(tagName),
+                        GroupName = groupName,
+                        IsDbTag = isDbTag,
+                        IsOptimized = isDbTag && tagName.Contains("S1"), // Демонстрационный признак оптимизации
+                        Comment = $"Демо-тег для {tagName}"
+                    };
 
-                    // Создаем демонстрационные теги для тестирования интерфейса
-                    foreach (var tagName in tagNames)
-                    {
-                        bool isDbTag = tagName.Contains("\"") && tagName.Contains(".");
-                        results.Add(new TagDefinition
-                        {
-                            Id = Guid.NewGuid(),
-                            Name = tagName,
-                            Address = isDbTag ? "" : $"I0.{results.Count}", // Пример адреса для PLC тега
-                            DataType = GetDemoDataType(tagName),
-                            GroupName = GetGroupName(tagName),
-                            IsDbTag = isDbTag,
-                            IsOptimized = isDbTag && tagName.Contains("S1"), // Демонстрационный признак оптимизации
-                            Comment = $"Демо-тег для {tagName}"
-                        });
-                    }
+                    results.Add(tag);
+                    _logger.Info($"Найден тег: {tag.Name}, тип: {(isDbTag ? "DB" : "PLC")}");
                 }
             }
             catch (Exception ex)

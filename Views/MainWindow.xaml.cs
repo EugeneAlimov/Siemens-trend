@@ -9,6 +9,7 @@ using SiemensTrend.ViewModels;
 using SiemensTrend.Storage.TagManagement;
 using SiemensTrend.Communication.TIA;
 using SiemensTrend.Communication;
+using SiemensTrend.Communication.S7;
 namespace SiemensTrend.Views
 {
     /// <summary>
@@ -26,6 +27,8 @@ namespace SiemensTrend.Views
         /// </summary>
         private readonly Logger _logger;
 
+        private readonly ICommunicationService _communicationService;
+
         /// <summary>
         /// Initializes the UI components and sets up any required configurations.
         /// </summary>
@@ -39,13 +42,14 @@ namespace SiemensTrend.Views
         /// <summary>
         /// иии?? ии?? и?
         /// </summary>
-        public MainWindow(Logger logger, MainViewModel viewModel)
+        public MainWindow(Logger logger, MainViewModel viewModel, ICommunicationService communicationService)
         {
             InitializeComponent();
 
             // Используем инжектированные зависимости
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            _communicationService = communicationService ?? throw new ArgumentNullException(nameof(communicationService));
 
             // Устанавливаем контекст данных
             DataContext = _viewModel;
@@ -75,28 +79,34 @@ namespace SiemensTrend.Views
         {
             try
             {
-                _logger.Info("BtnAddTag_Click: Вызов диалога добавления тега");
+                _logger.Info("Вызов диалога добавления тегов");
 
-                // Создаем диалог для добавления тега
-                var dialog = new Dialogs.TagEditorDialog();
+                // Создаем диалог для добавления тегов
+                var dialog = new Dialogs.AddTagsDialog(_logger, _communicationService);
                 dialog.Owner = this;
 
                 // Показываем диалог
                 if (dialog.ShowDialog() == true)
                 {
-                    // Получаем созданный тег
-                    var newTag = dialog.Tag;
+                    // Получаем найденные теги
+                    var foundTags = dialog.FoundTags;
 
-                    // Добавляем тег в модель
-                    _viewModel.AddNewTag(newTag);
+                    if (foundTags != null && foundTags.Count > 0)
+                    {
+                        // Добавляем теги в модель
+                        foreach (var tag in foundTags)
+                        {
+                            _viewModel.AddNewTag(tag);
+                        }
 
-                    _logger.Info($"BtnAddTag_Click: Добавлен новый тег: {newTag.Name}");
+                        _logger.Info($"Добавлено {foundTags.Count} тегов");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error($"BtnAddTag_Click: Ошибка: {ex.Message}");
-                MessageBox.Show($"Ошибка при добавлении тега: {ex.Message}",
+                _logger.Error($"Ошибка при добавлении тегов: {ex.Message}");
+                MessageBox.Show($"Ошибка при добавлении тегов: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

@@ -18,22 +18,21 @@
         </Grid.RowDefinitions>
 
         <!-- Панель инструментов с кнопками -->
-        <ToolBarTray Grid.Row="0" x:Name="toolBarTray">
-            <ToolBar>
-                <Button x:Name="btnConnect" Content="Подключиться" Margin="3" Padding="5,3" Click="BtnConnect_Click"/>
-                <Button x:Name="btnDisconnect" Content="Отключиться" Margin="3" Padding="5,3" Click="BtnDisconnect_Click"/>
-                <Separator/>
-                <Button x:Name="btnAddTag" Content="Добавить тег" Margin="3" Padding="5,3" Click="BtnAddTag_Click"/>
-                <Button x:Name="btnEditTag" Content="Редактировать тег" Margin="3" Padding="5,3" Click="BtnEditTag_Click"/>
-                <Button x:Name="btnRemoveTag" Content="Удалить тег" Margin="3" Padding="5,3" Click="BtnRemoveTag_Click"/>
-                <Separator/>
-                <Button x:Name="btnSaveTags" Content="Сохранить теги" Margin="3" Padding="5,3" Click="BtnSaveTags_Click"/>
-                <Separator/>
-                <Button x:Name="btnStartMonitoring" Content="Запустить мониторинг" Margin="3" Padding="5,3" Click="BtnStartMonitoring_Click"/>
-                <Button x:Name="btnStopMonitoring" Content="Остановить мониторинг" Margin="3" Padding="5,3" Click="BtnStopMonitoring_Click"/>
-            </ToolBar>
-        </ToolBarTray>
-
+            <ToolBarTray Grid.Row="0" x:Name="toolBarTray">
+                <ToolBar>
+                    <Button x:Name="btnConnect" Content="Подключиться" Margin="3" Padding="5,3" Click="BtnConnect_Click"/>
+                    <Button x:Name="btnDisconnect" Content="Отключиться" Margin="3" Padding="5,3" Click="BtnDisconnect_Click"/>
+                    <Separator/>
+                    <Button x:Name="btnAddTag" Content="Добавить тег" Margin="3" Padding="5,3" Click="BtnAddTag_Click"/>
+                    <Button x:Name="btnEditTag" Content="Редактировать тег" Margin="3" Padding="5,3" Click="BtnEditTag_Click"/>
+                    <Button x:Name="btnRemoveTag" Content="Удалить тег" Margin="3" Padding="5,3" Click="BtnRemoveTag_Click"/>
+                    <Separator/>
+                    <Button x:Name="btnSaveTags" Content="Сохранить теги" Margin="3" Padding="5,3" Click="BtnSaveTags_Click"/>
+                    <Separator/>
+                    <Button x:Name="btnStartMonitoring" Content="Запустить мониторинг" Margin="3" Padding="5,3" Click="BtnStartMonitoring_Click"/>
+                    <Button x:Name="btnStopMonitoring" Content="Остановить мониторинг" Margin="3" Padding="5,3" Click="BtnStopMonitoring_Click"/>
+                </ToolBar>
+            </ToolBarTray>
         <!-- Основной контент -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
