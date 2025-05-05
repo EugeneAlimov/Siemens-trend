@@ -34,127 +34,98 @@
             </ToolBar>
         </ToolBarTray>
 
-        <!-- Основной контент -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+<!-- Основной контент -->
+<Grid Grid.Row="1">
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="300"/>
+        <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
 
-            <!-- Левая панель с тегами и журналом -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="2*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="1*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="1*"/>
-                </Grid.RowDefinitions>
+    <!-- Левая панель с теками для мониторинга и журналом -->
+    <Grid Grid.Column="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="3*"/>
+        </Grid.RowDefinitions>
 
-                <!-- Доступные теги -->
-                <TextBlock Grid.Row="0" Margin="5" FontWeight="Bold" Text="Доступные теги:"/>
-                <!-- <local:TagBrowserView Grid.Row="1" x:Name="tagBrowser" Margin="5"/>  -->
+        <!-- Список тегов для мониторинга -->
+        <TextBlock Grid.Row="0" Margin="5" FontWeight="Bold" 
+                   Text="{Binding MonitoredTags.Count, StringFormat='Теги для мониторинга ({0}/10):'}"/>
+        <ListView Grid.Row="1" Margin="5" ItemsSource="{Binding MonitoredTags}">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Content="×" Width="20" Height="20" Margin="5,0,0,0"
+                                Command="{Binding DataContext.RemoveTagFromMonitoringCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                CommandParameter="{Binding}"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
 
-                <!-- Список тегов для мониторинга -->
-                <TextBlock Grid.Row="2" Margin="5" FontWeight="Bold" 
-                           Text="{Binding MonitoredTags.Count, StringFormat='Теги для мониторинга ({0}/10):'}"/>
-                <ListView Grid.Row="3" Margin="5" ItemsSource="{Binding MonitoredTags}">
-                    <ListView.ItemTemplate>
+        <!-- Лог -->
+        <TextBlock Grid.Row="2" Margin="5" FontWeight="Bold" Text="Лог:"/>
+        <TextBox x:Name="txtLog" Grid.Row="3" Margin="5" IsReadOnly="True" 
+                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+    </Grid>
+
+    <!-- Правая панель с объединенной таблицей тегов и графиком -->
+    <Grid Grid.Column="1">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок для объединенной таблицы тегов -->
+        <TextBlock Grid.Row="0" Margin="5" FontWeight="Bold" 
+                  Text="{Binding AllTags.Count, StringFormat='Доступные теги ({0}):'}"/>
+        
+        <!-- Объединенная таблица тегов -->
+        <DataGrid x:Name="dgTags" Grid.Row="1" Margin="5" ItemsSource="{Binding AllTags}" 
+                  AutoGenerateColumns="False" IsReadOnly="True" 
+                  AlternatingRowBackground="LightGray" SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Тип" Binding="{Binding IsDbTag, Converter={StaticResource BoolToTagTypeConverter}}" Width="60"/>
+                <DataGridTextColumn Header="Группа/DB" Binding="{Binding GroupName}" Width="120"/>
+                <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="150"/>
+                <DataGridTextColumn Header="Тип данных" Binding="{Binding DataType}" Width="100"/>
+                <DataGridCheckBoxColumn Header="Оптим." Binding="{Binding IsOptimized}" Width="60"/>
+                <DataGridTextColumn Header="Комментарий" Binding="{Binding Comment}" Width="*"/>
+                <DataGridTemplateColumn Header="Действия" Width="80">
+                    <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Content="×" Width="20" Height="20" Margin="5,0,0,0"
-                                        Command="{Binding DataContext.RemoveTagFromMonitoringCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
-                                        CommandParameter="{Binding}"/>
-                            </Grid>
+                            <Button Content="Добавить" Padding="3,1" Margin="2"
+                                    Command="{Binding DataContext.AddTagToMonitoringCommand, 
+                                    RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                    CommandParameter="{Binding}"/>
                         </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
 
-                <!-- Лог -->
-                <TextBlock Grid.Row="4" Margin="5" FontWeight="Bold" Text="Лог:"/>
-                <TextBox x:Name="txtLog" Grid.Row="5" Margin="5" IsReadOnly="True" 
-                         TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
-            </Grid>
+        <!-- Разделитель -->
+        <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" Background="LightGray"/>
 
-            <!-- Правая панель с табами и трендами -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- Теги ПЛК -->
-                <Grid Grid.Row="0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Margin="5" FontWeight="Bold" 
-                               Text="{Binding PlcTags.Count, StringFormat='Теги ПЛК ({0}):'}"/>
-                    <DataGrid x:Name="dgPlcTags" Grid.Row="1" Margin="5" ItemsSource="{Binding PlcTags}" 
-                              AutoGenerateColumns="False" IsReadOnly="True" 
-                              AlternatingRowBackground="LightGray" SelectionMode="Single">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Таблица" Binding="{Binding GroupName}" Width="120"/>
-                            <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="150"/>
-                            <DataGridTextColumn Header="Тип данных" Binding="{Binding DataType}" Width="100"/>
-                            <DataGridTextColumn Header="Адрес" Binding="{Binding Address}" Width="100"/>
-                            <DataGridTextColumn Header="Комментарий" Binding="{Binding Comment}" Width="*"/>
-                            <DataGridTemplateColumn Header="Действия" Width="80">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Button Content="Добавить" Padding="3,1" Margin="2"
-                                                Command="{Binding DataContext.AddTagToMonitoringCommand, 
-                                                RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                CommandParameter="{Binding}"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
-
-                <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="LightGray"/>
-
-                <!-- Теги DB или график мониторинга -->
-                <TabControl Grid.Row="2" Margin="5">
-                    <TabItem Header="Теги DB">
-                        <DataGrid x:Name="dgDbTags" ItemsSource="{Binding DbTags}" 
-                                  AutoGenerateColumns="False" IsReadOnly="True" 
-                                  AlternatingRowBackground="LightGray" SelectionMode="Single">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="DB" Binding="{Binding GroupName}" Width="120"/>
-                                <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="150"/>
-                                <DataGridTextColumn Header="Тип данных" Binding="{Binding DataType}" Width="100"/>
-                                <DataGridTextColumn Header="Адрес" Binding="{Binding Address}" Width="100"/>
-                                <DataGridTextColumn Header="Комментарий" Binding="{Binding Comment}" Width="*"/>
-                                <DataGridTemplateColumn Header="Действия" Width="80">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Button Content="Добавить" Padding="3,1" Margin="2"
-                                                    Command="{Binding DataContext.AddTagToMonitoringCommand, 
-                                                    RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                    CommandParameter="{Binding}"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </TabItem>
-                    <TabItem Header="График">
-                        <local:ChartView x:Name="chartView" DataContext="{Binding ChartViewModel}"/>
-                    </TabItem>
-                </TabControl>
-            </Grid>
-        </Grid>
+        <!-- График -->
+        <TabControl Grid.Row="3" Margin="5">
+            <TabItem Header="График">
+                     <local:ChartView x:Name="chartView" DataContext="{Binding ChartViewModel}"/>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Grid>
+                    
+                            </Grid>
 
         <!-- Строка состояния -->
         <StatusBar Grid.Row="2">

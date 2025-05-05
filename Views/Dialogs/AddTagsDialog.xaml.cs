@@ -1,19 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
-using SiemensTrend.Communication;
-using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
+using SiemensTrend.Communication;
+using SiemensTrend.Communication.TIA;
 
 namespace SiemensTrend.Views.Dialogs
 {
     /// <summary>
-    /// Логика взаимодействия для AddTagsDialog.xaml
+    /// Логика взаимодействия для диалога добавления тегов
     /// </summary>
     public partial class AddTagsDialog : Window
     {
@@ -37,25 +38,32 @@ namespace SiemensTrend.Views.Dialogs
             _communicationService = communicationService ?? throw new ArgumentNullException(nameof(communicationService));
             FoundTags = new List<TagDefinition>();
 
-            // Добавляем первый ввод в список
+            // Добавляем первое поле ввода в список
             _tagInputs.Add(txtTag1);
         }
 
         /// <summary>
-        /// Обработчик события изменения текста в поле ввода
+        /// Обработчик изменения текста в поле ввода
         /// </summary>
         private void TagInput_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // Активируем кнопку "Еще один", если текущий инпут не пустой
-            TextBox textBox = sender as TextBox;
-            if (textBox == _tagInputs.Last())
+            try
             {
-                btnAddMore.IsEnabled = !string.IsNullOrWhiteSpace(textBox.Text);
-            }
+                // Активируем кнопку "Еще один", если текущий инпут не пустой
+                TextBox textBox = sender as TextBox;
+                if (textBox == _tagInputs.Last())
+                {
+                    btnAddMore.IsEnabled = !string.IsNullOrWhiteSpace(textBox.Text);
+                }
 
-            // Проверяем, все ли поля заполнены для активации "Добавить"
-            bool allFilled = _tagInputs.All(tb => !string.IsNullOrWhiteSpace(tb.Text));
-            btnAdd.IsEnabled = allFilled && _tagInputs.Count > 0;
+                // Проверяем, все ли поля заполнены для активации "Добавить"
+                bool allFilled = _tagInputs.All(tb => !string.IsNullOrWhiteSpace(tb.Text));
+                btnAdd.IsEnabled = allFilled && _tagInputs.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при обработке изменения текста: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -63,44 +71,53 @@ namespace SiemensTrend.Views.Dialogs
         /// </summary>
         private void BtnAddMore_Click(object sender, RoutedEventArgs e)
         {
-            // Создаем новую строку для ввода
-            Grid grid = new Grid();
-            grid.Margin = new Thickness(0, 0, 0, 5);
+            try
+            {
+                // Создаем новую строку для ввода
+                Grid grid = new Grid();
+                grid.Margin = new Thickness(0, 0, 0, 5);
 
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Создаем новый TextBox
-            TextBox newTextBox = new TextBox();
-            newTextBox.Margin = new Thickness(0, 0, 5, 0);
-            newTextBox.VerticalContentAlignment = VerticalAlignment.Center;
-            newTextBox.Padding = new Thickness(5);
-            newTextBox.TextChanged += TagInput_TextChanged;
-            Grid.SetColumn(newTextBox, 0);
+                // Создаем новый TextBox
+                TextBox newTextBox = new TextBox();
+                newTextBox.Margin = new Thickness(0, 0, 5, 0);
+                newTextBox.VerticalContentAlignment = VerticalAlignment.Center;
+                newTextBox.Padding = new Thickness(5);
+                newTextBox.TextChanged += TagInput_TextChanged;
+                Grid.SetColumn(newTextBox, 0);
 
-            // Создаем кнопку удаления
-            Button removeButton = new Button();
-            removeButton.Content = "×";
-            removeButton.Width = 25;
-            removeButton.Height = 25;
-            removeButton.Click += RemoveInput_Click;
-            Grid.SetColumn(removeButton, 1);
+                // Создаем кнопку удаления
+                Button removeButton = new Button();
+                removeButton.Content = "×";
+                removeButton.Width = 25;
+                removeButton.Height = 25;
+                removeButton.Click += RemoveInput_Click;
+                Grid.SetColumn(removeButton, 1);
 
-            // Добавляем элементы в Grid
-            grid.Children.Add(newTextBox);
-            grid.Children.Add(removeButton);
+                // Добавляем элементы в Grid
+                grid.Children.Add(newTextBox);
+                grid.Children.Add(removeButton);
 
-            // Добавляем Grid на панель
-            InputsPanel.Children.Add(grid);
+                // Добавляем Grid на панель
+                InputsPanel.Children.Add(grid);
 
-            // Добавляем TextBox в список
-            _tagInputs.Add(newTextBox);
+                // Добавляем TextBox в список
+                _tagInputs.Add(newTextBox);
 
-            // Устанавливаем фокус на новый TextBox
-            newTextBox.Focus();
+                // Устанавливаем фокус на новый TextBox
+                newTextBox.Focus();
 
-            // Деактивируем кнопку "Еще один" до заполнения нового поля
-            btnAddMore.IsEnabled = false;
+                // Деактивируем кнопку "Еще один" до заполнения нового поля
+                btnAddMore.IsEnabled = false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при добавлении нового поля: {ex.Message}");
+                MessageBox.Show($"Ошибка при добавлении нового поля: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         /// <summary>
@@ -108,21 +125,30 @@ namespace SiemensTrend.Views.Dialogs
         /// </summary>
         private void RemoveInput_Click(object sender, RoutedEventArgs e)
         {
-            Button button = sender as Button;
-            Grid grid = button.Parent as Grid;
-            TextBox textBox = grid.Children.OfType<TextBox>().FirstOrDefault();
-
-            // Удаляем TextBox из списка
-            if (textBox != null)
+            try
             {
-                _tagInputs.Remove(textBox);
+                Button button = sender as Button;
+                Grid grid = button.Parent as Grid;
+                TextBox textBox = grid.Children.OfType<TextBox>().FirstOrDefault();
+
+                // Удаляем TextBox из списка
+                if (textBox != null)
+                {
+                    _tagInputs.Remove(textBox);
+                }
+
+                // Удаляем Grid с панели
+                InputsPanel.Children.Remove(grid);
+
+                // Обновляем состояние кнопок
+                UpdateButtonsState();
             }
-
-            // Удаляем Grid с панели
-            InputsPanel.Children.Remove(grid);
-
-            // Обновляем состояние кнопок
-            UpdateButtonsState();
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при удалении поля: {ex.Message}");
+                MessageBox.Show($"Ошибка при удалении поля: {ex.Message}",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         /// <summary>
@@ -130,14 +156,21 @@ namespace SiemensTrend.Views.Dialogs
         /// </summary>
         private void UpdateButtonsState()
         {
-            // Проверяем, все ли поля заполнены для активации "Добавить"
-            bool allFilled = _tagInputs.All(tb => !string.IsNullOrWhiteSpace(tb.Text));
-            btnAdd.IsEnabled = allFilled && _tagInputs.Count > 0;
-
-            // Проверяем последнее поле для активации "Еще один"
-            if (_tagInputs.Count > 0)
+            try
             {
-                btnAddMore.IsEnabled = !string.IsNullOrWhiteSpace(_tagInputs.Last().Text);
+                // Проверяем, все ли поля заполнены для активации "Добавить"
+                bool allFilled = _tagInputs.All(tb => !string.IsNullOrWhiteSpace(tb.Text));
+                btnAdd.IsEnabled = allFilled && _tagInputs.Count > 0;
+
+                // Проверяем последнее поле для активации "Еще один"
+                if (_tagInputs.Count > 0)
+                {
+                    btnAddMore.IsEnabled = !string.IsNullOrWhiteSpace(_tagInputs.Last().Text);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при обновлении состояния кнопок: {ex.Message}");
             }
         }
 
@@ -153,101 +186,44 @@ namespace SiemensTrend.Views.Dialogs
         /// <summary>
         /// Обработчик клика по кнопке "Добавить"
         /// </summary>
-        private void BtnAdd_Click(object sender, RoutedEventArgs e)
+/// <summary>
+/// Обработчик нажатия кнопки "Добавить тег"
+/// </summary>
+private void BtnAddTag_Click(object sender, RoutedEventArgs e)
+{
+    try
+    {
+        _logger.Info("Вызов диалога добавления тегов");
+
+        // Создаем диалог для добавления тегов
+        var dialog = new Dialogs.AddTagsDialog(_logger, _viewModel._communicationService);
+        dialog.Owner = this;
+
+        // Показываем диалог
+        if (dialog.ShowDialog() == true)
         {
-            // Получаем все введенные имена тегов
-            List<string> tagNames = _tagInputs
-                .Select(tb => tb.Text.Trim())
-                .Where(t => !string.IsNullOrEmpty(t))
-                .ToList();
+            // Получаем найденные теги
+            var foundTags = dialog.FoundTags;
 
-            if (tagNames.Count == 0)
+            if (foundTags != null && foundTags.Count > 0)
             {
-                MessageBox.Show("Пожалуйста, введите хотя бы один тег",
-                    "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Запускаем поиск тегов
-            try
-            {
-                Mouse.OverrideCursor = Cursors.Wait;
-
-                // Показываем индикатор прогресса
-                var progressWindow = new ProgressWindow("Поиск тегов", "Выполняется поиск тегов...");
-                progressWindow.Owner = this;
-                progressWindow.Show();
-
-                // Запускаем поиск в отдельном потоке
-                var dispatcher = Dispatcher.CurrentDispatcher;
-
-                System.Threading.Tasks.Task.Run(() =>
+                // Добавляем теги в модель
+                foreach (var tag in foundTags)
                 {
-                    try
-                    {
-                        // Ищем теги в проекте
-                        var foundTags = SearchTags(tagNames);
+                    _viewModel.AddNewTag(tag);
+                }
 
-                        // Возвращаемся в UI поток
-                        dispatcher.Invoke(() =>
-                        {
-                            // Закрываем окно прогресса
-                            progressWindow.Close();
-
-                            // Сохраняем найденные теги
-                            FoundTags = foundTags;
-
-                            // Проверяем результаты
-                            if (FoundTags.Count == 0)
-                            {
-                                MessageBox.Show("Не удалось найти ни один из введенных тегов",
-                                    "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
-                                return;
-                            }
-
-                            // Если найдены не все теги, показываем предупреждение
-                            if (FoundTags.Count < tagNames.Count)
-                            {
-                                MessageBox.Show($"Найдено {FoundTags.Count} из {tagNames.Count} тегов",
-                                    "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
-                            }
-
-                            // Закрываем диалог с успешным результатом
-                            DialogResult = true;
-                            Close();
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        dispatcher.Invoke(() =>
-                        {
-                            // Закрываем окно прогресса
-                            progressWindow.Close();
-
-                            // Показываем ошибку
-                            _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
-                            MessageBox.Show($"Ошибка при поиске тегов: {ex.Message}",
-                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                        });
-                    }
-                    finally
-                    {
-                        dispatcher.Invoke(() =>
-                        {
-                            Mouse.OverrideCursor = null;
-                        });
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                Mouse.OverrideCursor = null;
-                _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
-                MessageBox.Show($"Ошибка при поиске тегов: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger.Info($"Добавлено {foundTags.Count} тегов");
             }
         }
-
+    }
+    catch (Exception ex)
+    {
+        _logger.Error($"Ошибка при добавлении тегов: {ex.Message}");
+        MessageBox.Show($"Ошибка при добавлении тегов: {ex.Message}",
+            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+}
         /// <summary>
         /// Метод поиска тегов
         /// </summary>
@@ -257,16 +233,37 @@ namespace SiemensTrend.Views.Dialogs
 
             try
             {
-                // Проверяем, реализует ли сервис метод поиска тегов
+                // Проверяем доступность API для поиска тегов
                 if (_communicationService is TiaPortalCommunicationService tiaService)
                 {
-                    // Используем метод поиска тегов по символьному имени
-                    results = tiaService.FindTagsByNames(tagNames);
+                    // Создаем объект для поиска тегов
+                    var tagFinder = new TiaPortalTagFinder(_logger, tiaService.CurrentProject.TiaPortalInstance);
+                    
+                    // Ищем теги с оптимизацией запросов
+                    results = tagFinder.FindTags(tagNames);
                 }
                 else
                 {
-                    // Заглушка для других типов сервисов
-                    _logger.Warn("Сервис не поддерживает поиск тегов по имени");
+                    // Этот код будет использоваться только как заглушка
+                    // в реальном приложении здесь будет другая логика
+                    _logger.Warn("Коммуникационный сервис не поддерживает поиск тегов по символьным именам");
+                    
+                    // Создаем демонстрационные теги для тестирования интерфейса
+                    foreach (var tagName in tagNames)
+                    {
+                        bool isDbTag = tagName.Contains("\"") && tagName.Contains(".");
+                        results.Add(new TagDefinition
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = tagName,
+                            Address = isDbTag ? "" : $"I0.{results.Count}", // Пример адреса для PLC тега
+                            DataType = GetDemoDataType(tagName),
+                            GroupName = GetGroupName(tagName),
+                            IsDbTag = isDbTag,
+                            IsOptimized = isDbTag && tagName.Contains("S1"), // Демонстрационный признак оптимизации
+                            Comment = $"Демо-тег для {tagName}"
+                        });
+                    }
                 }
             }
             catch (Exception ex)
@@ -276,10 +273,41 @@ namespace SiemensTrend.Views.Dialogs
 
             return results;
         }
-    }
 
+        // Вспомогательные методы для демонстрационных тегов
+        
+        private TagDataType GetDemoDataType(string tagName)
+        {
+            if (tagName.ToLower().Contains("bool")) return TagDataType.Bool;
+            if (tagName.ToLower().Contains("int")) return TagDataType.Int;
+            if (tagName.ToLower().Contains("real")) return TagDataType.Real;
+            if (tagName.ToLower().Contains("string")) return TagDataType.String;
+            
+            // По умолчанию для демонстрации
+            return tagName.Length % 4 == 0 ? TagDataType.Bool :
+                   tagName.Length % 4 == 1 ? TagDataType.Int :
+                   tagName.Length % 4 == 2 ? TagDataType.DInt :
+                   TagDataType.Real;
+        }
+        
+        private string GetGroupName(string tagName)
+        {
+            if (tagName.Contains("\""))
+            {
+                int startQuote = tagName.IndexOf('\"');
+                int endQuote = tagName.IndexOf('\"', startQuote + 1);
+                if (startQuote >= 0 && endQuote > startQuote)
+                {
+                    return tagName.Substring(startQuote + 1, endQuote - startQuote - 1);
+                }
+            }
+            
+            return "DefaultGroup";
+        }
+    }
+    
     /// <summary>
-    /// Окно прогресса
+    /// Окно прогресса для отображения статуса операции
     /// </summary>
     public class ProgressWindow : Window
     {

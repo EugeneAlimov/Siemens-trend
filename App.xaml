@@ -1,10 +1,13 @@
 ﻿<Application x:Class="SiemensTrend.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:SiemensTrend">
+             xmlns:local="clr-namespace:SiemensTrend"
+             xmlns:converters="clr-namespace:SiemensTrend.Visualization.Converters">
     <Application.Resources>
         <ResourceDictionary>
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <!-- Добавляем новый конвертер -->
+            <converters:BoolToTagTypeConverter x:Key="BoolToTagTypeConverter"/>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Resources/Styles.xaml"/>
             </ResourceDictionary.MergedDictionaries>

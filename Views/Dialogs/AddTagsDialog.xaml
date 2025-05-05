@@ -1,7 +1,7 @@
 ﻿<Window x:Class="SiemensTrend.Views.Dialogs.AddTagsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Добавление тегов" Height="400" Width="500"
+        Title="Добавление тегов" Height="450" Width="550"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -13,12 +13,13 @@
         <!-- Заголовок и инструкции -->
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="Добавление тегов" FontSize="16" FontWeight="Bold"/>
-            <TextBlock Text="Введите полные имена тегов для добавления (по одному в каждой строке)" 
+            <TextBlock Text="Введите полные имена тегов для поиска и добавления" 
                        TextWrapping="Wrap" Margin="0,5,0,0"/>
-            <TextBlock Text="Пример PLC тега: &quot;=030+TB30-10KF1&quot;" 
-                       TextWrapping="Wrap" Margin="0,5,0,0"/>
-            <TextBlock Text="Пример DB тега: &quot;S1&quot;.v.R2.Stripe_laminating.RH1.mode" 
-                       TextWrapping="Wrap" Margin="0,5,0,0"/>
+            <TextBlock Text="Примеры форматов:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+            <TextBlock Text="PLC тег: &quot;=030+TB30-10KF1&quot; или &quot;=030+M31-70FQ5:1&quot;" 
+                       TextWrapping="Wrap" Margin="10,5,0,0"/>
+            <TextBlock Text="DB тег: &quot;S1&quot;.v.R2.Stripe_laminating.RH1.mode" 
+                       TextWrapping="Wrap" Margin="10,5,0,0"/>
         </StackPanel>
 
         <!-- Область для ввода тегов -->

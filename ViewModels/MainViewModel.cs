@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using SiemensTrend.Communication;
-using SiemensTrend.Communication.S7;
 using SiemensTrend.Communication.TIA;
 using SiemensTrend.Core.Commands;
 using SiemensTrend.Core.Logging;
@@ -35,6 +33,9 @@ namespace SiemensTrend.ViewModels
         /// Tag manager for manual tag management
         /// </summary>
         protected TagManager _tagManager;
+
+        /// Свойство для объединенного списка тегов
+        private ObservableCollection<TagDefinition> _allTags;
 
         // Поле для работы с TIA Portal - оставляем только в этом файле,
         // в других частичных классах его нужно удалить
@@ -143,6 +144,15 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
+        /// Все доступные теги (объединение PlcTags и DbTags)
+        /// </summary>
+        public ObservableCollection<TagDefinition> AllTags
+        {
+            get => _allTags;
+            private set => SetProperty(ref _allTags, value);
+        }
+        
+        /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="logger">Logger</param>
@@ -185,6 +195,35 @@ namespace SiemensTrend.ViewModels
 
             _logger.Info("MainViewModel инициализирован успешно");
         }
+
+        /// <summary>
+        /// Метод для обновления списка всех тегов
+        /// </summary>
+        private void UpdateAllTags()
+        {
+            if (AllTags == null)
+            {
+                AllTags = new ObservableCollection<TagDefinition>();
+            }
+            
+            AllTags.Clear();
+            
+            // Добавляем PLC теги
+            foreach (var tag in PlcTags)
+            {
+                AllTags.Add(tag);
+            }
+            
+            // Добавляем DB теги
+            foreach (var tag in DbTags)
+            {
+                AllTags.Add(tag);
+            }
+            
+            // Уведомляем представление об изменении
+            OnPropertyChanged(nameof(AllTags));
+        }
+
         /// <summary>
         /// Инициализация приложения
         /// </summary>
@@ -235,6 +274,9 @@ namespace SiemensTrend.ViewModels
                         PlcTags.Add(tag);
                     }
                 }
+                
+                // Обновляем объединенный список тегов
+                UpdateAllTags();
 
                 _logger.Info($"LoadTagsFromStorage: Загружено {PlcTags.Count} тегов PLC и {DbTags.Count} тегов DB");
             }
@@ -273,6 +315,7 @@ namespace SiemensTrend.ViewModels
         /// Добавляет новый тег
         /// </summary>
         /// <param name="tag">Тег для добавления</param>
+        /// 
         public void AddNewTag(TagDefinition tag)
         {
             if (tag == null)
@@ -305,6 +348,9 @@ namespace SiemensTrend.ViewModels
                     _logger.Info($"AddNewTag: Добавлен PLC тег: {tag.Name}");
                 }
 
+                // Обновляем объединенный список тегов
+                UpdateAllTags();
+
                 // Сохраняем изменения
                 SaveTagsToStorage();
 
@@ -315,6 +361,23 @@ namespace SiemensTrend.ViewModels
                 _logger.Error($"AddNewTag: Ошибка при добавлении тега: {ex.Message}");
                 StatusMessage = "Ошибка при добавлении тега";
             }
+        }
+        
+
+        /// <summary>
+        /// Инициализация метода в конструкторе
+        /// </summary>
+        private void InitializeTags()
+        {
+            // Инициализируем коллекции
+            AvailableTags = new ObservableCollection<TagDefinition>();
+            MonitoredTags = new ObservableCollection<TagDefinition>();
+            PlcTags = new ObservableCollection<TagDefinition>();
+            DbTags = new ObservableCollection<TagDefinition>();
+            AllTags = new ObservableCollection<TagDefinition>();
+            
+            // Загружаем теги из хранилища
+            LoadTagsFromStorage();
         }
 
         /// <summary>
@@ -360,6 +423,7 @@ namespace SiemensTrend.ViewModels
         /// Удаляет тег
         /// </summary>
         /// <param name="tag">Тег для удаления</param>
+        /// 
         public void RemoveTag(TagDefinition tag)
         {
             if (tag == null)
@@ -386,6 +450,9 @@ namespace SiemensTrend.ViewModels
                 {
                     MonitoredTags.Remove(tag);
                 }
+
+                // Обновляем объединенный список тегов
+                UpdateAllTags();
 
                 // Сохраняем изменения
                 SaveTagsToStorage();
