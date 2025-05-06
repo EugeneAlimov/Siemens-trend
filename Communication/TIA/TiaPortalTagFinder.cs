@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Siemens.Engineering;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
@@ -40,8 +41,29 @@ namespace SiemensTrend.Communication.TIA
             {
                 _logger.Info($"Начало поиска {tagNames.Count} тегов");
 
+                // Проверка подключения к TIA Portal
+                if (_tiaPortal == null || _tiaPortal.Projects.Count == 0)
+                {
+                    _logger.Error("Нет активного подключения к TIA Portal или нет открытых проектов");
+                    return results;
+                }
+
+                // Проверка, есть ли теги для поиска
+                if (tagNames == null || tagNames.Count == 0)
+                {
+                    _logger.Warn("Пустой список тегов для поиска");
+                    return results;
+                }
+
                 // Группировка тегов по контейнерам
                 var groupedTags = GroupTagsByContainer(tagNames);
+
+                // Вывод в лог для отладки
+                foreach (var group in groupedTags)
+                {
+                    _logger.Info($"Группа тегов для контейнера {group.Key}. " +
+                                 $"Количество тегов: {group.Value.Count}");
+                }
 
                 // Выполняем поиск для каждой группы
                 foreach (var group in groupedTags)
@@ -58,21 +80,41 @@ namespace SiemensTrend.Communication.TIA
                     {
                         // Ищем теги в блоке данных
                         var foundTags = FindTagsInDbContainer(containerName, tagPaths);
-                        results.AddRange(foundTags);
+                        if (foundTags.Count > 0)
+                        {
+                            _logger.Info($"Найдено {foundTags.Count} тегов в блоке данных {containerName}");
+                            results.AddRange(foundTags);
+                        }
+                        else
+                        {
+                            _logger.Warn($"Не найдено тегов в блоке данных {containerName}");
+                        }
                     }
                     else
                     {
                         // Ищем теги в таблице тегов ПЛК
                         var foundTags = FindTagsInPlcContainer(containerName, tagPaths);
-                        results.AddRange(foundTags);
+                        if (foundTags.Count > 0)
+                        {
+                            _logger.Info($"Найдено {foundTags.Count} тегов в таблице тегов {containerName}");
+                            results.AddRange(foundTags);
+                        }
+                        else
+                        {
+                            _logger.Warn($"Не найдено тегов в таблице тегов {containerName}");
+                        }
                     }
                 }
 
-                _logger.Info($"Найдено {results.Count} тегов");
+                _logger.Info($"Найдено {results.Count} тегов из {tagNames.Count} запрошенных");
             }
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
             }
 
             return results;
@@ -96,12 +138,30 @@ namespace SiemensTrend.Communication.TIA
                         result[parsedTag.Container] = new List<string>();
                     }
 
-                    result[parsedTag.Container].Add(parsedTag.TagName);
+                    if (parsedTag.IsDB)
+                    {
+                        // Для DB добавляем только часть имени после контейнера
+                        result[parsedTag.Container].Add(parsedTag.TagName);
+                        _logger.Info($"Тег DB: {parsedTag.Container}.{parsedTag.TagName}");
+                    }
+                    else
+                    {
+                        // Для PLC тегов добавляем полное имя
+                        result[parsedTag.Container].Add(parsedTag.TagName);
+                        _logger.Info($"Тег PLC: {parsedTag.Container} → {parsedTag.TagName}");
+                    }
                 }
                 else
                 {
-                    // Если контейнер не определен, используем имя тега как есть
+                    // Если контейнер не определен, добавляем в дефолтный контейнер
                     _logger.Warn($"Не удалось определить контейнер для тега {tagName}");
+
+                    if (!result.ContainsKey("Default"))
+                    {
+                        result["Default"] = new List<string>();
+                    }
+
+                    result["Default"].Add(tagName);
                 }
             }
 
@@ -113,10 +173,28 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         private bool IsDbContainer(string containerName)
         {
-            // Проверяем, является ли контейнер блоком данных
-            // Обычно DB имеют имена, начинающиеся с "DB" или содержащие "_DB"
-            return containerName.StartsWith("DB", StringComparison.OrdinalIgnoreCase) ||
-                   containerName.Contains("_DB", StringComparison.OrdinalIgnoreCase);
+            // Проверяем варианты форматов имени DB
+            if (string.IsNullOrEmpty(containerName))
+                return false;
+
+            // Точные совпадения с префиксом DB
+            if (containerName.StartsWith("DB", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Совпадения с _DB в имени
+            if (containerName.Contains("_DB", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Регулярное выражение для проверки DB+цифры
+            if (Regex.IsMatch(containerName, @"DB\d+"))
+                return true;
+
+            // Специфичные имена контейнеров, которые являются DB
+            if (containerName == "S1" || containerName == "Exchanger_DB")
+                return true;
+
+            // По умолчанию считаем, что это не DB
+            return false;
         }
 
         /// <summary>
@@ -134,6 +212,15 @@ namespace SiemensTrend.Communication.TIA
         /// </summary>
         private ParsedTag ParseTagName(string fullTagName)
         {
+            // Проверка на null или пустую строку
+            if (string.IsNullOrEmpty(fullTagName))
+            {
+                _logger.Warn("Пустое имя тега");
+                return new ParsedTag { Container = string.Empty, TagName = string.Empty, IsDB = false };
+            }
+
+            _logger.Info($"Разбор имени тега: {fullTagName}");
+
             // Результат по умолчанию
             ParsedTag result = new ParsedTag
             {
@@ -144,44 +231,77 @@ namespace SiemensTrend.Communication.TIA
 
             try
             {
-                // Проверяем наличие кавычек
+                // Формат с кавычками "ContainerName".TagPath или "TagName"
                 if (fullTagName.Contains("\""))
                 {
-                    // Ищем закрывающую кавычку
-                    int endQuoteIndex = fullTagName.IndexOf("\"", 1);
+                    int startQuoteIndex = fullTagName.IndexOf("\"");
+                    int endQuoteIndex = fullTagName.IndexOf("\"", startQuoteIndex + 1);
 
-                    if (endQuoteIndex > 0)
+                    if (startQuoteIndex >= 0 && endQuoteIndex > startQuoteIndex)
                     {
-                        // Извлекаем контейнер (часть в кавычках)
-                        result.Container = fullTagName.Substring(1, endQuoteIndex - 1);
+                        // Извлекаем имя контейнера (без кавычек)
+                        result.Container = fullTagName.Substring(startQuoteIndex + 1, endQuoteIndex - startQuoteIndex - 1);
 
-                        // Проверяем, есть ли точка после закрывающей кавычки
-                        if (fullTagName.Length > endQuoteIndex + 1 && fullTagName[endQuoteIndex + 1] == '.')
+                        // Проверяем, есть ли что-то после закрывающей кавычки
+                        if (fullTagName.Length > endQuoteIndex + 1)
                         {
-                            // Это тег DB, так как есть часть после точки
-                            result.IsDB = true;
-                            result.TagName = fullTagName.Substring(endQuoteIndex + 2); // Пропускаем кавычку и точку
+                            // Ищем точку после закрывающей кавычки
+                            if (fullTagName[endQuoteIndex + 1] == '.')
+                            {
+                                // Это формат DB - есть путь после контейнера
+                                result.IsDB = true;
+                                result.TagName = fullTagName.Substring(endQuoteIndex + 2); // Пропускаем кавычку и точку
+                                _logger.Info($"Распознан тег DB: контейнер={result.Container}, тег={result.TagName}");
+                            }
+                            else
+                            {
+                                // Необычный формат, логируем для отладки
+                                _logger.Warn($"Необычный формат имени тега: {fullTagName}");
+                                // Оставляем как PLC тег с полным именем
+                                result.TagName = fullTagName;
+                            }
                         }
                         else
                         {
-                            // Это тег PLC, так как нет части после точки
+                            // Только имя контейнера в кавычках - это PLC тег
+                            _logger.Info($"Распознан тег PLC: контейнер={result.Container}");
+                            // Для PLC тегов в этом формате TagName остается равным имени контейнера
+                            result.TagName = result.Container;
                             result.IsDB = false;
-                            // TagName остается полным именем, так как мы не можем определить только имя тега
                         }
                     }
                 }
+                // Формат с точкой, но без кавычек: ContainerName.TagPath
                 else if (fullTagName.Contains("."))
                 {
-                    // Формат без кавычек, но с точкой
                     var parts = fullTagName.Split(new[] { '.' }, 2);
 
                     if (parts.Length >= 2)
                     {
                         result.Container = parts[0];
                         result.TagName = parts[1];
-                        // Предполагаем, что это DB, если есть точка
-                        result.IsDB = true;
+
+                        // Проверяем, является ли контейнер блоком данных
+                        result.IsDB = IsDbContainer(result.Container);
+
+                        _logger.Info($"Распознан тег с точкой: контейнер={result.Container}, тег={result.TagName}, IsDB={result.IsDB}");
                     }
+                }
+                // Формат PLC тега без точек и кавычек
+                else
+                {
+                    // Предполагаем, что это PLC тег без явного указания контейнера
+                    result.Container = "Default";
+                    result.TagName = fullTagName;
+                    result.IsDB = false;
+
+                    _logger.Info($"Распознан простой тег: {fullTagName}");
+                }
+
+                // Дополнительная проверка после разбора
+                if (string.IsNullOrEmpty(result.Container))
+                {
+                    _logger.Warn($"Не удалось определить контейнер для тега: {fullTagName}");
                 }
             }
             catch (Exception ex)
@@ -207,7 +327,6 @@ namespace SiemensTrend.Communication.TIA
                 }
 
                 // Альтернативный способ: проверка на наличие свойства DataTypeName
-                // Это зависит от конкретной реализации API TIA Portal
                 var dataTypeName = member.GetType().GetProperty("DataTypeName")?.GetValue(member)?.ToString();
                 if (!string.IsNullOrEmpty(dataTypeName))
                 {
@@ -233,18 +352,36 @@ namespace SiemensTrend.Communication.TIA
             {
                 string lowerType = plcDataType.ToLower();
 
+                // Подробная логика определения типа
+                // Логические типы
                 if (lowerType.Contains("bool"))
                     return TagDataType.Bool;
-                else if (lowerType.Equals("int") || lowerType.Contains("int16") || lowerType.Contains("word"))
+
+                // Целочисленные типы - 16 бит
+                else if (lowerType == "int" || lowerType == "int16" || lowerType == "uint16" ||
+                         lowerType == "word" || lowerType.Contains("_int"))
                     return TagDataType.Int;
-                else if (lowerType.Equals("dint") || lowerType.Contains("int32") || lowerType.Contains("dword"))
+
+                // Целочисленные типы - 32 бит
+                else if (lowerType == "dint" || lowerType == "int32" || lowerType == "uint32" ||
+                         lowerType == "dword" || lowerType == "udint")
                     return TagDataType.DInt;
+
+                // Типы с плавающей точкой
                 else if (lowerType.Contains("real") || lowerType.Contains("float"))
                     return TagDataType.Real;
-                else if (lowerType.Contains("string"))
+
+                // Строковые типы
+                else if (lowerType.Contains("string") || lowerType.Contains("wstring") ||
+                         lowerType.Contains("char"))
                     return TagDataType.String;
-                else if (lowerType.StartsWith("udt_") || lowerType.Contains("struct") || lowerType.Contains("udt"))
+
+                // Пользовательские типы данных
+                else if (lowerType.StartsWith("udt") || lowerType.StartsWith("\"udt") ||
+                         lowerType.Contains("struct") || lowerType.Contains("tag_udt"))
                     return TagDataType.UDT;
+
+                // По умолчанию
                 else
                     return TagDataType.Other;
             }
@@ -273,14 +410,19 @@ namespace SiemensTrend.Communication.TIA
                     return results;
                 }
 
+                _logger.Info($"Найден блок данных {dbName}");
+
                 // Проверяем, оптимизирован ли блок данных
                 bool isOptimized = IsDataBlockOptimized(db);
+                _logger.Info($"Блок данных {dbName} оптимизирован: {isOptimized}");
 
                 // Для каждого пути к тегу
                 foreach (string tagPath in tagPaths)
                 {
                     try
                     {
+                        _logger.Info($"Поиск тега {tagPath} в блоке данных {dbName}");
+
                         // Находим тег по пути
                         var tagMember = FindTagMemberInDataBlock(db, tagPath);
 
@@ -288,6 +430,7 @@ namespace SiemensTrend.Communication.TIA
                         {
                             // Получаем тип данных
                             string dataTypeName = GetMemberDataTypeName(tagMember);
+                            _logger.Info($"Найден тег {tagPath} в блоке данных {dbName}, тип данных: {dataTypeName}");
 
                             // Создаем объект TagDefinition
                             var tagDefinition = new TagDefinition
@@ -304,7 +447,7 @@ namespace SiemensTrend.Communication.TIA
                             // Добавляем тег в результаты
                             results.Add(tagDefinition);
 
-                            _logger.Info($"Найден тег в DB: {dbName}.{tagPath} с типом данных {tagDefinition.DataType}");
+                            _logger.Info($"Тег добавлен в результаты: {dbName}.{tagPath} с типом данных {tagDefinition.DataType}");
                         }
                         else
                         {
@@ -343,11 +486,15 @@ namespace SiemensTrend.Communication.TIA
                     return results;
                 }
 
+                _logger.Info($"Найдена таблица тегов {tableName}");
+
                 // Для каждого имени тега
                 foreach (string tagName in tagNames)
                 {
                     try
                     {
+                        _logger.Info($"Поиск тега {tagName} в таблице тегов {tableName}");
+
                         // Находим тег по имени
                         var plcTag = FindPlcTagInTable(tagTable, tagName);
 
@@ -355,6 +502,7 @@ namespace SiemensTrend.Communication.TIA
                         {
                             // Получаем тип данных
                             string dataTypeName = plcTag.DataTypeName;
+                            _logger.Info($"Найден тег {tagName} в таблице {tableName}, тип данных: {dataTypeName}");
 
                             // Создаем объект TagDefinition
                             var tagDefinition = new TagDefinition
@@ -370,7 +518,7 @@ namespace SiemensTrend.Communication.TIA
                             // Добавляем тег в результаты
                             results.Add(tagDefinition);
 
-                            _logger.Info($"Найден PLC тег: {tableName}.{tagName} с типом данных {tagDefinition.DataType}");
+                            _logger.Info($"Тег добавлен в результаты: {tableName}.{tagName} с типом данных {tagDefinition.DataType}");
                         }
                         else
                         {
@@ -398,6 +546,8 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
+                _logger.Info($"Поиск блока данных {dbName} в проекте");
+
                 // Ищем во всех PLC устройствах проекта
                 foreach (var device in _tiaPortal.Projects.First().Devices)
                 {
@@ -410,12 +560,15 @@ namespace SiemensTrend.Communication.TIA
                             var plcSoftware = softwareContainer.Software as PlcSoftware;
                             if (plcSoftware != null)
                             {
+                                _logger.Info($"Проверка блоков данных в устройстве {device.Name}, элемент {deviceItem.Name}");
+
                                 // Ищем блок данных по имени
                                 foreach (var block in plcSoftware.BlockGroup.Blocks)
                                 {
                                     if (block is PlcBlock plcBlock &&
                                         string.Equals(plcBlock.Name, dbName, StringComparison.OrdinalIgnoreCase))
                                     {
+                                        _logger.Info($"Найден блок данных {dbName}");
                                         return plcBlock;
                                     }
                                 }
@@ -423,6 +576,8 @@ namespace SiemensTrend.Communication.TIA
                         }
                     }
                 }
+
+                _logger.Warn($"Блок данных {dbName} не найден в проекте");
             }
             catch (Exception ex)
             {
@@ -439,6 +594,8 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
+                _logger.Info($"Поиск таблицы тегов {tableName} в проекте");
+
                 // Ищем во всех PLC устройствах проекта
                 foreach (var device in _tiaPortal.Projects.First().Devices)
                 {
@@ -451,11 +608,14 @@ namespace SiemensTrend.Communication.TIA
                             var plcSoftware = softwareContainer.Software as PlcSoftware;
                             if (plcSoftware != null)
                             {
+                                _logger.Info($"Проверка таблиц тегов в устройстве {device.Name}, элемент {deviceItem.Name}");
+
                                 // Ищем таблицу тегов по имени
                                 foreach (var tagTable in plcSoftware.TagTableGroup.TagTables)
                                 {
                                     if (string.Equals(tagTable.Name, tableName, StringComparison.OrdinalIgnoreCase))
                                     {
+                                        _logger.Info($"Найдена таблица тегов {tableName}");
                                         return tagTable;
                                     }
                                 }
@@ -463,6 +623,8 @@ namespace SiemensTrend.Communication.TIA
                         }
                     }
                 }
+
+                _logger.Warn($"Таблица тегов {tableName} не найдена в проекте");
             }
             catch (Exception ex)
             {
@@ -479,19 +641,24 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
+                _logger.Info($"Проверка оптимизации блока данных {db.Name}");
+
                 // Получаем свойство "Optimized block access"
                 var properties = db.GetAttributeInfos();
                 var optimizedAccessProperty = properties.FirstOrDefault(p => p.Name == "Optimized block access");
 
                 if (optimizedAccessProperty != null)
                 {
-                    // Use the attribute directly as a boolean
+                    // Получаем значение атрибута
                     var attribute = db.GetAttribute("Optimized block access");
                     if (attribute is bool isOptimized)
                     {
+                        _logger.Info($"Блок данных {db.Name} оптимизирован: {isOptimized}");
                         return isOptimized;
                     }
                 }
+
+                _logger.Warn($"Не удалось определить оптимизацию блока данных {db.Name}");
             }
             catch (Exception ex)
             {
@@ -508,35 +675,69 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
+                _logger.Info($"Поиск тега {tagPath} в блоке данных {db.Name}");
+
                 // Получаем интерфейс блока данных
-                // В TIA Portal Openness может использоваться PlcBlockInterface вместо BlockInterface
-                var dbInterface = db.Interface;
+                var dbInterface = db.GetAttribute("Interface") as PlcBlockInterface;
                 if (dbInterface == null)
+                {
+                    _logger.Error($"Не удалось получить интерфейс блока данных {db.Name}");
                     return null;
+                }
 
                 // Разбиваем путь на части
                 string[] pathParts = tagPath.Split('.');
 
-                // Начинаем поиск с корневого элемента
+                // Начинаем с корневых элементов
+                var currentMembers = dbInterface.Members;
                 Member currentMember = null;
-                var members = dbInterface.Members;
 
                 // Проходим по каждой части пути
                 foreach (string part in pathParts)
                 {
+                    bool foundPart = false;
                     // Ищем член с указанным именем
-                    currentMember = members.FirstOrDefault(m =>
-                        string.Equals(m.Name, part, StringComparison.OrdinalIgnoreCase));
+                    foreach (var member in currentMembers)
+                    {
+                        if (string.Equals(member.Name, part, StringComparison.OrdinalIgnoreCase))
+                        {
+                            currentMember = member;
+
+                            // Пробуем получить дочерние элементы для следующего шага
+                            try
+                            {
+                                var membersProperty = member.GetType().GetProperty("Members");
+                                if (membersProperty != null)
+                                {
+                                    var memberObj = membersProperty.GetValue(member);
+                                    if (memberObj is MemberComposition nextMembers)
+                                    {
+                                        currentMembers = nextMembers;
+                                        foundPart = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.Warn($"Не удалось получить дочерние элементы для {part}: {ex.Message}");
+                            }
+
+                            // Если не получилось, это может быть конечный элемент
+                            foundPart = true;
+                            break;
+                        }
+                    }
 
                     // Если часть пути не найдена, возвращаем null
-                    if (currentMember == null)
+                    if (!foundPart)
+                    {
+                        _logger.Warn($"Часть пути '{part}' не найдена в блоке данных {db.Name}");
                         return null;
-
-                    // Переходим к дочерним элементам для следующей итерации
-                    // В API TIA Portal дочерние элементы могут быть доступны через свойство Children или Members
-                    members = GetChildMembers(currentMember);
+                    }
                 }
 
+                _logger.Info($"Найден тег {tagPath} в блоке данных {db.Name}");
                 return currentMember;
             }
             catch (Exception ex)
@@ -547,64 +748,25 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Вспомогательный метод для получения дочерних элементов Member
-        /// </summary>
-        /// <param name="member">Элемент, для которого нужно получить дочерние элементы</param>
-        private IEnumerable<Member> GetChildMembers(Member member)
-        {
-            try
-            {
-                // Пытаемся получить дочерние элементы через свойство Members или Children
-                // В разных версиях TIA Portal API могут быть разные способы доступа
-
-                // Вариант 1: Проверяем свойство Members
-                var membersProperty = member.GetType().GetProperty("Members");
-                if (membersProperty != null)
-                {
-                    var members = membersProperty.GetValue(member) as IEnumerable<Member>;
-                    if (members != null)
-                    {
-                        return members;
-                    }
-                }
-
-                // Вариант 2: Проверяем свойство Children
-                var childrenProperty = member.GetType().GetProperty("Children");
-                if (childrenProperty != null)
-                {
-                    var children = childrenProperty.GetValue(member) as IEnumerable<Member>;
-                    if (children != null)
-                    {
-                        return children;
-                    }
-                }
-
-                // Вариант 3: Если не удалось найти дочерние элементы, возвращаем пустой список
-                _logger.Warn($"Не удалось получить дочерние элементы для тега {member.Name}");
-                return new List<Member>();
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при получении дочерних элементов Member: {ex.Message}");
-                return new List<Member>();
-            }
-        }
-
-        /// <summary>
         /// Поиск тега в таблице PLC тегов по имени
         /// </summary>
         private PlcTag FindPlcTagInTable(PlcTagTable tagTable, string tagName)
         {
             try
             {
+                _logger.Info($"Поиск тега {tagName} в таблице тегов {tagTable.Name}");
+
                 // Ищем тег по имени
                 foreach (var tag in tagTable.Tags)
                 {
                     if (string.Equals(tag.Name, tagName, StringComparison.OrdinalIgnoreCase))
                     {
+                        _logger.Info($"Найден тег {tagName} в таблице тегов {tagTable.Name}");
                         return tag;
                     }
                 }
+
+                _logger.Warn($"Тег {tagName} не найден в таблице тегов {tagTable.Name}");
             }
             catch (Exception ex)
             {
