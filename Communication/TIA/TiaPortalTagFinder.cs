@@ -193,21 +193,66 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Retrieves the data type name of a Member object.
+        /// Получение имени типа данных для члена
         /// </summary>
         private string GetMemberDataTypeName(Member member)
         {
             try
             {
-                // Attempt to retrieve the "DataType" attribute from the Member object
-                var dataTypeAttribute = member.GetAttribute("DataType");
-                return dataTypeAttribute?.ToString() ?? string.Empty;
+                // Попытка получить атрибут "DataType" из объекта Member
+                var dataTypeAttr = member.GetAttribute("DataType");
+                if (dataTypeAttr != null)
+                {
+                    return dataTypeAttr.ToString();
+                }
+
+                // Альтернативный способ: проверка на наличие свойства DataTypeName
+                // Это зависит от конкретной реализации API TIA Portal
+                var dataTypeName = member.GetType().GetProperty("DataTypeName")?.GetValue(member)?.ToString();
+                if (!string.IsNullOrEmpty(dataTypeName))
+                {
+                    return dataTypeName;
+                }
+
+                return string.Empty;
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error retrieving DataType for member {member.Name}: {ex.Message}");
+                _logger.Error($"Ошибка при получении типа данных для члена {member.Name}: {ex.Message}");
                 return string.Empty;
             }
+        }
+
+        /// <summary>
+        /// Конвертация строкового типа данных в TagDataType
+        /// </summary>
+        private TagDataType GetTagDataType(string plcDataType, string tagName, string containerName)
+        {
+            // Используем только тип из API TIA Portal
+            if (!string.IsNullOrEmpty(plcDataType))
+            {
+                string lowerType = plcDataType.ToLower();
+
+                if (lowerType.Contains("bool"))
+                    return TagDataType.Bool;
+                else if (lowerType.Equals("int") || lowerType.Contains("int16") || lowerType.Contains("word"))
+                    return TagDataType.Int;
+                else if (lowerType.Equals("dint") || lowerType.Contains("int32") || lowerType.Contains("dword"))
+                    return TagDataType.DInt;
+                else if (lowerType.Contains("real") || lowerType.Contains("float"))
+                    return TagDataType.Real;
+                else if (lowerType.Contains("string"))
+                    return TagDataType.String;
+                else if (lowerType.StartsWith("udt_") || lowerType.Contains("struct") || lowerType.Contains("udt"))
+                    return TagDataType.UDT;
+                else
+                    return TagDataType.Other;
+            }
+
+            // Если тип не определен, используем Other и логируем предупреждение
+            _logger.Warn($"Не удалось определить тип данных для тега {containerName}.{tagName}. " +
+                         $"Тип из TIA Portal: '{plcDataType}'. Установлен тип Other.");
+            return TagDataType.Other;
         }
 
         /// <summary>
@@ -241,6 +286,9 @@ namespace SiemensTrend.Communication.TIA
 
                         if (tagMember != null)
                         {
+                            // Получаем тип данных
+                            string dataTypeName = GetMemberDataTypeName(tagMember);
+
                             // Создаем объект TagDefinition
                             var tagDefinition = new TagDefinition
                             {
@@ -249,14 +297,14 @@ namespace SiemensTrend.Communication.TIA
                                 GroupName = dbName,
                                 IsDbTag = true,
                                 IsOptimized = isOptimized,
-                                DataType = GetTagDataType(GetMemberDataTypeName(tagMember)),
+                                DataType = GetTagDataType(dataTypeName, tagPath, dbName),
                                 Comment = tagMember.GetAttribute("Comment")?.ToString()
                             };
 
                             // Добавляем тег в результаты
                             results.Add(tagDefinition);
 
-                            _logger.Info($"Найден тег в DB: {dbName}.{tagPath}");
+                            _logger.Info($"Найден тег в DB: {dbName}.{tagPath} с типом данных {tagDefinition.DataType}");
                         }
                         else
                         {
@@ -305,6 +353,9 @@ namespace SiemensTrend.Communication.TIA
 
                         if (plcTag != null)
                         {
+                            // Получаем тип данных
+                            string dataTypeName = plcTag.DataTypeName;
+
                             // Создаем объект TagDefinition
                             var tagDefinition = new TagDefinition
                             {
@@ -312,14 +363,14 @@ namespace SiemensTrend.Communication.TIA
                                 Name = tagName,
                                 GroupName = tableName,
                                 IsDbTag = false,
-                                DataType = GetTagDataType(plcTag.DataTypeName),
+                                DataType = GetTagDataType(dataTypeName, tagName, tableName),
                                 Comment = plcTag.Comment?.ToString()
                             };
 
                             // Добавляем тег в результаты
                             results.Add(tagDefinition);
 
-                            _logger.Info($"Найден PLC тег: {tableName}.{tagName}");
+                            _logger.Info($"Найден PLC тег: {tableName}.{tagName} с типом данных {tagDefinition.DataType}");
                         }
                         else
                         {
@@ -451,41 +502,16 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
-        /// Конвертация строкового типа данных в TagDataType
-        /// </summary>
-        private TagDataType GetTagDataType(string plcDataType)
-        {
-            if (string.IsNullOrEmpty(plcDataType))
-                return TagDataType.Other;
-
-            string lowerType = plcDataType.ToLower();
-
-            if (lowerType.Contains("bool"))
-                return TagDataType.Bool;
-            else if (lowerType.Contains("int") && !lowerType.Contains("dint"))
-                return TagDataType.Int;
-            else if (lowerType.Contains("dint"))
-                return TagDataType.DInt;
-            else if (lowerType.Contains("real"))
-                return TagDataType.Real;
-            else if (lowerType.Contains("string"))
-                return TagDataType.String;
-            else if (lowerType.StartsWith("udt_") || lowerType.Contains("type"))
-                return TagDataType.UDT;
-            else
-                return TagDataType.Other;
-        }
-
-        /// <summary>
         /// Поиск члена в блоке данных по пути
         /// </summary>
         private Member FindTagMemberInDataBlock(PlcBlock db, string tagPath)
         {
             try
             {
-                // Получаем список членов блока данных
-                var members = db.GetAttribute("Members") as IEnumerable<Member>;
-                if (members == null)
+                // Получаем интерфейс блока данных
+                // В TIA Portal Openness может использоваться PlcBlockInterface вместо BlockInterface
+                var dbInterface = db.Interface;
+                if (dbInterface == null)
                     return null;
 
                 // Разбиваем путь на части
@@ -493,6 +519,7 @@ namespace SiemensTrend.Communication.TIA
 
                 // Начинаем поиск с корневого элемента
                 Member currentMember = null;
+                var members = dbInterface.Members;
 
                 // Проходим по каждой части пути
                 foreach (string part in pathParts)
@@ -506,6 +533,7 @@ namespace SiemensTrend.Communication.TIA
                         return null;
 
                     // Переходим к дочерним элементам для следующей итерации
+                    // В API TIA Portal дочерние элементы могут быть доступны через свойство Children или Members
                     members = GetChildMembers(currentMember);
                 }
 
@@ -518,7 +546,6 @@ namespace SiemensTrend.Communication.TIA
             }
         }
 
-
         /// <summary>
         /// Вспомогательный метод для получения дочерних элементов Member
         /// </summary>
@@ -527,25 +554,34 @@ namespace SiemensTrend.Communication.TIA
         {
             try
             {
-                // Since 'IMemberHierarchy' does not exist and 'GetService' is not available,
-                // we will use the 'GetAttribute' method to retrieve child members if applicable.
-                var childMembers = new List<Member>();
+                // Пытаемся получить дочерние элементы через свойство Members или Children
+                // В разных версиях TIA Portal API могут быть разные способы доступа
 
-                // Example: If the API provides a way to retrieve child members via attributes
-                var childCountAttribute = member.GetAttribute("ChildCount");
-                if (childCountAttribute is int childCount && childCount > 0)
+                // Вариант 1: Проверяем свойство Members
+                var membersProperty = member.GetType().GetProperty("Members");
+                if (membersProperty != null)
                 {
-                    for (int i = 0; i < childCount; i++)
+                    var members = membersProperty.GetValue(member) as IEnumerable<Member>;
+                    if (members != null)
                     {
-                        var childMember = member.GetAttribute($"Child_{i}") as Member;
-                        if (childMember != null)
-                        {
-                            childMembers.Add(childMember);
-                        }
+                        return members;
                     }
                 }
 
-                return childMembers;
+                // Вариант 2: Проверяем свойство Children
+                var childrenProperty = member.GetType().GetProperty("Children");
+                if (childrenProperty != null)
+                {
+                    var children = childrenProperty.GetValue(member) as IEnumerable<Member>;
+                    if (children != null)
+                    {
+                        return children;
+                    }
+                }
+
+                // Вариант 3: Если не удалось найти дочерние элементы, возвращаем пустой список
+                _logger.Warn($"Не удалось получить дочерние элементы для тега {member.Name}");
+                return new List<Member>();
             }
             catch (Exception ex)
             {

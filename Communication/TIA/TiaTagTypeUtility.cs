@@ -19,17 +19,18 @@ namespace SiemensTrend.Communication.TIA
 
             string lowerType = dataTypeString.ToLower();
 
+            // Строгое соответствие типам
             if (lowerType.Contains("bool"))
                 return TagDataType.Bool;
-            else if (lowerType.Contains("int") && !lowerType.Contains("dint"))
+            else if (lowerType.Equals("int") || lowerType.Contains("int16") || lowerType.Contains("word"))
                 return TagDataType.Int;
-            else if (lowerType.Contains("dint"))
+            else if (lowerType.Equals("dint") || lowerType.Contains("int32") || lowerType.Contains("dword"))
                 return TagDataType.DInt;
-            else if (lowerType.Contains("real"))
+            else if (lowerType.Contains("real") || lowerType.Contains("float"))
                 return TagDataType.Real;
             else if (lowerType.Contains("string"))
                 return TagDataType.String;
-            else if (lowerType.StartsWith("udt_") || lowerType.Contains("type"))
+            else if (lowerType.StartsWith("udt_") || lowerType.Contains("struct") || lowerType.Contains("udt"))
                 return TagDataType.UDT;
             else
                 return TagDataType.Other;

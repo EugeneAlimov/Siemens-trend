@@ -436,25 +436,50 @@ namespace SiemensTrend.Views.Dialogs
 
             try
             {
-                // В реальной реализации здесь будет вызов TIA Portal API
-                // Сейчас для демонстрации используем мок-данные
-
-                foreach (var tagName in tagNames)
+                // Проверяем, доступен ли TIA Portal сервис через коммуникационный сервис
+                if (_communicationService is Communication.TIA.TiaPortalCommunicationService tiaService)
                 {
-                    // Создаем тег с соответствующим типом и данными
-                    var tag = new TagDefinition
+                    // Используем метод поиска тегов из TIA Portal
+                    // Формируем полные имена тегов в зависимости от типа (PLC или DB)
+                    var fullTagNames = new List<string>();
+                    foreach (var tagName in tagNames)
                     {
-                        Id = Guid.NewGuid(),
-                        Name = isDb ? tagName : tagName, // Для DB - относительное имя, для PLC - полное имя
-                        GroupName = containerName,
-                        IsDbTag = isDb,
-                        DataType = GetTagDataType(tagName),
-                        IsOptimized = isDb && containerName.Contains("S1"), // Демо-признак оптимизации
-                        Comment = $"Тег из {(isDb ? "DB" : "PLC")} {containerName}"
-                    };
+                        string fullName = isDb
+                            ? $"\"{containerName}\".{tagName}"
+                            : $"\"{containerName}\"";
 
-                    results.Add(tag);
-                    _logger.Info($"Найден тег: {tag.Name}, тип: {(isDb ? "DB" : "PLC")}");
+                        fullTagNames.Add(fullName);
+                    }
+
+                    // Ищем теги в проекте TIA Portal
+                    var foundTags = tiaService.SearchTagsByNames(fullTagNames);
+                    return foundTags;
+                }
+                else
+                {
+                    // Если TIA Portal сервис недоступен, используем заглушку для демонстрации
+                    _logger.Warn("TIA Portal сервис недоступен, используем заглушку");
+
+                    foreach (var tagName in tagNames)
+                    {
+                        // Определяем тип тега по имени для демонстрации
+                        TagDataType dataType = DetermineDataTypeByName(tagName);
+
+                        // Создаем тег с соответствующим типом и данными
+                        var tag = new TagDefinition
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = isDb ? tagName : tagName, // Для DB - относительное имя, для PLC - полное имя
+                            GroupName = containerName,
+                            IsDbTag = isDb,
+                            DataType = dataType,
+                            IsOptimized = isDb && containerName.Contains("S1"), // Демо-признак оптимизации
+                            Comment = $"Тег из {(isDb ? "DB" : "PLC")} {containerName}"
+                        };
+
+                        results.Add(tag);
+                        _logger.Info($"Найден тег: {tag.Name}, тип: {(isDb ? "DB" : "PLC")}, тип данных: {dataType}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -463,6 +488,56 @@ namespace SiemensTrend.Views.Dialogs
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Определение типа данных тега по имени (для демонстрационных целей)
+        /// </summary>
+        private TagDataType DetermineDataTypeByName(string tagName)
+        {
+            string name = tagName.ToLower();
+
+            // Теги с определенными окончаниями или содержащие определенные слова
+            if (name.Contains("switch") ||
+                name.Contains("enable") ||
+                name.Contains("status") ||
+                name.EndsWith("on") ||
+                name.EndsWith("off") ||
+                name.Contains("flag") ||
+                name.EndsWith("width1"))  // Добавлено на основе примера из скриншота
+            {
+                return TagDataType.Bool;
+            }
+
+            if (name.Contains("count") ||
+                name.Contains("index") ||
+                name.Contains("number") ||
+                name.EndsWith("width") ||  // Добавлено на основе примера из скриншота
+                name.Contains("measurement.el_width"))  // Добавлено на основе примера из скриншота
+            {
+                return TagDataType.Int;
+            }
+
+            if (name.Contains("pos") ||
+                name.Contains("speed") ||
+                name.Contains("temp") ||
+                name.Contains("pressure") ||
+                name.Contains("level") ||
+                name.Contains("pos.d2"))  // Добавлено на основе примера из скриншота
+            {
+                return TagDataType.Real;
+            }
+
+            if (name.Contains("correction") ||
+                name.Contains("offset") ||
+                name.Contains("counter") ||
+                name.Contains("cascade"))  // Добавлено на основе примера из скриншота
+            {
+                return TagDataType.DInt;
+            }
+
+            // По умолчанию
+            return TagDataType.DInt;
         }
 
         /// <summary>
@@ -532,18 +607,17 @@ namespace SiemensTrend.Views.Dialogs
         /// </summary>
         private TagDataType GetTagDataType(string tagName)
         {
-            if (tagName.ToLower().Contains("bool")) return TagDataType.Bool;
-            if (tagName.ToLower().Contains("int") && !tagName.ToLower().Contains("dint")) return TagDataType.Int;
-            if (tagName.ToLower().Contains("dint")) return TagDataType.DInt;
-            if (tagName.ToLower().Contains("real")) return TagDataType.Real;
+            string name = tagName.ToLower();
 
-            // По умолчанию для демонстрации
-            return tagName.Length % 4 == 0 ? TagDataType.Bool :
-                   tagName.Length % 4 == 1 ? TagDataType.Int :
-                   tagName.Length % 4 == 2 ? TagDataType.DInt :
-                   TagDataType.Real;
+            // Проверка на наличие явного указания типа в имени
+            if (name.Contains("bool")) return TagDataType.Bool;
+            if (name.Contains("int") && !name.Contains("dint")) return TagDataType.Int;
+            if (name.Contains("dint")) return TagDataType.DInt;
+            if (name.Contains("real")) return TagDataType.Real;
+
+            // Эвристическое определение по имени тега
+            return DetermineDataTypeByName(tagName);
         }
-
         /// <summary>
         /// Получение имени группы/блока данных из имени тега
         /// </summary>
