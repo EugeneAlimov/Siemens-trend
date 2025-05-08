@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Windows.Media.Animation;
 using Siemens.Engineering;
+using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
@@ -74,7 +76,11 @@ namespace SiemensTrend.Communication.TIA
                     _logger.Info($"Поиск тегов в контейнере {containerName}");
 
                     // Определяем тип контейнера (DB или таблица тегов)
-                    bool isDbContainer = IsDbContainer(containerName);
+                    // Проверяем, является ли контейнер блоком данных
+                    var parsedTag = ParseTagName(tagNames[0]); // Используем первый тег для определения типа
+                    bool isDbContainer = parsedTag.IsDB;
+
+                    _logger.Info($"Контейнер {containerName} является {(isDbContainer ? "блоком данных" : "таблицей тегов")}");
 
                     if (isDbContainer)
                     {
@@ -133,6 +139,7 @@ namespace SiemensTrend.Communication.TIA
 
                 if (!string.IsNullOrEmpty(parsedTag.Container))
                 {
+                    // Используем оригинальное имя контейнера с кавычками, если они есть
                     if (!result.ContainsKey(parsedTag.Container))
                     {
                         result[parsedTag.Container] = new List<string>();
@@ -167,7 +174,6 @@ namespace SiemensTrend.Communication.TIA
 
             return result;
         }
-
         /// <summary>
         /// Определение типа контейнера
         /// </summary>
@@ -239,8 +245,11 @@ namespace SiemensTrend.Communication.TIA
 
                     if (startQuoteIndex >= 0 && endQuoteIndex > startQuoteIndex)
                     {
-                        // Извлекаем имя контейнера (без кавычек)
-                        result.Container = fullTagName.Substring(startQuoteIndex + 1, endQuoteIndex - startQuoteIndex - 1);
+                        // Извлекаем имя контейнера (с кавычками)
+                        result.Container = fullTagName.Substring(startQuoteIndex, endQuoteIndex - startQuoteIndex + 1);
+
+                        // Также сохраняем имя контейнера без кавычек для удобства
+                        string containerNameWithoutQuotes = fullTagName.Substring(startQuoteIndex + 1, endQuoteIndex - startQuoteIndex - 1);
 
                         // Проверяем, есть ли что-то после закрывающей кавычки
                         if (fullTagName.Length > endQuoteIndex + 1)
@@ -251,7 +260,7 @@ namespace SiemensTrend.Communication.TIA
                                 // Это формат DB - есть путь после контейнера
                                 result.IsDB = true;
                                 result.TagName = fullTagName.Substring(endQuoteIndex + 2); // Пропускаем кавычку и точку
-                                _logger.Info($"Распознан тег DB: контейнер={result.Container}, тег={result.TagName}");
+                                _logger.Info($"Распознан тег DB: контейнер={containerNameWithoutQuotes}, тег={result.TagName}");
                             }
                             else
                             {
@@ -264,9 +273,9 @@ namespace SiemensTrend.Communication.TIA
                         else
                         {
                             // Только имя контейнера в кавычках - это PLC тег
-                            _logger.Info($"Распознан тег PLC: контейнер={result.Container}");
+                            _logger.Info($"Распознан тег PLC: контейнер={containerNameWithoutQuotes}");
                             // Для PLC тегов в этом формате TagName остается равным имени контейнера
-                            result.TagName = result.Container;
+                            result.TagName = containerNameWithoutQuotes;
                             result.IsDB = false;
                         }
                     }
@@ -311,7 +320,6 @@ namespace SiemensTrend.Communication.TIA
 
             return result;
         }
-
         /// <summary>
         /// Получение имени типа данных для члена
         /// </summary>
@@ -401,27 +409,31 @@ namespace SiemensTrend.Communication.TIA
 
             try
             {
+                // Удаляем кавычки из имени блока, если они есть
+                string cleanDbName = dbName.Trim('"');
+                _logger.Info($"Поиск тегов в контейнере {cleanDbName} (исходное имя: {dbName})");
+
                 // Находим блок данных в проекте TIA Portal
                 var db = FindDataBlock(dbName);
 
                 if (db == null)
                 {
-                    _logger.Warn($"Блок данных {dbName} не найден");
+                    _logger.Warn($"Блок данных {cleanDbName} не найден");
                     return results;
                 }
 
-                _logger.Info($"Найден блок данных {dbName}");
+                _logger.Info($"Найден блок данных {cleanDbName}");
 
                 // Проверяем, оптимизирован ли блок данных
                 bool isOptimized = IsDataBlockOptimized(db);
-                _logger.Info($"Блок данных {dbName} оптимизирован: {isOptimized}");
+                _logger.Info($"Блок данных {cleanDbName} оптимизирован: {isOptimized}");
 
                 // Для каждого пути к тегу
                 foreach (string tagPath in tagPaths)
                 {
                     try
                     {
-                        _logger.Info($"Поиск тега {tagPath} в блоке данных {dbName}");
+                        _logger.Info($"Поиск тега {tagPath} в блоке данных {cleanDbName}");
 
                         // Находим тег по пути
                         var tagMember = FindTagMemberInDataBlock(db, tagPath);
@@ -430,33 +442,33 @@ namespace SiemensTrend.Communication.TIA
                         {
                             // Получаем тип данных
                             string dataTypeName = GetMemberDataTypeName(tagMember);
-                            _logger.Info($"Найден тег {tagPath} в блоке данных {dbName}, тип данных: {dataTypeName}");
+                            _logger.Info($"Найден тег {tagPath} в блоке данных {cleanDbName}, тип данных: {dataTypeName}");
 
                             // Создаем объект TagDefinition
                             var tagDefinition = new TagDefinition
                             {
                                 Id = Guid.NewGuid(),
                                 Name = tagPath,
-                                GroupName = dbName,
+                                GroupName = cleanDbName,
                                 IsDbTag = true,
                                 IsOptimized = isOptimized,
-                                DataType = GetTagDataType(dataTypeName, tagPath, dbName),
+                                DataType = GetTagDataType(dataTypeName, tagPath, cleanDbName),
                                 Comment = tagMember.GetAttribute("Comment")?.ToString()
                             };
 
                             // Добавляем тег в результаты
                             results.Add(tagDefinition);
 
-                            _logger.Info($"Тег добавлен в результаты: {dbName}.{tagPath} с типом данных {tagDefinition.DataType}");
+                            _logger.Info($"Тег добавлен в результаты: {cleanDbName}.{tagPath} с типом данных {tagDefinition.DataType}");
                         }
                         else
                         {
-                            _logger.Warn($"Тег {tagPath} не найден в блоке данных {dbName}");
+                            _logger.Warn($"Тег {tagPath} не найден в блоке данных {cleanDbName}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.Error($"Ошибка при поиске тега {tagPath} в блоке данных {dbName}: {ex.Message}");
+                        _logger.Error($"Ошибка при поиске тега {tagPath} в блоке данных {cleanDbName}: {ex.Message}");
                     }
                 }
             }
@@ -542,51 +554,80 @@ namespace SiemensTrend.Communication.TIA
         /// <summary>
         /// Метод для нахождения блока данных по имени
         /// </summary>
-        private PlcBlock FindDataBlock(string dbName)
-        {
-            try
-            {
-                _logger.Info($"Поиск блока данных {dbName} в проекте");
+        //private PlcBlock FindDataBlock(string dbName)
+        //{
+        //    try
+        //    {
+        //        // Удаляем кавычки из имени блока, если они есть
+        //        string cleanDbName = dbName.Trim('"');
+        //        _logger.Info($"Поиск блока данных {cleanDbName} в проекте (исходное имя: {dbName})");
 
-                // Ищем во всех PLC устройствах проекта
-                foreach (var device in _tiaPortal.Projects.First().Devices)
-                {
-                    // Проверяем только устройства PLC
-                    foreach (var deviceItem in device.DeviceItems)
-                    {
-                        var softwareContainer = deviceItem.GetService<SoftwareContainer>();
-                        if (softwareContainer != null)
-                        {
-                            var plcSoftware = softwareContainer.Software as PlcSoftware;
-                            if (plcSoftware != null)
-                            {
-                                _logger.Info($"Проверка блоков данных в устройстве {device.Name}, элемент {deviceItem.Name}");
+        //        // Ищем во всех PLC устройствах проекта
+        //        foreach (var device in _tiaPortal.Projects.First().Devices)
+        //        {
+        //            // Проверяем только устройства PLC
+        //            foreach (var deviceItem in device.DeviceItems)
+        //            {
+        //                var softwareContainer = deviceItem.GetService<SoftwareContainer>();
+        //                if (softwareContainer != null)
+        //                {
+        //                    var plcSoftware = softwareContainer.Software as PlcSoftware;
+        //                    if (plcSoftware != null)
+        //                    {
+        //                        _logger.Info($"Проверка блоков данных в устройстве {device.Name}, элемент {deviceItem.Name}");
 
-                                // Ищем блок данных по имени
-                                foreach (var block in plcSoftware.BlockGroup.Blocks)
-                                {
-                                    if (block is PlcBlock plcBlock &&
-                                        string.Equals(plcBlock.Name, dbName, StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        _logger.Info($"Найден блок данных {dbName}");
-                                        return plcBlock;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        //                        // Логируем все доступные блоки для отладки
+        //                        _logger.Info("Список доступных блоков в устройстве:");
+        //                        foreach (var block in plcSoftware.BlockGroup.Blocks)
+        //                        {
+        //                            if (block is PlcBlock plcBlock)
+        //                            {
+        //                                _logger.Info($"  - Блок: {plcBlock.Name}, Тип: {plcBlock.ProgrammingLanguage}");
+        //                            }
+        //                        }
 
-                _logger.Warn($"Блок данных {dbName} не найден в проекте");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Ошибка при поиске блока данных {dbName}: {ex.Message}");
-            }
+        //                        // Ищем блок данных по имени с несколькими вариантами сопоставления
+        //                        foreach (var block in plcSoftware.BlockGroup.Blocks)
+        //                        {
+        //                            if (block is PlcBlock plcBlock && plcBlock.ProgrammingLanguage == Siemens.Engineering.SW.Blocks.ProgrammingLanguage.DB)
+        //                            {
+        //                                // Проверка по полному точному имени
+        //                                if (string.Equals(plcBlock.Name, cleanDbName, StringComparison.OrdinalIgnoreCase) ||
+        //                                    string.Equals(plcBlock.Name, dbName, StringComparison.OrdinalIgnoreCase))
+        //                                {
+        //                                    _logger.Info($"Найден блок данных {plcBlock.Name} по точному имени");
+        //                                    return plcBlock;
+        //                                }
 
-            return null;
-        }
+        //                                // Проверка по имени, игнорируя номер DB
+        //                                if (plcBlock.Name.StartsWith(cleanDbName + " [DB", StringComparison.OrdinalIgnoreCase))
+        //                                {
+        //                                    _logger.Info($"Найден блок данных {plcBlock.Name} по началу имени");
+        //                                    return plcBlock;
+        //                                }
 
+        //                                // Проверка, входит ли имя как часть полного имени блока
+        //                                if (plcBlock.Name.IndexOf(cleanDbName, StringComparison.OrdinalIgnoreCase) >= 0)
+        //                                {
+        //                                    _logger.Info($"Найден блок данных {plcBlock.Name}, содержащий '{cleanDbName}' в имени");
+        //                                    return plcBlock;
+        //                                }
+        //                            }
+        //                        }
+        //                    }
+        //                }
+        //            }
+        //        }
+
+        //        _logger.Warn($"Блок данных {cleanDbName} не найден в проекте");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.Error($"Ошибка при поиске блока данных {dbName}: {ex.Message}");
+        //    }
+
+        //    return null;
+        //}
         /// <summary>
         /// Метод для нахождения таблицы PLC тегов по имени
         /// </summary>
@@ -774,6 +815,187 @@ namespace SiemensTrend.Communication.TIA
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Метод для нахождения блока данных по имени с расширенным поиском
+        /// </summary>
+        private PlcBlock FindDataBlock(string dbName)
+        {
+            try
+            {
+                // Удаляем кавычки из имени блока, если они есть
+                string cleanDbName = dbName.Trim('"');
+                _logger.Info($"Расширенный поиск блока данных {cleanDbName} в проекте (исходное имя: {dbName})");
+
+                // Получаем список всех устройств в проекте
+                var devices = _tiaPortal.Projects.First().Devices;
+                _logger.Info($"Найдено устройств в проекте: {devices.Count}");
+
+                // Перебираем все устройства
+                foreach (var device in devices)
+                {
+                    _logger.Info($"Устройство: {device.Name}, Тип: {device.TypeIdentifier}");
+
+                    // Получаем все DeviceItems
+                    var allDeviceItems = GetAllDeviceItems(device);
+                    _logger.Info($"Найдено элементов устройства: {allDeviceItems.Count}");
+
+                    // Перебираем все DeviceItems
+                    foreach (var deviceItem in allDeviceItems)
+                    {
+                        try
+                        {
+                            _logger.Info($"Проверка элемента устройства: {deviceItem.Name}");
+
+                            // Получаем SoftwareContainer
+                            var softwareContainer = deviceItem.GetService<SoftwareContainer>();
+                            if (softwareContainer != null)
+                            {
+                                _logger.Info("Найден SoftwareContainer");
+
+                                // Получаем PlcSoftware
+                                var plcSoftware = softwareContainer.Software as PlcSoftware;
+                                if (plcSoftware != null)
+                                {
+                                    _logger.Info("Найден PlcSoftware");
+
+                                    // Получаем все блоки рекурсивно, включая вложенные группы
+                                    var allBlocks = GetAllBlocksRecursively(plcSoftware.BlockGroup);
+                                    _logger.Info($"Всего найдено блоков: {allBlocks.Count}");
+
+                                    // Логируем все найденные блоки
+                                    _logger.Info("Список всех доступных блоков:");
+                                    foreach (var block in allBlocks)
+                                    {
+                                        if (block is PlcBlock plcBlock)
+                                        {
+                                            string blockType = plcBlock.ProgrammingLanguage.ToString();
+                                            _logger.Info($"  - Блок: {plcBlock.Name}, Тип: {blockType}");
+                                        }
+                                    }
+
+                                    // Поиск блока данных по имени
+                                    foreach (var block in allBlocks)
+                                    {
+                                        if (block is PlcBlock plcBlock)
+                                        {
+                                            // Проверяем, является ли блок блоком данных (DB)
+                                            bool isDataBlock = plcBlock.ProgrammingLanguage == Siemens.Engineering.SW.Blocks.ProgrammingLanguage.DB;
+
+                                            if (isDataBlock)
+                                            {
+                                                _logger.Info($"Проверка блока данных: {plcBlock.Name}");
+
+                                                // Проверка по полному точному имени
+                                                if (string.Equals(plcBlock.Name, cleanDbName, StringComparison.OrdinalIgnoreCase) ||
+                                                    string.Equals(plcBlock.Name, dbName, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    _logger.Info($"Найден блок данных {plcBlock.Name} по точному имени");
+                                                    return plcBlock;
+                                                }
+
+                                                // Проверка по частичному имени (без номера DB)
+                                                if (plcBlock.Name.StartsWith(cleanDbName + " [DB", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    _logger.Info($"Найден блок данных {plcBlock.Name}, начинающийся с '{cleanDbName} [DB'");
+                                                    return plcBlock;
+                                                }
+
+                                                // Проверка по имени без пробела перед [DB]
+                                                if (plcBlock.Name.StartsWith(cleanDbName + "[DB", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    _logger.Info($"Найден блок данных {plcBlock.Name}, начинающийся с '{cleanDbName}[DB'");
+                                                    return plcBlock;
+                                                }
+
+                                                // Проверка по началу имени
+                                                if (plcBlock.Name.StartsWith(cleanDbName, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    _logger.Info($"Найден блок данных {plcBlock.Name}, начинающийся с '{cleanDbName}'");
+                                                    return plcBlock;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Error($"Ошибка при проверке элемента устройства {deviceItem.Name}: {ex.Message}");
+                        }
+                    }
+                }
+
+                _logger.Warn($"Блок данных {cleanDbName} не найден в проекте после расширенного поиска");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при поиске блока данных {dbName}: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Получает рекурсивно все элементы устройства, включая вложенные
+        /// </summary>
+        private List<DeviceItem> GetAllDeviceItems(Device device)
+        {
+            List<DeviceItem> result = new List<DeviceItem>();
+
+            // Получаем элементы устройства на верхнем уровне
+            foreach (var item in device.DeviceItems)
+            {
+                result.Add(item);
+
+                // Добавляем вложенные элементы рекурсивно
+                result.AddRange(GetNestedDeviceItems(item));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Получает рекурсивно все вложенные элементы устройства
+        /// </summary>
+        private List<DeviceItem> GetNestedDeviceItems(DeviceItem deviceItem)
+        {
+            List<DeviceItem> result = new List<DeviceItem>();
+
+            // Получаем вложенные элементы устройства
+            foreach (var item in deviceItem.DeviceItems)
+            {
+                result.Add(item);
+
+                // Добавляем вложенные элементы рекурсивно
+                result.AddRange(GetNestedDeviceItems(item));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Получает рекурсивно все блоки, включая вложенные группы
+        /// </summary>
+        private List<IBlock> GetAllBlocksRecursively(IBlockGroup blockGroup)
+        {
+            List<IBlock> result = new List<IBlock>();
+
+            // Добавляем блоки из текущей группы
+            foreach (var block in blockGroup.Blocks)
+            {
+                result.Add(block);
+            }
+
+            // Добавляем блоки из вложенных групп
+            foreach (var group in blockGroup.Groups)
+            {
+                result.AddRange(GetAllBlocksRecursively(group));
+            }
+
+            return result;
         }
     }
 }

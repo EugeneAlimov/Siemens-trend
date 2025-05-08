@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -201,9 +200,6 @@ namespace SiemensTrend.Views.Dialogs
         /// <summary>
         /// Обработчик клика по кнопке "Добавить"
         /// </summary>
-        /// <summary>
-        /// Обработчик клика по кнопке "Добавить"
-        /// </summary>
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
             // Приводим коммуникационный сервис к TiaPortalCommunicationService
@@ -245,71 +241,53 @@ namespace SiemensTrend.Views.Dialogs
                 progressWindow.Owner = this;
                 progressWindow.Show();
 
-                // Запускаем поиск в отдельном потоке
-                var dispatcher = Dispatcher.CurrentDispatcher;
-
-                Task.Run(() =>
+                try
                 {
-                    try
+                    _logger.Info($"Начало поиска тегов: {string.Join(", ", tagNames)}");
+
+                    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ВЫ ДОЛЖНЫ ВЫПОЛНЯТЬ ПОИСК В ОСНОВНОМ ПОТОКЕ
+                    // Выполняем поиск тегов прямо здесь, без использования Task.Run
+                    // Это критически важно для работы с TIA Portal Openness API
+                    var foundTags = tiaService.SearchTagsByNames(tagNames);
+
+                    _logger.Info($"Поиск завершен, найдено {foundTags.Count} тегов");
+
+                    // Закрываем окно прогресса
+                    progressWindow.Close();
+
+                    // Сохраняем найденные теги
+                    FoundTags = foundTags;
+
+                    // Проверяем результаты
+                    if (FoundTags.Count == 0)
                     {
-                        _logger.Info($"Начало поиска тегов: {string.Join(", ", tagNames)}");
-
-                        // Вызываем метод поиска тегов из сервиса TIA Portal
-                        var foundTags = tiaService.SearchTagsByNames(tagNames);
-
-                        _logger.Info($"Поиск завершен, найдено {foundTags.Count} тегов");
-
-                        // Возвращаемся в UI поток
-                        dispatcher.Invoke(() =>
-                        {
-                            // Закрываем окно прогресса
-                            progressWindow.Close();
-
-                            // Сохраняем найденные теги
-                            FoundTags = foundTags;
-
-                            // Проверяем результаты
-                            if (FoundTags.Count == 0)
-                            {
-                                MessageBox.Show("Не удалось найти ни один из введенных тегов. Проверьте правильность имен тегов.",
-                                    "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
-                                return;
-                            }
-
-                            // Если найдены не все теги, показываем предупреждение
-                            if (FoundTags.Count < tagNames.Count)
-                            {
-                                MessageBox.Show($"Найдено {FoundTags.Count} из {tagNames.Count} тегов. " +
-                                    "Проверьте правильность имен ненайденных тегов.",
-                                    "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
-                            }
-
-                            // Закрываем диалог с успешным результатом
-                            DialogResult = true;
-                            Close();
-                        });
+                        MessageBox.Show("Не удалось найти ни один из введенных тегов. Проверьте правильность имен тегов.",
+                            "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
                     }
-                    catch (Exception ex)
+
+                    // Если найдены не все теги, показываем предупреждение
+                    if (FoundTags.Count < tagNames.Count)
                     {
-                        dispatcher.Invoke(() =>
-                        {
-                            // Закрываем окно прогресса
-                            progressWindow.Close();
+                        MessageBox.Show($"Найдено {FoundTags.Count} из {tagNames.Count} тегов. " +
+                            "Проверьте правильность имен ненайденных тегов.",
+                            "Результат", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
 
-                            // Показываем ошибку
-                            _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
-                            MessageBox.Show($"Ошибка при поиске тегов: {ex.Message}",
-                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                        });
-                    }
-                    finally
-                    {
-                        dispatcher.Invoke(() =>
-                        {
-                            Mouse.OverrideCursor = null;
-                        });
-                    }
-                });
+                    // Закрываем диалог с успешным результатом
+                    DialogResult = true;
+                    Close();
+                }
+                catch (Exception ex)
+                {
+                    // Закрываем окно прогресса
+                    progressWindow.Close();
+
+                    // Показываем ошибку
+                    _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
+                    MessageBox.Show($"Ошибка при поиске тегов: {ex.Message}",
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
             catch (Exception ex)
             {
@@ -317,6 +295,10 @@ namespace SiemensTrend.Views.Dialogs
                 _logger.Error($"Ошибка при запуске поиска тегов: {ex.Message}");
                 MessageBox.Show($"Ошибка при запуске поиска тегов: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
             }
         }
     }
