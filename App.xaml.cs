@@ -72,16 +72,12 @@ namespace SiemensTrend
             services.AddSingleton<TagManager>(tagManager);
 
             // Создаем и регистрируем ICommunicationService
-            var communicationService = new Communication.S7.S7CommunicationService(
-                _logger,
-                new Communication.S7.S7ConnectionParameters
-                {
-                    IpAddress = "127.0.0.1" // Значение по умолчанию
-                });
-            services.AddSingleton<ICommunicationService>(communicationService);
-
-            // Создаем экземпляр TiaPortalCommunicationService
             var tiaService = new Communication.TIA.TiaPortalCommunicationService(_logger);
+            services.AddSingleton<ICommunicationService>(tiaService);
+
+            // Регистрируем адаптер для TIA Portal
+            services.AddSingleton<Communication.TIA.TiaPortalServiceAdapter>(sp =>
+                new Communication.TIA.TiaPortalServiceAdapter(sp.GetRequiredService<ICommunicationService>(), _logger));
 
             // Регистрируем ChartViewModel
             services.AddSingleton<ChartViewModel>();
@@ -95,7 +91,10 @@ namespace SiemensTrend
             // Создаем провайдер сервисов
             _serviceProvider = services.BuildServiceProvider();
         }
-
+        
+        /// <summary>
+        /// Инициализация Assembly Resolver для Siemens.Engineering.dll
+        /// </summary>
         private void InitializeAssemblyResolver()
         {
             try

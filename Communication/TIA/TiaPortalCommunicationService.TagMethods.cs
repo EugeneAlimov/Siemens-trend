@@ -40,6 +40,10 @@ namespace SiemensTrend.Communication.TIA
             catch (Exception ex)
             {
                 _logger.Error($"Ошибка при поиске тегов: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
                 return new List<TagDefinition>();
             }
         }
@@ -279,8 +283,6 @@ namespace SiemensTrend.Communication.TIA
                 return new List<Siemens.Engineering.SW.Blocks.Interface.Member>();
             }
         }
-
-
 
         /// <summary>
         /// Интерфейс для доступа к иерархии Member (определяется в зависимости от API)

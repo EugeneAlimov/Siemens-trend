@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using SiemensTrend.Communication;
 using SiemensTrend.Communication.TIA;
+using SiemensTrend.Core.Logging;
+using SiemensTrend.Storage.TagManagement;
 
 namespace SiemensTrend.ViewModels
 {
@@ -12,13 +16,12 @@ namespace SiemensTrend.ViewModels
         /// <summary>
         /// Список проектов TIA Portal для выбора
         /// </summary>
-        public List<TiaProjectInfo> TiaProjects { get; private set; }
+        public List<TiaProjectInfo> TiaProjects { get; private set; } = new List<TiaProjectInfo>();
 
         /// <summary>
         /// Соединение с TIA Portal
         /// </summary>
         /// <returns>True если подключение успешно</returns>
-
         public bool ConnectToTiaPortal()
         {
             try
@@ -27,24 +30,14 @@ namespace SiemensTrend.ViewModels
                 StatusMessage = "Проверка запущенных экземпляров TIA Portal...";
                 ProgressValue = 10;
 
-                // Создаем сервис TIA Portal только если его еще нет
-                if (_tiaPortalService == null)
-                {
-                    _logger.Info("Создание экземпляра TiaPortalCommunicationService");
-                    _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
-                    _logger.Info("Экземпляр TiaPortalCommunicationService создан успешно");
-                }
-                else
-                {
-                    _logger.Info("Используется существующий экземпляр TiaPortalCommunicationService");
-                }
+                _logger.Info("Запрос подключения к TIA Portal через адаптер");
 
                 // Получаем список открытых проектов
                 StatusMessage = "Получение списка открытых проектов...";
                 _logger.Info("Запрос списка открытых проектов");
 
-                // ВАЖНО: используем синхронные вызовы для TIA Portal API
-                List<Communication.TIA.TiaProjectInfo> openProjects = _tiaPortalService.GetOpenProjects();
+                // ВАЖНО: используем синхронные вызовы для TIA Portal API через адаптер
+                List<TiaProjectInfo> openProjects = _tiaAdapter.GetOpenProjects();
                 _logger.Info($"Получено {openProjects.Count} открытых проектов");
                 ProgressValue = 50;
 
@@ -91,7 +84,7 @@ namespace SiemensTrend.ViewModels
         /// </summary>
         /// <param name="projectInfo">Информация о проекте</param>
         /// <returns>True если подключение успешно</returns>
-        public bool ConnectToSpecificTiaProject(Communication.TIA.TiaProjectInfo projectInfo)
+        public bool ConnectToSpecificTiaProject(TiaProjectInfo projectInfo)
         {
             try
             {
@@ -106,15 +99,8 @@ namespace SiemensTrend.ViewModels
                 _logger.Info($"ConnectToSpecificTiaProject: Подключение к проекту {projectInfo.Name}");
                 ProgressValue = 60;
 
-                // Создаем сервис TIA Portal только если его еще нет
-                if (_tiaPortalService == null)
-                {
-                    _logger.Info("ConnectToSpecificTiaProject: Создание экземпляра TiaPortalCommunicationService");
-                    _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
-                }
-
-                // ВАЖНО: Выполняем ConnectToProject синхронно в текущем STA-потоке
-                bool result = _tiaPortalService.ConnectToProject(projectInfo);
+                // Используем адаптер для подключения к проекту
+                bool result = _tiaAdapter.ConnectToSpecificTiaProject(projectInfo);
 
                 if (result)
                 {
@@ -174,13 +160,6 @@ namespace SiemensTrend.ViewModels
                 _logger.Info($"OpenTiaProject: Открытие проекта {projectPath}");
                 ProgressValue = 20;
 
-                // Создаем сервис TIA Portal только если его еще нет
-                if (_tiaPortalService == null)
-                {
-                    _logger.Info("OpenTiaProject: Создание экземпляра TiaPortalCommunicationService");
-                    _tiaPortalService = new Communication.TIA.TiaPortalCommunicationService(_logger);
-                }
-
                 // Предупреждаем пользователя о длительной операции
                 StatusMessage = "Открытие проекта TIA Portal. Это может занять некоторое время...";
                 ProgressValue = 30;
@@ -190,11 +169,9 @@ namespace SiemensTrend.ViewModels
                     _logger.Info("OpenTiaProject: Показываем индикатор прогресса");
                 });
 
-                // ВАЖНО: Открытие проекта выполняем синхронно
-                // Это может занять длительное время, но выполняется в текущем STA-потоке
-                // В MainWindow этот метод должен вызываться в обработчике события нажатия кнопки
+                // Открытие проекта через адаптер
                 _logger.Info("OpenTiaProject: Начинаем открытие проекта");
-                bool result = _tiaPortalService.OpenProjectSync(projectPath);
+                bool result = _tiaAdapter.OpenTiaProject(projectPath);
                 _logger.Info($"OpenTiaProject: Результат открытия проекта: {result}");
 
                 // Обрабатываем результат и обновляем UI
@@ -202,12 +179,11 @@ namespace SiemensTrend.ViewModels
                     if (result)
                     {
                         // Успешное открытие
-                        string projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath);
+                        string projectName = Path.GetFileNameWithoutExtension(projectPath);
                         StatusMessage = $"Проект TIA Portal открыт успешно: {projectName}";
                         _logger.Info($"OpenTiaProject: Проект успешно открыт: {projectName}");
                         ProgressValue = 100;
                         IsConnected = true;  // Важно: явно устанавливаем этот флаг!
-
                     }
                     else
                     {

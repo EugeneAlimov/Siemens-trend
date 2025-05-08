@@ -40,6 +40,21 @@ namespace SiemensTrend.Views.Dialogs
 
             // Добавляем первое поле ввода в список
             _tagInputs.Add(txtTag1);
+
+            // Логируем тип сервиса
+            _logger.Info($"AddTagsDialog: Инициализация с сервисом типа {_communicationService.GetType().FullName}");
+
+            // Проверка типа сервиса
+            if (_communicationService is Communication.TIA.TiaPortalCommunicationService tiaService)
+            {
+                _logger.Info($"AddTagsDialog: Сервис является TiaPortalCommunicationService");
+                _logger.Info($"AddTagsDialog: Состояние подключения - IsConnected: {tiaService.IsConnected}");
+            }
+            else
+            {
+                _logger.Warn($"AddTagsDialog: Передан сервис типа {_communicationService.GetType().Name}, " +
+                              "который не является TiaPortalCommunicationService");
+            }
         }
 
         /// <summary>
@@ -186,21 +201,23 @@ namespace SiemensTrend.Views.Dialogs
         /// <summary>
         /// Обработчик клика по кнопке "Добавить"
         /// </summary>
+        /// <summary>
+        /// Обработчик клика по кнопке "Добавить"
+        /// </summary>
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
-            // Проверка, что сервис подключения - это именно TIA Portal
-            var tiaService = _communicationService as Communication.TIA.TiaPortalCommunicationService;
-            if (tiaService == null)
+            // Приводим коммуникационный сервис к TiaPortalCommunicationService
+            if (!(_communicationService is Communication.TIA.TiaPortalCommunicationService tiaService))
             {
-                MessageBox.Show("Необходимо подключение к TIA Portal. Подключитесь перед добавлением тегов.",
-                    "Нет подключения", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Необходимо подключение к TIA Portal. Используется неподдерживаемый тип сервиса.",
+                    "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // Проверка, что есть активное подключение
-            if (tiaService.CurrentProject == null)
+            // Проверка подключения
+            if (!tiaService.IsConnected)
             {
-                MessageBox.Show("Отсутствует активное подключение к проекту TIA Portal.",
+                MessageBox.Show("Отсутствует активное подключение к TIA Portal.",
                     "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -235,9 +252,12 @@ namespace SiemensTrend.Views.Dialogs
                 {
                     try
                     {
+                        _logger.Info($"Начало поиска тегов: {string.Join(", ", tagNames)}");
+
                         // Вызываем метод поиска тегов из сервиса TIA Portal
-                        // Используем непосредственно метод сервиса для поиска тегов
                         var foundTags = tiaService.SearchTagsByNames(tagNames);
+
+                        _logger.Info($"Поиск завершен, найдено {foundTags.Count} тегов");
 
                         // Возвращаемся в UI поток
                         dispatcher.Invoke(() =>

@@ -10,6 +10,7 @@ using SiemensTrend.Storage.TagManagement;
 using SiemensTrend.Communication.TIA;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.S7;
+using System.Windows.Threading;
 namespace SiemensTrend.Views
 {
     /// <summary>
@@ -40,7 +41,7 @@ namespace SiemensTrend.Views
         }
 
         /// <summary>
-        /// иии?? ии?? и?
+        /// Конструктор
         /// </summary>
         public MainWindow(Logger logger, MainViewModel viewModel, ICommunicationService communicationService)
         {
@@ -50,6 +51,9 @@ namespace SiemensTrend.Views
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             _communicationService = communicationService ?? throw new ArgumentNullException(nameof(communicationService));
+
+            // Логируем тип коммуникационного сервиса
+            _logger.Info($"MainWindow: Инициализирован с коммуникационным сервисом типа {_communicationService.GetType().FullName}");
 
             // Устанавливаем контекст данных
             DataContext = _viewModel;
@@ -71,187 +75,6 @@ namespace SiemensTrend.Views
             // Обновляем состояние интерфейса
             UpdateConnectionState();
         }
-
-        ///// <summary>
-        ///// Обработчик нажатия кнопки "Добавить тег"
-        ///// </summary>
-        //private void BtnAddTag_Click(object sender, RoutedEventArgs e)
-        //{
-        //    try
-        //    {
-        //        _logger.Info("Вызов диалога добавления тегов");
-
-        //        // Создаем диалог для добавления тегов
-        //        var dialog = new Dialogs.AddTagsDialog(_logger, _communicationService);
-        //        dialog.Owner = this;
-
-        //        // Показываем диалог
-        //        if (dialog.ShowDialog() == true)
-        //        {
-        //            // Получаем найденные теги
-        //            var foundTags = dialog.FoundTags;
-
-        //            if (foundTags != null && foundTags.Count > 0)
-        //            {
-        //                // Добавляем теги в модель
-        //                foreach (var tag in foundTags)
-        //                {
-        //                    _viewModel.AddNewTag(tag);
-        //                }
-
-        //                _logger.Info($"Добавлено {foundTags.Count} тегов");
-        //            }
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.Error($"Ошибка при добавлении тегов: {ex.Message}");
-        //        MessageBox.Show($"Ошибка при добавлении тегов: {ex.Message}",
-        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-        //    }
-        //}
-
-        ///// <summary>
-        ///// Обработчик нажатия кнопки "Редактировать тег"
-        ///// </summary>
-        //private void BtnEditTag_Click(object sender, RoutedEventArgs e)
-        //{
-        //    try
-        //    {
-        //        _logger.Info("BtnEditTag_Click: Вызов диалога редактирования тега");
-
-        //        // Получаем выбранный тег из таблицы PLC или DB
-        //        TagDefinition selectedTag = null;
-
-        //        // Проверяем, есть ли выбранный тег в таблице PLC
-        //        var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
-        //        if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
-        //        {
-        //            selectedTag = plcDataGrid.SelectedItem as TagDefinition;
-        //        }
-
-        //        // Если в таблице PLC ничего не выбрано, проверяем таблицу DB
-        //        if (selectedTag == null)
-        //        {
-        //            var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
-        //            if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
-        //            {
-        //                selectedTag = dbDataGrid.SelectedItem as TagDefinition;
-        //            }
-        //        }
-
-        //        if (selectedTag == null)
-        //        {
-        //            _logger.Warn("BtnEditTag_Click: Не выбран тег для редактирования");
-        //            MessageBox.Show("Пожалуйста, выберите тег для редактирования",
-        //                "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-        //            return;
-        //        }
-
-        //        // Создаем диалог для редактирования тега
-        //        var dialog = new Dialogs.TagEditorDialog(selectedTag);
-        //        dialog.Owner = this;
-
-        //        // Показываем диалог
-        //        if (dialog.ShowDialog() == true)
-        //        {
-        //            // Получаем отредактированный тег
-        //            var updatedTag = dialog.Tag;
-
-        //            // Обновляем тег в модели
-        //            _viewModel.EditTag(selectedTag, updatedTag);
-
-        //            _logger.Info($"BtnEditTag_Click: Отредактирован тег: {updatedTag.Name}");
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.Error($"BtnEditTag_Click: Ошибка: {ex.Message}");
-        //        MessageBox.Show($"Ошибка при редактировании тега: {ex.Message}",
-        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-        //    }
-        //}
-
-        ///// <summary>
-        ///// Обработчик нажатия кнопки "Удалить тег"
-        ///// </summary>
-        //private void BtnRemoveTag_Click(object sender, RoutedEventArgs e)
-        //{
-        //    try
-        //    {
-        //        _logger.Info("BtnRemoveTag_Click: Удаление тега");
-
-        //        // Получаем выбранный тег из таблицы PLC или DB
-        //        TagDefinition selectedTag = null;
-
-        //        // Проверяем, есть ли выбранный тег в таблице PLC
-        //        var plcDataGrid = this.FindName("dgPlcTags") as DataGrid;
-        //        if (plcDataGrid != null && plcDataGrid.SelectedItem is TagDefinition)
-        //        {
-        //            selectedTag = plcDataGrid.SelectedItem as TagDefinition;
-        //        }
-
-        //        // Если в таблице PLC ничего не выбрано, проверяем таблицу DB
-        //        if (selectedTag == null)
-        //        {
-        //            var dbDataGrid = this.FindName("dgDbTags") as DataGrid;
-        //            if (dbDataGrid != null && dbDataGrid.SelectedItem is TagDefinition)
-        //            {
-        //                selectedTag = dbDataGrid.SelectedItem as TagDefinition;
-        //            }
-        //        }
-
-        //        if (selectedTag == null)
-        //        {
-        //            _logger.Warn("BtnRemoveTag_Click: Не выбран тег для удаления");
-        //            MessageBox.Show("Пожалуйста, выберите тег для удаления",
-        //                "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-        //            return;
-        //        }
-
-        //        // Запрос подтверждения
-        //        var result = MessageBox.Show($"Вы уверены, что хотите удалить тег {selectedTag.Name}?",
-        //            "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-        //        if (result == MessageBoxResult.Yes)
-        //        {
-        //            // Удаляем тег из модели
-        //            _viewModel.RemoveTag(selectedTag);
-
-        //            _logger.Info($"BtnRemoveTag_Click: Удален тег: {selectedTag.Name}");
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.Error($"BtnRemoveTag_Click: Ошибка: {ex.Message}");
-        //        MessageBox.Show($"Ошибка при удалении тега: {ex.Message}",
-        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-        //    }
-        //}
-
-        ///// <summary>
-        ///// Обработчик нажатия кнопки "Сохранить теги"
-        ///// </summary>
-        //private void BtnSaveTags_Click(object sender, RoutedEventArgs e)
-        //{
-        //    try
-        //    {
-        //        _logger.Info("BtnSaveTags_Click: Сохранение тегов");
-
-        //        // Сохраняем теги
-        //        _viewModel.SaveTagsToStorage();
-
-        //        _logger.Info("BtnSaveTags_Click: Теги сохранены успешно");
-        //        MessageBox.Show("Теги сохранены успешно",
-        //            "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        _logger.Error($"BtnSaveTags_Click: Ошибка: {ex.Message}");
-        //        MessageBox.Show($"Ошибка при сохранении тегов: {ex.Message}",
-        //            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-        //    }
-        //}
 
         /// <summary>
         /// Обработчик события получения новых данных
@@ -277,6 +100,33 @@ namespace SiemensTrend.Views
         }
 
         /// <summary>
+        /// Переопределяем OnContentRendered для вызова InitializeChart после загрузки UI
+        /// </summary>
+        private void InitializeDurationTimer()
+        {
+            _durationTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+
+            _durationTimer.Tick += (s, e) =>
+            {
+                if (!_isPaused)
+                {
+                    UpdateDuration();
+                }
+            };
+
+            _durationTimer.Start();
+        }
+
+        protected override void OnContentRendered(EventArgs e)
+        {
+            base.OnContentRendered(e);
+            InitializeChart();
+        }
+
+        /// <summary>
         /// Метод инициализации графика
         /// </summary>
         private void InitializeChart()
@@ -290,9 +140,9 @@ namespace SiemensTrend.Views
                 };
 
                 // Подписываемся на событие получения данных от коммуникационного сервиса
-                if (_viewModel._communicationService != null)
+                if (_viewModel.TiaPortalService != null)
                 {
-                    _viewModel._communicationService.DataReceived += CommunicationService_DataReceived;
+                    _viewModel.TiaPortalService.DataReceived += CommunicationService_DataReceived;
                 }
             }
             catch (Exception ex)
@@ -334,9 +184,9 @@ namespace SiemensTrend.Views
             base.OnClosing(e);
 
             // Отписываемся от событий
-            if (_viewModel._communicationService != null)
+            if (_communicationService != null)
             {
-                _viewModel._communicationService.DataReceived -= CommunicationService_DataReceived;
+                _communicationService.DataReceived -= CommunicationService_DataReceived;
             }
         }
     }

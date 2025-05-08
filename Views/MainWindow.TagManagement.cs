@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows;
+using SiemensTrend.Communication;
 using SiemensTrend.Core.Models;
 using SiemensTrend.Views.Dialogs;
 
@@ -13,6 +14,9 @@ namespace SiemensTrend.Views
         /// <summary>
         /// Обработчик нажатия кнопки "Добавить тег"
         /// </summary>
+        /// <summary>
+        /// Обработчик нажатия кнопки "Добавить тег"
+        /// </summary>
         private void BtnAddTag_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -20,8 +24,8 @@ namespace SiemensTrend.Views
                 _logger.Info("Вызов диалога добавления тегов");
 
                 // Проверяем подключение к TIA Portal
-                if (!_viewModel.IsConnected && _viewModel.TiaPortalService == null)
-                    {
+                if (!_viewModel.IsConnected || _viewModel.TiaPortalService == null)
+                {
                     _logger.Warn("Попытка добавления тегов без подключения к TIA Portal");
                     MessageBox.Show("Необходимо сначала подключиться к TIA Portal",
                         "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -58,7 +62,6 @@ namespace SiemensTrend.Views
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
         /// <summary>
         /// Обработчик нажатия кнопки "Редактировать тег"
         /// </summary>
