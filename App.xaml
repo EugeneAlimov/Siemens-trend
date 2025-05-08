@@ -6,7 +6,6 @@
     <Application.Resources>
         <ResourceDictionary>
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-            <!-- Добавляем новый конвертер -->
             <converters:BoolToTagTypeConverter x:Key="BoolToTagTypeConverter"/>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Resources/Styles.xaml"/>

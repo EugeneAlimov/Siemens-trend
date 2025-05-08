@@ -8,6 +8,7 @@ using Siemens.Collaboration.Net;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Storage.TagManagement;
 using SiemensTrend.Communication;
+using SiemensTrend.Communication.TIA;
 using SiemensTrend.ViewModels;
 using SiemensTrend.Views;
 
@@ -32,7 +33,7 @@ namespace SiemensTrend
                 _logger.Info("Приложение запущено");
 
                 // Проверяем, что мы в STA потоке
-                if (System.Threading.Thread.CurrentThread.GetApartmentState() != System.Threading.ApartmentState.STA)
+                if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
                 {
                     _logger.Error("Приложение не запущено в режиме STA!");
                     MessageBox.Show("Приложение должно быть запущено в STA режиме для работы с TIA Portal Openness.",
@@ -72,12 +73,14 @@ namespace SiemensTrend
             services.AddSingleton<TagManager>(tagManager);
 
             // Создаем и регистрируем ICommunicationService
-            var tiaService = new Communication.TIA.TiaPortalCommunicationService(_logger);
+            var tiaService = new TiaPortalCommunicationService(_logger);
             services.AddSingleton<ICommunicationService>(tiaService);
 
+            // Регистрируем TiaPortalCommunicationService напрямую
+            services.AddSingleton<TiaPortalCommunicationService>(tiaService);
+
             // Регистрируем адаптер для TIA Portal
-            services.AddSingleton<Communication.TIA.TiaPortalServiceAdapter>(sp =>
-                new Communication.TIA.TiaPortalServiceAdapter(sp.GetRequiredService<ICommunicationService>(), _logger));
+            services.AddSingleton<TiaPortalServiceAdapter>();
 
             // Регистрируем ChartViewModel
             services.AddSingleton<ChartViewModel>();
@@ -91,7 +94,6 @@ namespace SiemensTrend
             // Создаем провайдер сервисов
             _serviceProvider = services.BuildServiceProvider();
         }
-        
         /// <summary>
         /// Инициализация Assembly Resolver для Siemens.Engineering.dll
         /// </summary>

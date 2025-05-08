@@ -134,6 +134,33 @@ namespace SiemensTrend.Communication.TIA
         }
 
         /// <summary>
+        /// Устанавливает текущий проект в XmlManager
+        /// </summary>
+        private void SetCurrentProjectInXmlManager()
+        {
+            try
+            {
+                _logger.Info("Установка текущего проекта в XmlManager");
+
+                // Так как XmlManager может быть не реализован или не использоваться,
+                // добавляем пустую реализацию или подставляем заглушку
+
+                // Пример заглушки:
+                // if (_xmlManager != null && _project != null)
+                // {
+                //     _xmlManager.SetCurrentProject(_project);
+                // }
+
+                // Если XmlManager не используется, можно просто добавить запись в лог
+                _logger.Info("SetCurrentProjectInXmlManager: Метод вызван, но не реализован (заглушка)");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при установке текущего проекта в XmlManager: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Чтение значения тега
         /// </summary>
         public async Task<object> ReadTagAsync(TagDefinition tag)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using SiemensTrend.Communication;
 using SiemensTrend.Communication.TIA;
@@ -13,38 +14,40 @@ using SiemensTrend.Storage.TagManagement;
 namespace SiemensTrend.ViewModels
 {
     /// <summary>
-    /// Main view model
+    /// Основная модель представления
     /// </summary>
-    public partial class MainViewModel : ViewModelBase
+    public class MainViewModel : ViewModelBase
     {
-        // Общие поля для всех частичных классов MainViewModel
+        // Общие поля
 
         /// <summary>
-        /// Logger for event recording
+        /// Логгер для записи событий
         /// </summary>
         protected readonly Logger _logger;
 
         /// <summary>
-        /// Service for communication with PLC
+        /// Сервис для коммуникации с ПЛК
         /// </summary>
         protected readonly ICommunicationService _communicationService;
 
         /// <summary>
-        /// Adapter for communication with TIA Portal
+        /// Адаптер для коммуникации с TIA Portal
         /// </summary>
-        private readonly Communication.TIA.TiaPortalServiceAdapter _tiaAdapter;
+        private readonly TiaPortalServiceAdapter _tiaAdapter;
 
         /// <summary>
         /// Свойство для доступа к адаптеру TIA Portal
         /// </summary>
-        public Communication.TIA.TiaPortalServiceAdapter TiaPortalService => _tiaAdapter;
+        public TiaPortalServiceAdapter TiaPortalService => _tiaAdapter;
 
         /// <summary>
-        /// Tag manager for manual tag management
+        /// Управление тегами
         /// </summary>
         protected readonly TagManager _tagManager;
 
-        /// Свойство для объединенного списка тегов
+        /// <summary>
+        /// Объединенный список тегов
+        /// </summary>
         private ObservableCollection<TagDefinition> _allTags;
 
         private bool _isConnected;
@@ -78,7 +81,7 @@ namespace SiemensTrend.ViewModels
         private ObservableCollection<TagDefinition> _dbTags;
 
         /// <summary>
-        /// Connection status
+        /// Статус подключения
         /// </summary>
         public bool IsConnected
         {
@@ -87,7 +90,7 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Loading flag (operation in progress)
+        /// Флаг загрузки (операция в процессе)
         /// </summary>
         public bool IsLoading
         {
@@ -96,7 +99,7 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Status message
+        /// Статусное сообщение
         /// </summary>
         public string StatusMessage
         {
@@ -105,7 +108,7 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Progress value (0-100)
+        /// Значение прогресса (0-100)
         /// </summary>
         public int ProgressValue
         {
@@ -114,7 +117,7 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Available tags
+        /// Доступные теги
         /// </summary>
         public ObservableCollection<TagDefinition> AvailableTags
         {
@@ -123,7 +126,7 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Monitored tags
+        /// Мониторируемые теги
         /// </summary>
         public ObservableCollection<TagDefinition> MonitoredTags
         {
@@ -132,7 +135,7 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// PLC tags
+        /// Теги ПЛК
         /// </summary>
         public ObservableCollection<TagDefinition> PlcTags
         {
@@ -141,7 +144,7 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// DB tags
+        /// Теги DB
         /// </summary>
         public ObservableCollection<TagDefinition> DbTags
         {
@@ -164,34 +167,33 @@ namespace SiemensTrend.ViewModels
         public List<TiaProjectInfo> TiaProjects { get; private set; } = new List<TiaProjectInfo>();
 
         /// <summary>
-        /// Chart view model
+        /// Модель представления графика
         /// </summary>
         public ChartViewModel ChartViewModel { get; }
 
         /// <summary>
-        /// Tags view model
+        /// Модель представления для работы с тегами
         /// </summary>
         public TagsViewModel TagsViewModel { get; }
 
         /// <summary>
-        /// Constructor
+        /// Конструктор
         /// </summary>
         public MainViewModel(
             Logger logger,
             ICommunicationService communicationService,
-            TiaPortalCommunicationService tiaPortalService,
+            TiaPortalServiceAdapter tiaAdapter,
             TagManager tagManager,
             ChartViewModel chartViewModel)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _communicationService = communicationService ?? throw new ArgumentNullException(nameof(communicationService));
-            _tiaPortalService = tiaPortalService ?? throw new ArgumentNullException(nameof(tiaPortalService));
+            _tiaAdapter = tiaAdapter ?? throw new ArgumentNullException(nameof(tiaAdapter));
             _tagManager = tagManager ?? throw new ArgumentNullException(nameof(tagManager));
             ChartViewModel = chartViewModel ?? throw new ArgumentNullException(nameof(chartViewModel));
 
             // Логируем информацию о типах сервисов
             _logger.Info($"MainViewModel: Инициализирован с коммуникационным сервисом типа {_communicationService.GetType().FullName}");
-            _logger.Info($"MainViewModel: Инициализирован с TIA Portal сервисом типа {_tiaPortalService.GetType().FullName}");
 
             // Инициализируем коллекции
             AvailableTags = new ObservableCollection<TagDefinition>();
@@ -469,7 +471,7 @@ namespace SiemensTrend.ViewModels
                 // Удаляем из мониторинга, если присутствует
                 if (MonitoredTags.Contains(tag))
                 {
-                    MonitoredTags.Remove(tag);
+                    RemoveTagFromMonitoring(tag);
                 }
 
                 // Обновляем объединенный список тегов
@@ -623,20 +625,288 @@ namespace SiemensTrend.ViewModels
         }
 
         /// <summary>
-        /// Current project name
+        /// Соединение с TIA Portal
+        /// </summary>
+        /// <returns>True если подключение успешно</returns>
+        public bool ConnectToTiaPortal()
+        {
+            try
+            {
+                IsLoading = true;
+                StatusMessage = "Проверка запущенных экземпляров TIA Portal...";
+                ProgressValue = 10;
+
+                _logger.Info("Запрос подключения к TIA Portal через адаптер");
+
+                // Получаем список открытых проектов
+                StatusMessage = "Получение списка открытых проектов...";
+                _logger.Info("Запрос списка открытых проектов");
+
+                // ВАЖНО: используем синхронные вызовы для TIA Portal API через адаптер
+                List<TiaProjectInfo> openProjects = _tiaAdapter.GetOpenProjects();
+                _logger.Info($"Получено {openProjects.Count} открытых проектов");
+                ProgressValue = 50;
+
+                // Сохраняем список проектов для последующего выбора
+                TiaProjects = openProjects;
+
+                // Для MainWindow - возвращаем false, чтобы показать диалог выбора проекта
+                // Даже если есть только один проект, мы всё равно покажем диалог
+                if (openProjects.Count > 0)
+                {
+                    StatusMessage = $"Найдено {openProjects.Count} открытых проектов TIA Portal";
+                    _logger.Info($"Найдено {openProjects.Count} открытых проектов. Возвращаем список для выбора.");
+                    ProgressValue = 60;
+                    IsLoading = false;
+                    return false;
+                }
+                else
+                {
+                    // Нет открытых проектов
+                    StatusMessage = "Открытые проекты не найдены. Выберите файл проекта...";
+                    _logger.Info("Открытые проекты не найдены. Потребуется выбрать файл.");
+                    ProgressValue = 60;
+                    IsLoading = false;
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при поиске проектов TIA Portal: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"Внутренняя ошибка: {ex.InnerException.Message}");
+                }
+                StatusMessage = "Ошибка при поиске проектов TIA Portal";
+                ProgressValue = 0;
+                IsConnected = false;
+                IsLoading = false;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Подключение к конкретному проекту TIA Portal
+        /// </summary>
+        /// <param name="projectInfo">Информация о проекте</param>
+        /// <returns>True если подключение успешно</returns>
+        public bool ConnectToSpecificTiaProject(TiaProjectInfo projectInfo)
+        {
+            try
+            {
+                if (projectInfo == null)
+                {
+                    _logger.Error("ConnectToSpecificTiaProject: projectInfo не может быть null");
+                    return false;
+                }
+
+                IsLoading = true;
+                StatusMessage = $"Подключение к проекту {projectInfo.Name}...";
+                _logger.Info($"ConnectToSpecificTiaProject: Подключение к проекту {projectInfo.Name}");
+                ProgressValue = 60;
+
+                // Используем адаптер для подключения к проекту
+                bool result = _tiaAdapter.ConnectToSpecificTiaProject(projectInfo);
+
+                if (result)
+                {
+                    // Успешное подключение
+                    StatusMessage = $"Подключено к проекту: {projectInfo.Name}";
+                    _logger.Info($"ConnectToSpecificTiaProject: Успешное подключение к проекту: {projectInfo.Name}");
+                    ProgressValue = 100;
+                    IsConnected = true;
+
+                    return true;
+                }
+                else
+                {
+                    // Ошибка подключения
+                    StatusMessage = "Ошибка при подключении к TIA Portal";
+                    _logger.Error("ConnectToSpecificTiaProject: Ошибка при подключении к TIA Portal");
+                    ProgressValue = 0;
+                    IsConnected = false;
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"ConnectToSpecificTiaProject: Ошибка при подключении к проекту {projectInfo?.Name}: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"ConnectToSpecificTiaProject: Внутренняя ошибка: {ex.InnerException.Message}");
+                }
+                StatusMessage = ($"Ошибка при подключении к проекту {projectInfo?.Name}");
+                ProgressValue = 0;
+                IsConnected = false;
+                return false;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Открытие проекта TIA Portal
+        /// </summary>
+        /// <param name="projectPath">Путь к файлу проекта TIA Portal</param>
+        /// <returns>True если проект успешно открыт</returns>
+        public bool OpenTiaProject(string projectPath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(projectPath))
+                {
+                    _logger.Error("OpenTiaProject: путь к проекту не может быть пустым");
+                    return false;
+                }
+
+                IsLoading = true;
+                StatusMessage = $"Открытие проекта TIA Portal...";
+                _logger.Info($"OpenTiaProject: Открытие проекта {projectPath}");
+                ProgressValue = 20;
+
+                // Предупреждаем пользователя о длительной операции
+                StatusMessage = "Открытие проекта TIA Portal. Это может занять некоторое время...";
+                ProgressValue = 30;
+
+                // Открытие проекта через адаптер
+                _logger.Info("OpenTiaProject: Начинаем открытие проекта");
+                bool result = _tiaAdapter.OpenTiaProject(projectPath);
+                _logger.Info($"OpenTiaProject: Результат открытия проекта: {result}");
+
+                // Обрабатываем результат
+                if (result)
+                {
+                    // Успешное открытие
+                    string projectName = System.IO.Path.GetFileNameWithoutExtension(projectPath);
+                    StatusMessage = $"Проект TIA Portal открыт успешно: {projectName}";
+                    _logger.Info($"OpenTiaProject: Проект успешно открыт: {projectName}");
+                    ProgressValue = 100;
+                    IsConnected = true;  // Важно: явно устанавливаем этот флаг!
+                }
+                else
+                {
+                    StatusMessage = "Ошибка при открытии проекта TIA Portal";
+                    _logger.Error("OpenTiaProject: Ошибка при открытии проекта TIA Portal");
+                    ProgressValue = 0;
+                    IsConnected = false;
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"OpenTiaProject: Ошибка при открытии проекта TIA Portal: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _logger.Error($"OpenTiaProject: Внутренняя ошибка: {ex.InnerException.Message}");
+                }
+                StatusMessage = "Ошибка при открытии проекта TIA Portal";
+                ProgressValue = 0;
+                IsConnected = false;
+                return false;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        /// <summary>
+        /// Отключение от ПЛК
+        /// </summary>
+        public void Disconnect()
+        {
+            if (IsLoading || !IsConnected)
+                return;
+
+            try
+            {
+                _communicationService.Disconnect();
+                StatusMessage = "Отключено от ПЛК";
+
+                // Очищаем списки тегов
+                AvailableTags.Clear();
+                MonitoredTags.Clear();
+                PlcTags.Clear();
+                DbTags.Clear();
+
+                IsConnected = false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при отключении: {ex.Message}");
+                StatusMessage = "Ошибка при отключении";
+            }
+        }
+
+        /// <summary>
+        /// Начало мониторинга выбранных тегов
+        /// </summary>
+        public async Task StartMonitoringAsync()
+        {
+            if (!IsConnected || MonitoredTags.Count == 0)
+                return;
+
+            try
+            {
+                // Останавливаем мониторинг, если он уже запущен
+                await StopMonitoringAsync();
+
+                StatusMessage = "Запуск мониторинга...";
+
+                // Устанавливаем интервал опроса в миллисекундах
+                // (можно добавить настройку в UI)
+                _communicationService.PollingIntervalMs = 1000;
+
+                // Запускаем мониторинг
+                await _communicationService.StartMonitoringAsync(MonitoredTags);
+                StatusMessage = $"Мониторинг запущен для {MonitoredTags.Count} тегов";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при запуске мониторинга: {ex.Message}");
+                StatusMessage = "Ошибка при запуске мониторинга";
+            }
+        }
+
+        /// <summary>
+        /// Остановка мониторинга
+        /// </summary>
+        public async Task StopMonitoringAsync()
+        {
+            if (!IsConnected)
+                return;
+
+            try
+            {
+                StatusMessage = "Остановка мониторинга...";
+                await _communicationService.StopMonitoringAsync();
+                StatusMessage = "Мониторинг остановлен";
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Ошибка при остановке мониторинга: {ex.Message}");
+                StatusMessage = "Ошибка при остановке мониторинга";
+            }
+        }
+
+        /// <summary>
+        /// Текущее имя проекта
         /// </summary>
         public string CurrentProjectName
         {
             get
             {
-                if (_tiaPortalService != null && _tiaPortalService.CurrentProject != null)
-                    return _tiaPortalService.CurrentProject.Name;
-                return "No project";
+                if (_tiaAdapter != null && _tiaAdapter.CurrentProject != null)
+                    return _tiaAdapter.CurrentProject.Name;
+                return "Нет проекта";
             }
         }
 
         /// <summary>
-        /// Maximum number of tags for monitoring
+        /// Максимальное количество тегов для мониторинга
         /// </summary>
         public int MaxMonitoredTags => 10;
     }

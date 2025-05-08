@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Siemens.Engineering;
 using SiemensTrend.Core.Logging;
 using SiemensTrend.Core.Models;
@@ -45,23 +44,6 @@ namespace SiemensTrend.Communication.TIA
         public TiaPortal TiaPortalInstance => _tiaService.TiaPortalInstance;
 
         /// <summary>
-        /// Соединение с TIA Portal
-        /// </summary>
-        public bool ConnectToTiaPortal()
-        {
-            try
-            {
-                _logger.Info("Адаптер: Подключение к TIA Portal");
-                return _tiaService.ConnectToTiaPortal();
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Адаптер: Ошибка при подключении к TIA Portal: {ex.Message}");
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Получение открытых проектов TIA Portal
         /// </summary>
         public List<TiaProjectInfo> GetOpenProjects()
@@ -86,7 +68,7 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 _logger.Info($"Адаптер: Подключение к проекту {projectInfo?.Name ?? "null"}");
-                return _tiaService.ConnectToSpecificTiaProject(projectInfo);
+                return _tiaService.ConnectToProject(projectInfo);
             }
             catch (Exception ex)
             {
@@ -103,7 +85,7 @@ namespace SiemensTrend.Communication.TIA
             try
             {
                 _logger.Info($"Адаптер: Открытие проекта {projectPath}");
-                return _tiaService.OpenTiaProject(projectPath);
+                return _tiaService.OpenProjectSync(projectPath);
             }
             catch (Exception ex)
             {
